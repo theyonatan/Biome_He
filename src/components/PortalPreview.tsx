@@ -11,6 +11,7 @@ type PortalPreviewProps = {
   isEntering: boolean
   isSettingsOpen?: boolean
   glowRgb: string
+  portalSceneGlowRgb: string
   onShrinkComplete: () => void
 }
 
@@ -23,6 +24,7 @@ const PortalPreview = ({
   isEntering,
   isSettingsOpen = false,
   glowRgb,
+  portalSceneGlowRgb,
   onShrinkComplete
 }: PortalPreviewProps) => {
   const coreRef = useRef<HTMLDivElement>(null)
@@ -73,9 +75,6 @@ const PortalPreview = ({
               style={{ backgroundImage: `url("${image}")` }}
             />
           )}
-          {/* Vortex overlay: rendered at 70% opacity on hover so the scene image
-              darkens underneath the additive-blended streaks. The vortex canvas is
-              physically reparented here by VortexHost when this component mounts. */}
           {hoverContent && (
             <div
               className={`absolute inset-0 rounded-[inherit] transition-opacity duration-200 ${isHovered ? 'opacity-70' : 'opacity-0'}`}
@@ -85,7 +84,13 @@ const PortalPreview = ({
           )}
         </div>
       </div>
-      <PortalSparks glowRgb={glowRgb} isHovered={isHovered} visible={true} coreRef={coreRef} />
+      <PortalSparks
+        glowRgb={glowRgb}
+        hoverGlowRgb={portalSceneGlowRgb}
+        isHovered={isHovered}
+        visible={true}
+        coreRef={coreRef}
+      />
     </div>
   )
 }

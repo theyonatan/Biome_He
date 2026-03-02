@@ -83,6 +83,7 @@ in vec2 v_uv;
 in float v_brightness;
 
 uniform vec3 u_glowColor;
+uniform float u_colorBoost;
 
 out vec4 fragColor;
 
@@ -93,13 +94,23 @@ void main() {
   float alpha = 1.0 - smoothstep(0.0, 1.0, d);
   alpha *= alpha;
 
-  float coreMix = smoothstep(0.4, 0.0, d);
-  vec3 color = mix(u_glowColor, vec3(1.0), coreMix);
+  // Saturate the glow color: the scene average is naturally washed out,
+  // so we push it away from its luminance toward the dominant hue.
+  float lum = dot(u_glowColor, vec3(0.299, 0.587, 0.114));
+  vec3 saturated = mix(vec3(lum), u_glowColor, 1.0 + u_colorBoost * 1.5);
+  saturated = max(saturated, 0.0);
+
+  // coreMix: 1.0 at center (white hot), 0.0 at edge (glow color).
+  // When boosted, shrink the white core to let the tint show through.
+  float coreMix = smoothstep(0.4, 0.0, d) * (1.0 - u_colorBoost * 0.6);
+  vec3 color = mix(saturated, vec3(1.0), coreMix);
 
   // Output premultiplied RGB with zero alpha. With premultipliedAlpha: true,
   // the browser composites as: result = canvas.rgb + page.rgb * (1 - 0),
   // giving pure additive blending with no dark halo.
-  float a = alpha * v_brightness;
+  // When color-boosted, slightly reduce brightness to preserve color.
+  float intensityScale = mix(1.0, 0.7, u_colorBoost);
+  float a = alpha * v_brightness * intensityScale;
   fragColor = vec4(color * a, 0.0);
 }
 `
@@ -228,6 +239,7 @@ export class PortalSparksRenderer {
   private vbo: WebGLBuffer | null = null
   private ibo: WebGLBuffer | null = null
   private glowColorLoc: WebGLUniformLocation | null = null
+  private colorBoostLoc: WebGLUniformLocation | null = null
 
   private particles: Float32Array
   private quadVerts: Float32Array
@@ -242,6 +254,7 @@ export class PortalSparksRenderer {
   private glowG = 0.81
   private glowB = 0.96
   private intensity = 1.0
+  private colorBoost = 0.0
   private contextLost = false
 
   // Edge map: points stored in local coords (relative to core center)
@@ -325,6 +338,7 @@ export class PortalSparksRenderer {
     }
     this.program = prog
     this.glowColorLoc = gl.getUniformLocation(prog, 'u_glowColor')
+    this.colorBoostLoc = gl.getUniformLocation(prog, 'u_colorBoost')
 
     this.vao = gl.createVertexArray()!
     gl.bindVertexArray(this.vao)
@@ -444,6 +458,10 @@ export class PortalSparksRenderer {
     this.glowR = r / 255
     this.glowG = g / 255
     this.glowB = b / 255
+  }
+
+  setColorBoost(boost: number): void {
+    this.colorBoost = Math.max(0, Math.min(1, boost))
   }
 
   setIntensity(multiplier: number): void {
@@ -621,6 +639,7 @@ export class PortalSparksRenderer {
 
     gl.useProgram(this.program)
     gl.uniform3f(this.glowColorLoc, this.glowR, this.glowG, this.glowB)
+    gl.uniform1f(this.colorBoostLoc, this.colorBoost)
 
     gl.bindVertexArray(this.vao)
     gl.drawElements(gl.TRIANGLES, indexCount, gl.UNSIGNED_INT, 0)

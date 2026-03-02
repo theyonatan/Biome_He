@@ -80,6 +80,7 @@ const AppShell = () => {
   const useMainBackground = !isStreamingUi
   const backgroundBlurPx = isMainUi ? (isSettingsOpen ? 14 : 2) : 0
   const portalGlowRgb = useSceneGlowColor(images, currentIndex)
+  const nextSceneGlowRgb = useSceneGlowColor(images, nextIndex)
   const showMenuHome = isMainUi && !isConnected && !isSettingsOpen && !showInstallLog
   const showMenuSettings = isMainUi && !isConnected && isSettingsOpen
   const showInstallLogView = isMainUi && !isConnected && showInstallLog
@@ -185,6 +186,7 @@ const AppShell = () => {
                 isEntering={isPortalEntering}
                 isSettingsOpen={!isConnected && isSettingsOpen}
                 glowRgb={portalGlowRgb}
+                portalSceneGlowRgb={nextSceneGlowRgb}
                 onShrinkComplete={completePortalShrink}
               />
             </div>

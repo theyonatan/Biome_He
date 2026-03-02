@@ -3,9 +3,18 @@ import { PortalSparksRenderer } from '../lib/portalSparksRenderer'
 
 type PortalSparksProps = {
   glowRgb: string
+  hoverGlowRgb: string
   isHovered: boolean
   visible: boolean
   coreRef: RefObject<HTMLDivElement | null>
+}
+
+function parseRgb(rgb: string): [number, number, number] | null {
+  const parts = rgb.split(',').map((s) => parseFloat(s.trim()))
+  if (parts.length >= 3 && parts.every((n) => !isNaN(n))) {
+    return [parts[0], parts[1], parts[2]]
+  }
+  return null
 }
 
 // The core is rotated by -8deg. We know the base (un-transformed) size from
@@ -40,30 +49,23 @@ function measureCore(canvas: HTMLCanvasElement, core: HTMLDivElement) {
   return { coreW, coreH, coreCx, coreCy }
 }
 
-const PortalSparks = ({ glowRgb, isHovered, visible, coreRef }: PortalSparksProps) => {
+const PortalSparks = ({ glowRgb, hoverGlowRgb, isHovered, visible, coreRef }: PortalSparksProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rendererRef = useRef<PortalSparksRenderer | null>(null)
   const rafRef = useRef<number>(0)
   const lastTimeRef = useRef<number>(0)
   const lastCoreSizeRef = useRef<{ w: number; h: number }>({ w: 0, h: 0 })
 
-  // Parse glowRgb and update renderer
+  // Update glow color — use portal scene color on hover, background color otherwise
   useEffect(() => {
     const renderer = rendererRef.current
     if (!renderer) return
 
-    const parts = glowRgb.split(',').map((s) => parseFloat(s.trim()))
-    if (parts.length >= 3 && parts.every((n) => !isNaN(n))) {
-      renderer.setGlowColor(parts[0], parts[1], parts[2])
-    }
-  }, [glowRgb])
-
-  // Update intensity on hover/entering
-  useEffect(() => {
-    const renderer = rendererRef.current
-    if (!renderer) return
+    const rgb = parseRgb(isHovered ? hoverGlowRgb : glowRgb)
+    if (rgb) renderer.setGlowColor(rgb[0], rgb[1], rgb[2])
     renderer.setIntensity(isHovered ? 1.5 : 1.0)
-  }, [isHovered])
+    renderer.setColorBoost(isHovered ? 1.0 : 0.0)
+  }, [glowRgb, hoverGlowRgb, isHovered])
 
   // Init renderer, ResizeObserver, rAF loop
   useEffect(() => {
@@ -76,9 +78,9 @@ const PortalSparks = ({ glowRgb, isHovered, visible, coreRef }: PortalSparksProp
     rendererRef.current = renderer
 
     // Apply initial glow color
-    const parts = glowRgb.split(',').map((s) => parseFloat(s.trim()))
-    if (parts.length >= 3 && parts.every((n) => !isNaN(n))) {
-      renderer.setGlowColor(parts[0], parts[1], parts[2])
+    const rgb = parseRgb(isHovered ? hoverGlowRgb : glowRgb)
+    if (rgb) {
+      renderer.setGlowColor(rgb[0], rgb[1], rgb[2])
     }
     renderer.setIntensity(isHovered ? 1.5 : 1.0)
 
