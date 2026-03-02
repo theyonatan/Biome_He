@@ -122,8 +122,16 @@ void main() {
     color = vec3(0.2, 0.4, 1.0);
   } else if (ct < 2.5) {
     color = vec3(0.1, 0.55, 1.0);
-  } else {
+  } else if (ct < 3.5) {
     color = vec3(0.55, 0.75, 1.0);
+  } else if (ct < 4.5) {
+    color = vec3(0.95, 0.08, 0.08);
+  } else if (ct < 5.5) {
+    color = vec3(1.0, 0.2, 0.15);
+  } else if (ct < 6.5) {
+    color = vec3(1.0, 0.1, 0.05);
+  } else {
+    color = vec3(1.0, 0.55, 0.45);
   }
 
   fragColor = vec4(color * v_brightness, v_brightness);
@@ -201,7 +209,7 @@ const INDICES_PER_QUAD = 6
  * @param resetZ If true, spawn near z=0 (far end). If false, spread across full depth
  *               (used for initial population to avoid a visible wave of particles).
  */
-function randomParticle(out: Float32Array, offset: number, resetZ: boolean): void {
+function randomParticle(out: Float32Array, offset: number, resetZ: boolean, error = false): void {
   out[offset + P_ANGLE] = Math.random() * Math.PI * 2
   out[offset + P_RADIUS] = VORTEX_RADIUS_MIN + Math.random() * (VORTEX_RADIUS_MAX - VORTEX_RADIUS_MIN)
   out[offset + P_Z] = resetZ ? Math.random() * 0.05 : Math.random()
@@ -214,7 +222,8 @@ function randomParticle(out: Float32Array, offset: number, resetZ: boolean): voi
   out[offset + P_WIDTH] = VORTEX_WIDTH_MIN + Math.random() * (VORTEX_WIDTH_MAX - VORTEX_WIDTH_MIN)
 
   const roll = Math.random()
-  out[offset + P_COLOR_TYPE] = roll < 0.4 ? 0 : roll < 0.65 ? 1 : roll < 0.85 ? 2 : 3
+  const baseType = roll < 0.4 ? 0 : roll < 0.65 ? 1 : roll < 0.85 ? 2 : 3
+  out[offset + P_COLOR_TYPE] = error ? baseType + 4 : baseType
 }
 
 export class VortexRenderer {
@@ -254,6 +263,7 @@ export class VortexRenderer {
   private viewWarpX = 1
   private viewWarpY = 1
   private speedMultiplier = 1
+  private _errorMode = false
 
   settings: VortexSettings = { ...DEFAULT_SETTINGS }
 
@@ -454,6 +464,16 @@ export class VortexRenderer {
     this.speedMultiplier = Math.max(0.1, Math.min(5, Number.isFinite(multiplier) ? multiplier : 1))
   }
 
+  setErrorMode(error: boolean): void {
+    this._errorMode = error
+  }
+
+  respawnAllParticles(): void {
+    for (let i = 0; i < this._activeCount; i++) {
+      randomParticle(this.particles, i * FLOATS_PER_PARTICLE, false, this._errorMode)
+    }
+  }
+
   get activeCount(): number {
     return this._activeCount
   }
@@ -467,7 +487,7 @@ export class VortexRenderer {
     if (this._activeCount < this._targetCount) {
       const toAdd = this._targetCount - this._activeCount
       for (let i = 0; i < toAdd; i++) {
-        randomParticle(this.particles, (this._activeCount + i) * FLOATS_PER_PARTICLE, false)
+        randomParticle(this.particles, (this._activeCount + i) * FLOATS_PER_PARTICLE, false, this._errorMode)
       }
       this._activeCount += toAdd
     }
@@ -490,7 +510,7 @@ export class VortexRenderer {
           i--
           continue
         } else {
-          randomParticle(this.particles, off, true)
+          randomParticle(this.particles, off, true, this._errorMode)
         }
       }
 

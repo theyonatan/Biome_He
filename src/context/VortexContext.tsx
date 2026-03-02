@@ -27,6 +27,7 @@ const PARTICLE_COUNTS: Record<VortexMode, number> = {
 type VortexContextValue = {
   claimCanvas: (container: HTMLElement, mode: VortexMode) => void
   releaseCanvas: () => void
+  setErrorMode: (error: boolean) => void
 }
 
 const VortexContext = createContext<VortexContextValue | null>(null)
@@ -139,20 +140,21 @@ export function VortexProvider({ children }: { children: ReactNode }) {
       renderer.setTargetCount(PARTICLE_COUNTS[mode])
       renderer.setViewWarp(1, 1)
       renderer.setSpeedMultiplier(1)
+      renderer.setErrorMode(false)
+      renderer.respawnAllParticles()
       lastSizeRef.current = { w: 0, h: 0 }
 
       resizeObserverRef.current?.disconnect()
       resizeObserverRef.current = new ResizeObserver(() => syncSize())
       resizeObserverRef.current.observe(container)
       syncSize()
-      syncViewWarp()
 
       if (rafRef.current == null && !document.hidden) {
         lastTimeRef.current = 0
         rafRef.current = requestAnimationFrame(frame)
       }
     },
-    [syncSize, syncViewWarp, frame]
+    [syncSize, frame]
   )
 
   const releaseCanvas = useCallback(() => {
@@ -169,7 +171,13 @@ export function VortexProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  return <VortexContext.Provider value={{ claimCanvas, releaseCanvas }}>{children}</VortexContext.Provider>
+  const setErrorMode = useCallback((error: boolean) => {
+    rendererRef.current?.setErrorMode(error)
+  }, [])
+
+  return (
+    <VortexContext.Provider value={{ claimCanvas, releaseCanvas, setErrorMode }}>{children}</VortexContext.Provider>
+  )
 }
 
 export function useVortex() {

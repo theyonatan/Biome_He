@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useMemo, useState } from 'react'
 import { invoke, listen } from '../bridge'
 import { usePortal } from '../context/PortalContext'
 import { useStreaming } from '../context/StreamingContext'
+import { useVortex } from '../context/VortexContext'
 import { useConfig } from '../hooks/useConfig'
 import OverlayModal from './ui/OverlayModal'
 import Button from './ui/Button'
@@ -15,6 +16,7 @@ type TerminalDisplayProps = {
 const TerminalDisplay = ({ onCancel, keepVisible = false }: TerminalDisplayProps) => {
   const { state, states } = usePortal()
   const { connectionState, statusStage, engineError, error, cancelConnection, endpointUrl } = useStreaming()
+  const { setErrorMode } = useVortex()
   const { isServerMode, getUrl } = useConfig()
   const [showLogsPanel, setShowLogsPanel] = useState(false)
   const logsPanelHeight = 260
@@ -28,6 +30,12 @@ const TerminalDisplay = ({ onCancel, keepVisible = false }: TerminalDisplayProps
   const [fallbackStage, setFallbackStage] = useState<{ id: string; label: string; percent: number } | null>(null)
 
   const errorDetail = engineError || error
+
+  useEffect(() => {
+    setErrorMode(!!errorDetail)
+    return () => setErrorMode(false)
+  }, [errorDetail, setErrorMode])
+
   const currentStage = statusStage ?? fallbackStage
   const progressPercent = currentStage ? Math.max(0, Math.min(100, Math.round(currentStage.percent))) : 0
   const statusText = useMemo(() => {
