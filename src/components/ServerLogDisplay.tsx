@@ -69,7 +69,26 @@ const ServerLogDisplay = ({
     }
   }, [disableLiveIpc])
 
+  const autoScrollRef = useRef(true)
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const onScroll = () => {
+      autoScrollRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 30
+    }
+    el.addEventListener('scroll', onScroll)
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [])
+
   const visibleLogs = externalLogs ?? logs
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (el && autoScrollRef.current) {
+      el.scrollTop = el.scrollHeight
+    }
+  }, [visibleLogs])
 
   return (
     <div
