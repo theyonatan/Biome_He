@@ -73,7 +73,7 @@ const ServerLogDisplay = ({
 
   return (
     <div
-      className={`flex flex-col overflow-hidden ${isLoadingInline ? 'static w-full h-full max-h-none border border-[rgba(255,255,255,0.55)] bg-[rgba(0,0,0,0.72)] opacity-100 !animate-none' : 'absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[70%] max-h-[50%] z-100 bg-[rgba(8,12,16,0.95)] border border-warm/30 rounded-[1.42cqh] opacity-0 animate-[serverLogFadeIn_0.3s_ease_forwards] shadow-[0_0_30px_rgba(0,0,0,0.6),0_0_15px_rgba(255,200,100,0.1)]'}`}
+      className={`flex flex-col overflow-hidden ${isLoadingInline ? 'static w-full h-full max-h-[70vh] border border-[rgba(255,255,255,0.55)] bg-[rgba(0,0,0,0.72)] opacity-100 !animate-none' : 'absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[70%] max-h-[50%] z-100 bg-[rgba(8,12,16,0.95)] border border-warm/30 rounded-[1.42cqh] opacity-0 animate-[serverLogFadeIn_0.3s_ease_forwards] shadow-[0_0_30px_rgba(0,0,0,0.6),0_0_15px_rgba(255,200,100,0.1)]'}`}
     >
       <div
         className={`flex items-center gap-[1.42cqh] px-[2.13cqh] py-[0.8cqh] ${isLoadingInline ? 'bg-[rgba(255,255,255,0.08)] border-b border-[rgba(255,255,255,0.2)] justify-between' : 'bg-warm/8 border-b border-warm/20'}`}
@@ -90,10 +90,19 @@ const ServerLogDisplay = ({
         </div>
         {headerAction}
       </div>
-      {showProgress && progressMessage && (
+      {progressMessage && (
         <div className="flex items-center gap-[1.78cqh] px-[2.13cqh] py-[0.8cqh] bg-hud/8 border-b border-hud/20">
-          <div className="animate-spin w-[2.13cqh] h-[2.13cqh] border-2 border-hud/30 border-t-hud/90 rounded-full" />
-          <span className="font-mono text-[1.96cqh] text-hud/90">{progressMessage}</span>
+          {showProgress ? (
+            <div className="animate-spin w-[2.13cqh] h-[2.13cqh] border-2 border-hud/30 border-t-hud/90 rounded-full" />
+          ) : (
+            <div
+              className={`w-[1.42cqh] h-[1.42cqh] rounded-full ${errorMessage ? 'bg-error/90' : 'bg-hot/90'}`}
+              aria-hidden="true"
+            />
+          )}
+          <span className={`font-mono text-[1.96cqh] ${errorMessage ? 'text-error/90' : 'text-hud/90'}`}>
+            {progressMessage}
+          </span>
         </div>
       )}
       {errorMessage && (

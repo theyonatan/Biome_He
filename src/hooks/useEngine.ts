@@ -35,7 +35,7 @@ export const useEngine = (): UseEngineResult => {
   const checkStatus = useCallback(async () => {
     try {
       setError(null)
-      const engineStatus = await invoke('check-engine-status')
+      const engineStatus = await invoke('check-engine-status', 'useEngine.checkStatus')
       setStatus(engineStatus)
       return engineStatus
     } catch (err) {
@@ -49,7 +49,10 @@ export const useEngine = (): UseEngineResult => {
       setIsLoading(true)
       setError(null)
       setSetupProgress('Installing uv...')
-      return await invoke('install-uv')
+      const result = await invoke('install-uv')
+      const statusAfter = await invoke('check-engine-status', 'useEngine.installUv.post')
+      setStatus(statusAfter)
+      return result
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
       throw err
@@ -64,7 +67,10 @@ export const useEngine = (): UseEngineResult => {
       setIsLoading(true)
       setError(null)
       setSetupProgress('Setting up server components...')
-      return await invoke('setup-server-components')
+      const result = await invoke('setup-server-components')
+      const statusAfter = await invoke('check-engine-status', 'useEngine.setupServerComponents.post')
+      setStatus(statusAfter)
+      return result
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
       throw err
@@ -79,7 +85,10 @@ export const useEngine = (): UseEngineResult => {
       setIsLoading(true)
       setError(null)
       setSetupProgress('Syncing dependencies...')
-      return await invoke('sync-engine-dependencies')
+      const result = await invoke('sync-engine-dependencies')
+      const statusAfter = await invoke('check-engine-status', 'useEngine.syncDependencies.post')
+      setStatus(statusAfter)
+      return result
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
       throw err
@@ -95,7 +104,7 @@ export const useEngine = (): UseEngineResult => {
       setError(null)
 
       setSetupProgress('Checking uv installation...')
-      const currentStatus = await invoke('check-engine-status')
+      const currentStatus = await invoke('check-engine-status', 'useEngine.setupEngine.pre')
 
       if (!currentStatus.uv_installed) {
         setSetupProgress('Installing uv...')
@@ -109,7 +118,7 @@ export const useEngine = (): UseEngineResult => {
       await invoke('sync-engine-dependencies')
 
       setSetupProgress('Verifying setup...')
-      const finalStatus = await invoke('check-engine-status')
+      const finalStatus = await invoke('check-engine-status', 'useEngine.setupEngine.post')
       setStatus(finalStatus)
 
       setSetupProgress(null)
@@ -128,7 +137,7 @@ export const useEngine = (): UseEngineResult => {
       setServerStarting(true)
       setError(null)
       const result = await invoke('start-engine-server', port)
-      const newStatus = await invoke('check-engine-status')
+      const newStatus = await invoke('check-engine-status', 'useEngine.startServer.post')
       setStatus(newStatus)
       return result
     } catch (err) {
@@ -143,7 +152,7 @@ export const useEngine = (): UseEngineResult => {
     try {
       setError(null)
       const result = await invoke('stop-engine-server')
-      const newStatus = await invoke('check-engine-status')
+      const newStatus = await invoke('check-engine-status', 'useEngine.stopServer.post')
       setStatus(newStatus)
       return result
     } catch (err) {
@@ -156,7 +165,7 @@ export const useEngine = (): UseEngineResult => {
     try {
       const running = await invoke('is-server-running')
       if (status?.server_running !== running) {
-        const newStatus = await invoke('check-engine-status')
+        const newStatus = await invoke('check-engine-status', 'useEngine.checkServerRunning.delta')
         setStatus(newStatus)
       }
       return running

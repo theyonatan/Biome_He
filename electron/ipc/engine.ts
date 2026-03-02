@@ -1,7 +1,8 @@
-import { ipcMain, shell } from 'electron'
+import { ipcMain, shell, BrowserWindow } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
+import { createInterface } from 'node:readline'
 import { getEngineDir, getUvDir, getResourcePath } from '../lib/paths.js'
 import { getUvBinaryPath, getUvEnvVars } from '../lib/uv.js'
 import { getHiddenWindowOptions, getUvArchiveName, getVenvPythonPath } from '../lib/platform.js'
@@ -10,6 +11,59 @@ import { getServerState } from '../lib/serverState.js'
 const UV_VERSION = '0.9.26'
 
 const SERVER_COMPONENT_FILES = ['server.py', 'pyproject.toml', 'engine_manager.py', 'safety.py']
+
+function emitToAllWindows(channel: string, ...args: unknown[]): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    win.webContents.send(channel, ...args)
+  }
+}
+
+function logEngineToConsoleAndUi(message: string): void {
+  console.log(message)
+  emitToAllWindows('server-log', message)
+}
+
+async function runUvSyncWithMirroredLogs(uvBinary: string, cwd: string, env: NodeJS.ProcessEnv): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(uvBinary, ['sync', '--verbose', '--index-strategy', 'unsafe-best-match'], {
+      cwd,
+      env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      ...getHiddenWindowOptions()
+    })
+
+    const tail: string[] = []
+    const handleLine = (line: string, isStderr: boolean) => {
+      const prefixed = `[ENGINE] ${line}`
+      if (isStderr) {
+        console.error(prefixed)
+      } else {
+        console.log(prefixed)
+      }
+      emitToAllWindows('server-log', prefixed)
+      tail.push(prefixed)
+      if (tail.length > 80) tail.shift()
+    }
+
+    if (child.stdout) {
+      const rl = createInterface({ input: child.stdout })
+      rl.on('line', (line) => handleLine(line, false))
+    }
+    if (child.stderr) {
+      const rl = createInterface({ input: child.stderr })
+      rl.on('line', (line) => handleLine(line, true))
+    }
+
+    child.on('error', (err) => reject(err))
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolve()
+        return
+      }
+      reject(new Error(`uv sync failed (exit ${code ?? 'unknown'})\n${tail.join('\n')}`))
+    })
+  })
+}
 
 /** Unpack bundled server files to the engine directory */
 function unpackServerFilesInner(force: boolean): string {
@@ -108,7 +162,9 @@ async function installUv(): Promise<string> {
 }
 
 export function registerEngineIpc(): void {
-  ipcMain.handle('check-engine-status', () => {
+  ipcMain.handle('check-engine-status', (_event, source?: string) => {
+    const caller = source ?? 'unknown'
+    logEngineToConsoleAndUi(`[ENGINE] check-engine-status: start (caller=${caller})`)
     const engineDir = getEngineDir()
     const uvBinary = getUvBinaryPath()
     const uvDir = getUvDir()
@@ -118,13 +174,16 @@ export function registerEngineIpc(): void {
     let uvInstalled = false
     if (fs.existsSync(uvBinary)) {
       try {
+        logEngineToConsoleAndUi('[ENGINE] check-engine-status: validating uv binary...')
         execFileSync(uvBinary, ['--version'], {
           ...getHiddenWindowOptions(),
           stdio: 'pipe'
         })
         uvInstalled = true
+        logEngineToConsoleAndUi('[ENGINE] check-engine-status: uv binary ok')
       } catch {
         uvInstalled = false
+        logEngineToConsoleAndUi('[ENGINE] check-engine-status: uv binary validation failed')
       }
     }
 
@@ -140,6 +199,9 @@ export function registerEngineIpc(): void {
       const pythonPath = getVenvPythonPath(engineDir)
       if (fs.existsSync(pythonPath)) {
         try {
+          logEngineToConsoleAndUi(
+            '[ENGINE] check-engine-status: validating synced dependencies via uv run python --version...'
+          )
           execFileSync(uvBinary, ['run', 'python', '--version'], {
             cwd: engineDir,
             env: { ...process.env, ...uvEnv, UV_FROZEN: '1' },
@@ -147,8 +209,10 @@ export function registerEngineIpc(): void {
             stdio: 'pipe'
           })
           dependenciesSynced = true
+          logEngineToConsoleAndUi('[ENGINE] check-engine-status: dependency validation ok')
         } catch {
           dependenciesSynced = false
+          logEngineToConsoleAndUi('[ENGINE] check-engine-status: dependency validation failed')
         }
       }
     }
@@ -160,7 +224,7 @@ export function registerEngineIpc(): void {
 
     const serverLogPath = path.join(engineDir, 'server.log')
 
-    return {
+    const result = {
       uv_installed: uvInstalled,
       repo_cloned: repoCloned,
       dependencies_synced: dependenciesSynced,
@@ -168,6 +232,8 @@ export function registerEngineIpc(): void {
       server_port: serverPort,
       server_log_path: serverLogPath
     }
+    logEngineToConsoleAndUi(`[ENGINE] check-engine-status: result ${JSON.stringify(result)}`)
+    return result
   })
 
   ipcMain.handle('install-uv', async () => {
@@ -190,7 +256,7 @@ export function registerEngineIpc(): void {
     return 'Server components installed'
   })
 
-  ipcMain.handle('sync-engine-dependencies', () => {
+  ipcMain.handle('sync-engine-dependencies', async () => {
     const engineDir = getEngineDir()
     const uvDir = getUvDir()
     const uvBinary = getUvBinaryPath()
@@ -209,19 +275,15 @@ export function registerEngineIpc(): void {
       throw new Error('uv is not installed. Please install it first.')
     }
 
-    const output = execFileSync(uvBinary, ['sync', '--index-strategy', 'unsafe-best-match'], {
-      cwd: engineDir,
-      env: {
-        ...process.env,
-        ...uvEnv,
-        UV_LINK_MODE: 'copy',
-        UV_NO_EDITABLE: '1',
-        UV_MANAGED_PYTHON: '1'
-      },
-      ...getHiddenWindowOptions(),
-      stdio: 'pipe',
-      maxBuffer: 50 * 1024 * 1024
+    logEngineToConsoleAndUi('[ENGINE] Running uv sync for engine dependencies...')
+    await runUvSyncWithMirroredLogs(uvBinary, engineDir, {
+      ...process.env,
+      ...uvEnv,
+      UV_LINK_MODE: 'copy',
+      UV_NO_EDITABLE: '1',
+      UV_MANAGED_PYTHON: '1'
     })
+    logEngineToConsoleAndUi('[ENGINE] uv sync finished for engine dependencies')
 
     return 'Dependencies synced successfully'
   })
@@ -246,19 +308,15 @@ export function registerEngineIpc(): void {
       fs.mkdirSync(path.join(uvDir, subdir), { recursive: true })
     }
 
-    execFileSync(getUvBinaryPath(), ['sync', '--index-strategy', 'unsafe-best-match'], {
-      cwd: engineDir,
-      env: {
-        ...process.env,
-        ...uvEnv,
-        UV_LINK_MODE: 'copy',
-        UV_NO_EDITABLE: '1',
-        UV_MANAGED_PYTHON: '1'
-      },
-      ...getHiddenWindowOptions(),
-      stdio: 'pipe',
-      maxBuffer: 50 * 1024 * 1024
+    logEngineToConsoleAndUi('[ENGINE] Running uv sync during setup-engine...')
+    await runUvSyncWithMirroredLogs(getUvBinaryPath(), engineDir, {
+      ...process.env,
+      ...uvEnv,
+      UV_LINK_MODE: 'copy',
+      UV_NO_EDITABLE: '1',
+      UV_MANAGED_PYTHON: '1'
     })
+    logEngineToConsoleAndUi('[ENGINE] uv sync finished during setup-engine')
 
     return 'Engine setup complete'
   })

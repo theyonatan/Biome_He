@@ -28,7 +28,7 @@ export type IpcCommandMap = {
   'list-model-availability': { args: [modelIds: string[]]; return: ModelAvailability[] }
 
   // Engine
-  'check-engine-status': { args: []; return: EngineStatus }
+  'check-engine-status': { args: [source?: string]; return: EngineStatus }
   'install-uv': { args: []; return: string }
   'setup-server-components': { args: []; return: string }
   'sync-engine-dependencies': { args: []; return: string }

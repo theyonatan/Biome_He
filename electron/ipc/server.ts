@@ -1,5 +1,5 @@
 import { ipcMain, BrowserWindow } from 'electron'
-import { spawn, execFileSync } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import { createInterface } from 'node:readline'
 import fs from 'node:fs'
 import net from 'node:net'
@@ -53,6 +53,42 @@ function processLogLine(line: string, _isStderr: boolean): void {
   }
 }
 
+async function runUvSyncWithMirroredLogs(uvBinary: string, cwd: string, env: NodeJS.ProcessEnv): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(uvBinary, ['sync', '--verbose', '--index-strategy', 'unsafe-best-match'], {
+      cwd,
+      env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      ...getHiddenWindowOptions()
+    })
+
+    const tail: string[] = []
+    const onLine = (line: string, isStderr: boolean) => {
+      processLogLine(`[UV] ${line}`, isStderr)
+      tail.push(line)
+      if (tail.length > 80) tail.shift()
+    }
+
+    if (child.stdout) {
+      const rl = createInterface({ input: child.stdout })
+      rl.on('line', (line) => onLine(line, false))
+    }
+    if (child.stderr) {
+      const rl = createInterface({ input: child.stderr })
+      rl.on('line', (line) => onLine(line, true))
+    }
+
+    child.on('error', (err) => reject(err))
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolve()
+        return
+      }
+      reject(new Error(`uv sync failed (exit ${code ?? 'unknown'})\n${tail.join('\n')}`))
+    })
+  })
+}
+
 export function registerServerIpc(): void {
   ipcMain.handle('start-engine-server', async (_event, port: number) => {
     const engineDir = getEngineDir()
@@ -98,12 +134,9 @@ export function registerServerIpc(): void {
     // Run uv sync before starting
     console.log('[ENGINE] Syncing dependencies...')
     try {
-      execFileSync(uvBinary, ['sync', '--index-strategy', 'unsafe-best-match'], {
-        cwd: engineDir,
-        env: { ...process.env, ...uvEnv },
-        ...getHiddenWindowOptions(),
-        stdio: 'pipe',
-        maxBuffer: 50 * 1024 * 1024
+      await runUvSyncWithMirroredLogs(uvBinary, engineDir, {
+        ...process.env,
+        ...uvEnv
       })
       console.log('[ENGINE] Dependencies synced successfully')
     } catch (err) {

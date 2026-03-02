@@ -81,7 +81,7 @@ const AppShell = () => {
   const backgroundBlurPx = isMainUi ? (isSettingsOpen ? 14 : 2) : 0
   const portalGlowRgb = useSceneGlowColor(images, currentIndex)
   const showMenuHome = isMainUi && !isConnected && !isSettingsOpen && !showInstallLog
-  const showMenuSettings = isMainUi && !isConnected && isSettingsOpen && !showInstallLog
+  const showMenuSettings = isMainUi && !isConnected && isSettingsOpen
   const showInstallLogView = isMainUi && !isConnected && showInstallLog
   const loadingProgressPercent = Math.max(0, Math.min(100, Math.round(statusStage?.percent ?? 0)))
   const loadingLayerStyle = {
@@ -215,20 +215,40 @@ const AppShell = () => {
           <MenuSettingsView
             onBack={toggleSettings}
             onFixEngine={() => {
-              if (isSettingsOpen) toggleSettings()
               setShowInstallLog(true)
             }}
           />
         )}
         {showInstallLogView && (
-          <div className="absolute inset-0 z-[9] pointer-events-auto">
-            <ServerLogDisplay
-              showProgress={true}
-              progressMessage={setupProgress || 'Installing World Engine...'}
-              errorMessage={engineSetupError}
-              showDismiss={!engineSetupInProgress}
-              onDismiss={() => setShowInstallLog(false)}
-            />
+          <div className="absolute inset-0 z-[12] pointer-events-none flex items-center justify-center bg-[rgba(2,6,16,0.62)] backdrop-blur-sm">
+            <div className="w-[135.11cqh] max-w-[92vw] pointer-events-auto">
+              <ServerLogDisplay
+                variant="loading-inline"
+                title="WORLD ENGINE INSTALL"
+                showProgress={engineSetupInProgress}
+                progressMessage={
+                  engineSetupInProgress
+                    ? setupProgress || 'Installing World Engine...'
+                    : engineSetupError
+                      ? 'World Engine installation failed.'
+                      : 'World Engine installation complete.'
+                }
+                errorMessage={engineSetupError}
+                showDismiss={false}
+                headerAction={
+                  !engineSetupInProgress ? (
+                    <button
+                      type="button"
+                      className="loading-inline-logs-close"
+                      onClick={() => setShowInstallLog(false)}
+                      aria-label="Close install logs"
+                    >
+                      Close
+                    </button>
+                  ) : null
+                }
+              />
+            </div>
           </div>
         )}
 
