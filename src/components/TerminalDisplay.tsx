@@ -7,6 +7,9 @@ import OverlayModal from './ui/OverlayModal'
 import Button from './ui/Button'
 import ServerLogDisplay from './ServerLogDisplay'
 
+const INLINE_ERROR_MAX_LENGTH = 80
+const ERROR_DETAIL_CLASS = 'font-serif text-[3.2cqh] leading-[1.15] text-[rgba(255,205,205,0.96)]'
+
 type TerminalDisplayProps = {
   onCancel?: (options?: { shutdownHosted?: boolean }) => void
 }
@@ -120,26 +123,20 @@ const TerminalDisplay = ({ onCancel }: TerminalDisplayProps) => {
     <>
       <div className="terminal-display absolute z-55 flex flex-col items-center top-auto bottom-[var(--edge-bottom)] left-1/2 -translate-x-1/2 gap-[1.6cqh] opacity-100 !animate-none w-[135.11cqh]">
         <div className="flex flex-col items-center gap-[0.55cqh] w-[135.11cqh]">
-          {errorDetail && errorDetail.length >= 80 && (
-            <div className="max-w-[117.35cqh] text-center font-serif text-[3.2cqh] leading-[1.15] text-[rgba(255,205,205,0.96)]">
-              {errorDetail}
-            </div>
-          )}
-          <div
-            className={`w-full ${errorDetail && errorDetail.length < 80 ? 'flex items-baseline justify-between' : ''}`}
-          >
+          <div className="w-full flex items-baseline justify-between">
             <div
-              className={`font-serif text-[4.62cqh] font-normal tracking-[0.01em] normal-case text-white [text-shadow:0_1px_4px_rgba(0,0,0,0.45)] ${errorDetail && errorDetail.length < 80 ? 'text-left' : 'text-center'}`}
+              className="font-serif text-[4.62cqh] font-normal tracking-[0.01em] normal-case text-white [text-shadow:0_1px_4px_rgba(0,0,0,0.45)] text-left"
               id="terminal-status"
             >
               {statusText}
             </div>
-            {errorDetail && errorDetail.length < 80 && (
-              <div className="font-serif text-[3.2cqh] leading-[1.15] text-[rgba(255,205,205,0.96)] whitespace-nowrap">
-                {errorDetail}
-              </div>
+            {errorDetail && errorDetail.length < INLINE_ERROR_MAX_LENGTH && (
+              <div className={`${ERROR_DETAIL_CLASS} whitespace-nowrap`}>{errorDetail}</div>
             )}
           </div>
+          {errorDetail && errorDetail.length >= INLINE_ERROR_MAX_LENGTH && (
+            <div className={`w-full text-left ${ERROR_DETAIL_CLASS}`}>{errorDetail}</div>
+          )}
 
           <div className="flex items-center w-[135.11cqh] mx-auto justify-center">
             <div className="relative overflow-hidden w-full h-[0.9cqh] m-0 border border-[rgba(255,255,255,0.78)] bg-[rgba(255,255,255,0.08)] before:hidden">
