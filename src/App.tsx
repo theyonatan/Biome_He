@@ -168,7 +168,6 @@ const AppShell = () => {
             onClick={handleLaunch}
             role="button"
             tabIndex={0}
-            aria-label="Enter the Overworld"
             onKeyDown={(event) => {
               if (event.key === 'Enter' || event.key === ' ') {
                 event.preventDefault()
@@ -189,11 +188,6 @@ const AppShell = () => {
                 onShrinkComplete={completePortalShrink}
               />
             </div>
-            {showMenuHome && (
-              <div className="portal-subtitle text-center font-serif text-[3.91cqh] tracking-[0.03em] text-[rgb(255,255,255)] [text-shadow:0_1px_4px_rgba(0,0,0,0.35)]">
-                Enter the Overworld
-              </div>
-            )}
           </div>
         )}
         {showMenuHome && (
