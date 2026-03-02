@@ -11,21 +11,21 @@
  */
 
 // --- Tuning constants ---
-const MAX_PARTICLES = 400
-const SPAWN_RATE = 180 // particles per second at intensity 1.0
-const LIFETIME_MIN = 0.35
-const LIFETIME_MAX = 0.9
-const TANGENT_SPEED_MIN = 80 // CSS px/s — along the ring (primary)
-const TANGENT_SPEED_MAX = 180
-const RADIAL_SPEED_MIN = 15 // CSS px/s — gentle outward drift
-const RADIAL_SPEED_MAX = 45
+const MAX_PARTICLES = 900
+const SPAWN_RATE = 600 // particles per second at intensity 1.0
+const LIFETIME_MIN = 0.2
+const LIFETIME_MAX = 0.6
+const TANGENT_SPEED_MIN = 120 // CSS px/s — along the ring (primary)
+const TANGENT_SPEED_MAX = 260
+const RADIAL_SPEED_MIN = 25 // CSS px/s — gentle outward drift
+const RADIAL_SPEED_MAX = 65
 // Elliptical gravity: pulls particles back toward the ring.
 // Tuned so tangentSpeed ≈ omega * radius gives near-circular orbits
 // that gradually spiral out due to the radial kick.
 const GRAVITY_STRENGTH = 2.5 // ω² for the harmonic oscillator
 const SIZE_MIN = 3.0 // px (before DPR)
 const SIZE_MAX = 7.0
-const STREAK_ASPECT = 3.0
+const STREAK_ASPECT = 8.0
 const BRIGHTNESS_MIN = 0.7
 const BRIGHTNESS_MAX = 1.0
 const HOT_SPARK_CHANCE = 0.12
