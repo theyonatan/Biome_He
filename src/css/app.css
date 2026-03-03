@@ -152,47 +152,6 @@
     align-items: center;
     background: #000;
   }
-
-  a {
-    color: #24c8db;
-    text-decoration: none;
-  }
-  a:hover {
-    color: #6ee7ef;
-  }
-
-  input,
-  button {
-    border-radius: 6px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 0.5em 1em;
-    font-size: 1em;
-    font-family: inherit;
-    color: #fff;
-    background-color: rgba(255, 255, 255, 0.05);
-    transition:
-      color 0.2s ease,
-      background-color 0.2s ease,
-      border-color 0.2s ease,
-      outline-width 0.2s ease;
-  }
-
-  input:focus {
-    border-color: rgba(0, 255, 255, 0.4);
-    outline: 2px solid rgba(0, 255, 255, 0.4);
-  }
-
-  button {
-    cursor: pointer;
-    background: rgba(0, 255, 255, 0.1);
-    border-color: rgba(0, 255, 255, 0.3);
-  }
-
-  button:hover {
-    background: rgba(0, 255, 255, 0.2);
-    border-color: rgba(0, 255, 255, 0.5);
-    outline: 2px solid rgba(0, 255, 255, 0.5);
-  }
 }
 
 /* ============================================
