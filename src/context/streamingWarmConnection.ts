@@ -1,5 +1,6 @@
 type WarmConnectionOptions = {
   standalonePort: number
+  currentServerPort: number | null
   isStandaloneMode: boolean
   endpointUrl: string | null
   gpuServer: { host: string; port: number; use_ssl?: boolean }
@@ -11,6 +12,7 @@ type WarmConnectionOptions = {
     uv_installed?: boolean
     repo_cloned?: boolean
     dependencies_synced?: boolean
+    server_port?: number | null
   } | null>
   startServer: (port: number) => Promise<unknown>
   connect: (wsUrl: string) => void
@@ -25,6 +27,7 @@ const CONNECTIVITY_RETRY_DELAY_MS = 450
 
 const STARTUP_HEALTH_POLL_INTERVAL_MS = 500
 const STARTUP_HEALTH_TIMEOUT_MS = 120_000
+const STANDALONE_PORT_SCAN_LIMIT = 1337
 
 const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
@@ -106,8 +109,24 @@ const waitForHealthy = async (
   throw new Error('Server startup timeout - check logs for errors')
 }
 
+const findFirstOpenStandalonePort = async (
+  startPort: number,
+  checkPortInUse: (port: number) => Promise<boolean>,
+  log: { info: (...args: unknown[]) => void }
+): Promise<number | null> => {
+  for (let i = 0; i < STANDALONE_PORT_SCAN_LIMIT; i++) {
+    const port = startPort + i
+    const inUse = await checkPortInUse(port)
+    if (!inUse) return port
+
+    log.info(`Port ${port} is in use; skipping`)
+  }
+  return null
+}
+
 export const runWarmConnectionFlow = async ({
   standalonePort,
+  currentServerPort,
   isStandaloneMode,
   endpointUrl,
   gpuServer,
@@ -122,59 +141,29 @@ export const runWarmConnectionFlow = async ({
   isCancelled,
   log
 }: WarmConnectionOptions): Promise<void> => {
-  const standaloneUrl = `localhost:${standalonePort}`
-  const rawEndpoint = isStandaloneMode ? standaloneUrl : endpointUrl || `${gpuServer.host}:${gpuServer.port}`
+  const rawEndpoint = endpointUrl || `${gpuServer.host}:${gpuServer.port}`
   const preferSecureTransport = isStandaloneMode ? false : Boolean(gpuServer.use_ssl)
-  const wsUrl = normalizeWsEndpoint(rawEndpoint, preferSecureTransport)
+  let wsUrl = normalizeWsEndpoint(rawEndpoint, preferSecureTransport)
 
   if (isStandaloneMode) {
     log.info('Standalone mode enabled, checking server state...')
+    let selectedPort = standalonePort
 
-    const serverAlreadyReady = await checkServerReady()
-    if (serverAlreadyReady) {
-      log.info('Server already running and ready')
-    } else {
-      const portInUse = await checkPortInUse(standalonePort)
-      if (portInUse) {
-        log.info(`Port ${standalonePort} already in use - waiting for health endpoint`)
-        try {
-          await waitForHealthy(wsUrl, probeServerHealthViaMain, isCancelled, log)
-          if (isCancelled()) return
-        } catch (err) {
-          if (isCancelled()) return
-          onServerError(
-            new Error(
-              `Port ${standalonePort} is already in use, but no healthy standalone server responded at ${toHealthUrl(wsUrl)}.`
-            )
-          )
-          return
-        }
-      } else if (isServerRunning) {
-        log.info('Server running but not ready - polling health...')
-        try {
-          await waitForHealthy(wsUrl, probeServerHealthViaMain, isCancelled, log)
-          if (isCancelled()) return
-        } catch (err) {
-          if (isCancelled()) return
-          onServerError(err)
-          return
-        }
-      } else {
-        log.info('Starting server on port', standalonePort)
+    // Only attach to an already-running server when it's Biome's managed process.
+    if (isServerRunning) {
+      selectedPort = currentServerPort ?? selectedPort
+      if (!currentServerPort) {
         const status = await checkEngineStatus()
-        if (!status?.uv_installed || !status?.repo_cloned || !status?.dependencies_synced) {
-          const missing: string[] = []
-          if (!status?.uv_installed) missing.push('uv package manager')
-          if (!status?.repo_cloned) missing.push('engine files')
-          if (!status?.dependencies_synced) missing.push('dependencies')
-          const missingStr = missing.join(', ')
-          onServerError(new Error(`Engine not ready: missing ${missingStr}. Please reinstall in Settings.`))
-          return
-        }
+        if (status?.server_port) selectedPort = status.server_port
+      }
+      wsUrl = normalizeWsEndpoint(`localhost:${selectedPort}`, false)
 
+      const serverAlreadyReady = await checkServerReady()
+      if (serverAlreadyReady) {
+        log.info('Managed standalone server already running and ready on port', selectedPort)
+      } else {
+        log.info('Managed standalone server running but not ready; polling health on port', selectedPort)
         try {
-          await startServer(standalonePort)
-          log.info('Server started, polling health until ready...')
           await waitForHealthy(wsUrl, probeServerHealthViaMain, isCancelled, log)
           if (isCancelled()) return
         } catch (err) {
@@ -182,6 +171,41 @@ export const runWarmConnectionFlow = async ({
           onServerError(err)
           return
         }
+      }
+    } else {
+      const openPort = await findFirstOpenStandalonePort(standalonePort, checkPortInUse, log)
+      if (openPort === null) {
+        onServerError(
+          new Error(
+            `No open standalone port found in range ${standalonePort}-${standalonePort + STANDALONE_PORT_SCAN_LIMIT - 1}.`
+          )
+        )
+        return
+      }
+      selectedPort = openPort
+      wsUrl = normalizeWsEndpoint(`localhost:${selectedPort}`, false)
+
+      const status = await checkEngineStatus()
+      if (!status?.uv_installed || !status?.repo_cloned || !status?.dependencies_synced) {
+        const missing: string[] = []
+        if (!status?.uv_installed) missing.push('uv package manager')
+        if (!status?.repo_cloned) missing.push('engine files')
+        if (!status?.dependencies_synced) missing.push('dependencies')
+        const missingStr = missing.join(', ')
+        onServerError(new Error(`Engine not ready: missing ${missingStr}. Please reinstall in Settings.`))
+        return
+      }
+
+      try {
+        log.info('Starting standalone server on port', selectedPort)
+        await startServer(selectedPort)
+        log.info('Server started, polling health until ready...')
+        await waitForHealthy(wsUrl, probeServerHealthViaMain, isCancelled, log)
+        if (isCancelled()) return
+      } catch (err) {
+        if (isCancelled()) return
+        onServerError(err)
+        return
       }
     }
   }

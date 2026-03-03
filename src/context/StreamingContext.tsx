@@ -42,6 +42,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     startServer,
     stopServer,
     isServerRunning,
+    serverPort,
     isReady: engineReady,
     checkStatus: checkEngineStatus,
     checkServerReady,
@@ -291,6 +292,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
 
     runWarmConnectionFlow({
       standalonePort,
+      currentServerPort: serverPort,
       isStandaloneMode,
       endpointUrl,
       gpuServer: config.gpu_server,
