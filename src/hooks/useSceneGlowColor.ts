@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 
-const DEFAULT_GLOW_RGB = '140, 206, 244'
+const DEFAULT_GLOW_RGB: [number, number, number] = [140, 206, 244]
 
-const useSceneGlowColor = (images: string[], currentIndex: number): string => {
-  const [glowRgb, setGlowRgb] = useState(DEFAULT_GLOW_RGB)
+const useSceneGlowColor = (images: string[], currentIndex: number): [number, number, number] => {
+  const [glowRgb, setGlowRgb] = useState<[number, number, number]>(DEFAULT_GLOW_RGB)
 
   useEffect(() => {
     const src = images[currentIndex]
@@ -59,7 +59,7 @@ const useSceneGlowColor = (images: string[], currentIndex: number): string => {
       const glowG = Math.round(Math.min(255, avgG * 0.78 + 255 * 0.22))
       const glowB = Math.round(Math.min(255, avgB * 0.78 + 255 * 0.22))
 
-      setGlowRgb(`${glowR}, ${glowG}, ${glowB}`)
+      setGlowRgb([glowR, glowG, glowB])
     }
 
     image.src = src

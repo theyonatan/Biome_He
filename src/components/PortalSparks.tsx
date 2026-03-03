@@ -2,19 +2,11 @@ import { useEffect, useRef, type RefObject } from 'react'
 import { PortalSparksRenderer } from '../lib/portalSparksRenderer'
 
 type PortalSparksProps = {
-  glowRgb: string
-  hoverGlowRgb: string
+  glowRgb: [number, number, number]
+  hoverGlowRgb: [number, number, number]
   isHovered: boolean
   visible: boolean
   coreRef: RefObject<HTMLDivElement | null>
-}
-
-function parseRgb(rgb: string): [number, number, number] | null {
-  const parts = rgb.split(',').map((s) => parseFloat(s.trim()))
-  if (parts.length >= 3 && parts.every((n) => !isNaN(n))) {
-    return [parts[0], parts[1], parts[2]]
-  }
-  return null
 }
 
 // The core is rotated by -8deg. We know the base (un-transformed) size from
@@ -61,8 +53,8 @@ const PortalSparks = ({ glowRgb, hoverGlowRgb, isHovered, visible, coreRef }: Po
     const renderer = rendererRef.current
     if (!renderer) return
 
-    const rgb = parseRgb(isHovered ? hoverGlowRgb : glowRgb)
-    if (rgb) renderer.setGlowColor(rgb[0], rgb[1], rgb[2])
+    const rgb = isHovered ? hoverGlowRgb : glowRgb
+    renderer.setGlowColor(rgb[0], rgb[1], rgb[2])
     renderer.setIntensity(isHovered ? 1.5 : 1.0)
     renderer.setColorBoost(isHovered ? 1.0 : 0.0)
   }, [glowRgb, hoverGlowRgb, isHovered])
@@ -78,10 +70,8 @@ const PortalSparks = ({ glowRgb, hoverGlowRgb, isHovered, visible, coreRef }: Po
     rendererRef.current = renderer
 
     // Apply initial glow color
-    const rgb = parseRgb(isHovered ? hoverGlowRgb : glowRgb)
-    if (rgb) {
-      renderer.setGlowColor(rgb[0], rgb[1], rgb[2])
-    }
+    const rgb = isHovered ? hoverGlowRgb : glowRgb
+    renderer.setGlowColor(rgb[0], rgb[1], rgb[2])
     renderer.setIntensity(isHovered ? 1.5 : 1.0)
 
     // Resize handler — rebuilds backing store and edge map (shape detection)

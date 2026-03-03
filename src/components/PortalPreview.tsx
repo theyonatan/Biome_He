@@ -10,8 +10,8 @@ type PortalPreviewProps = {
   isShrinking: boolean
   isEntering: boolean
   isSettingsOpen?: boolean
-  glowRgb: string
-  portalSceneGlowRgb: string
+  glowRgb: [number, number, number]
+  portalSceneGlowRgb: [number, number, number]
   onShrinkComplete: () => void
 }
 
@@ -50,7 +50,7 @@ const PortalPreview = ({
   const portalStyle: CSSProperties = {
     ['--portal-offset-x' as string]: `${offset.x}px`,
     ['--portal-offset-y' as string]: `${offset.y}px`,
-    ['--portal-glow-rgb' as string]: glowRgb
+    ['--portal-glow-rgb' as string]: glowRgb.join(', ')
   }
 
   return (
