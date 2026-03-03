@@ -70,7 +70,7 @@ interface SceneCardProps {
 const SceneCard = ({ seed, thumbnailSrc, isPinned, pinVariant, onSelect, onTogglePin, onRemove }: SceneCardProps) => (
   <button
     type="button"
-    className="pause-scene-card group/scene relative"
+    className="w-full aspect-video rounded-[var(--radius-card)] border border-[var(--color-border-medium)] bg-[var(--color-surface-card)] p-0 cursor-pointer overflow-hidden group/scene relative"
     title={seed.filename}
     onClick={() => onSelect(seed.filename)}
   >

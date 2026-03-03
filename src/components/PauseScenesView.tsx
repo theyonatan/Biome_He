@@ -43,11 +43,11 @@ const PauseScenesView = ({
         </p>
         {uploadError && <p className="!mt-[0.6cqh] !text-[rgba(255,180,180,0.92)]">{uploadError}</p>}
         <input ref={fileInputRef} type="file" accept="image/*" onChange={onImageUpload} style={{ display: 'none' }} />
-        <div className="pause-scene-scroll pause-scene-scroll-main mt-[1.1cqh] relative z-[4]">
-          <div className="pause-scene-grid w-full">
+        <div className="pause-scene-scroll overflow-y-auto pr-[0.8cqh] max-h-[62cqh] mt-[1.1cqh] relative z-[4]">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(25.78cqh,1fr))] gap-[1.28cqh] w-full">
             <button
               type="button"
-              className={`pause-scene-add-card grid grid-cols-2 ${uploadingImage ? 'opacity-60 pointer-events-none' : ''}`}
+              className={`w-full aspect-video border border-[rgba(245,249,255,0.84)] bg-[rgba(248,248,245,0.14)] p-0 overflow-hidden grid grid-cols-2 ${uploadingImage ? 'opacity-60 pointer-events-none' : ''}`}
               onClick={(event) => event.preventDefault()}
             >
               <span
