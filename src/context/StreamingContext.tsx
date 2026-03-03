@@ -432,16 +432,6 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [isStandaloneMode, isServerRunning, stopServer])
 
-  const shutdownHostedServer = useCallback(async () => {
-    if (isStandaloneMode) return
-    log.info('Requesting hosted server shutdown via WS')
-    try {
-      await wsRequest('admin_shutdown')
-    } catch (err) {
-      log.error('Failed to send shutdown request via WS:', err)
-    }
-  }, [isStandaloneMode, wsRequest])
-
   const logout = useCallback(async () => {
     log.info('Logout initiated')
     cleanupState()
@@ -458,38 +448,18 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     await shutdown()
   }, [cleanupState, stopServerIfRunning, shutdown])
 
-  const cancelConnection = useCallback(
-    async (options?: { shutdownHosted?: boolean }) => {
-      log.info('Cancelling connection')
-      cleanupState()
-      await stopServerIfRunning()
-      if (options?.shutdownHosted) {
-        try {
-          await shutdownHostedServer()
-        } catch (err) {
-          log.error('Hosted shutdown failed:', err)
-        }
-      }
-      transitionTo(states.MAIN_MENU)
-    },
-    [cleanupState, stopServerIfRunning, shutdownHostedServer, transitionTo, states.MAIN_MENU]
-  )
+  const cancelConnection = useCallback(async () => {
+    log.info('Cancelling connection')
+    cleanupState()
+    await stopServerIfRunning()
+    transitionTo(states.MAIN_MENU)
+  }, [cleanupState, stopServerIfRunning, transitionTo, states.MAIN_MENU])
 
-  const prepareReturnToMainMenu = useCallback(
-    async (options?: { shutdownHosted?: boolean }) => {
-      log.info('Preparing return to main menu')
-      cleanupState()
-      await stopServerIfRunning()
-      if (options?.shutdownHosted) {
-        try {
-          await shutdownHostedServer()
-        } catch (err) {
-          log.error('Hosted shutdown failed:', err)
-        }
-      }
-    },
-    [cleanupState, stopServerIfRunning, shutdownHostedServer]
-  )
+  const prepareReturnToMainMenu = useCallback(async () => {
+    log.info('Preparing return to main menu')
+    cleanupState()
+    await stopServerIfRunning()
+  }, [cleanupState, stopServerIfRunning])
 
   const value: StreamingContextValue = {
     // Connection state

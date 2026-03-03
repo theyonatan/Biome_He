@@ -134,11 +134,11 @@ const AppShell = () => {
     }
   }
 
-  const handleCancelLoading = (options?: { shutdownHosted?: boolean }) => {
+  const handleCancelLoading = () => {
     if (isReturningToMenu || portalState !== portalStates.LOADING) return
     setIsReturningToMenu(true)
     setIsPortalHovered(false)
-    void prepareReturnToMainMenu(options)
+    void prepareReturnToMainMenu()
   }
 
   return (

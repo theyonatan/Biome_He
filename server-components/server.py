@@ -718,8 +718,6 @@ async def dispatch_request(msg: dict, websocket: WebSocket) -> dict:
         return await _handle_seeds_delete(msg)
     elif req_type == "seeds_rescan":
         return await _handle_seeds_rescan(msg)
-    elif req_type == "admin_shutdown":
-        return await _handle_admin_shutdown()
     elif req_type == "subscribe_logs":
         return await _handle_subscribe_logs(msg, websocket)
     else:
@@ -942,16 +940,6 @@ async def _handle_seeds_rescan(msg: dict) -> dict:
                 "safe_seeds": safe_count,
             },
         }
-
-
-async def _handle_admin_shutdown() -> dict:
-    async def _shutdown() -> None:
-        await asyncio.sleep(0.2)
-        os._exit(0)
-
-    asyncio.create_task(_shutdown())
-    logger.warning("[ADMIN] Hosted shutdown requested")
-    return {"success": True, "data": {"status": "shutting_down"}}
 
 
 # Per-websocket log queues are stored by dispatch; the subscribe handler just

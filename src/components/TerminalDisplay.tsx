@@ -2,8 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { useStreaming } from '../context/StreamingContext'
 import { useVortex } from '../context/VortexContext'
 import { useConfig } from '../hooks/useConfig'
-import { CONFIRM_BUTTON_BASE } from '../styles'
-import OverlayModal from './ui/OverlayModal'
 import Button from './ui/Button'
 import ServerLogDisplay from './ServerLogDisplay'
 
@@ -11,7 +9,7 @@ const INLINE_ERROR_MAX_LENGTH = 80
 const ERROR_DETAIL_CLASS = 'font-serif text-[3.2cqh] leading-[1.15] text-[rgba(255,205,205,0.96)]'
 
 type TerminalDisplayProps = {
-  onCancel?: (options?: { shutdownHosted?: boolean }) => void
+  onCancel?: () => void
 }
 
 const TerminalDisplay = ({ onCancel }: TerminalDisplayProps) => {
@@ -20,7 +18,6 @@ const TerminalDisplay = ({ onCancel }: TerminalDisplayProps) => {
   const { isServerMode } = useConfig()
   const [showLogsPanel, setShowLogsPanel] = useState(false)
   const logsPanelHeight = 260
-  const [showCancelModal, setShowCancelModal] = useState(false)
 
   const errorDetail = engineError || error
 
@@ -123,10 +120,6 @@ const TerminalDisplay = ({ onCancel }: TerminalDisplayProps) => {
               variant="danger"
               className="!animate-none flex items-center justify-center h-[4.9cqh] min-w-[12.5cqh] px-[1.8cqh] text-[2.45cqh] leading-none"
               onClick={() => {
-                if (isServerMode) {
-                  setShowCancelModal(true)
-                  return
-                }
                 if (onCancel) {
                   onCancel()
                   return
@@ -139,55 +132,6 @@ const TerminalDisplay = ({ onCancel }: TerminalDisplayProps) => {
           </div>
         </div>
       </div>
-
-      <OverlayModal
-        open={showCancelModal}
-        title="Cancel Loading"
-        onClose={() => setShowCancelModal(false)}
-        actions={
-          <>
-            <button
-              type="button"
-              className={`${CONFIRM_BUTTON_BASE} border border-[rgba(245,251,255,0.7)] bg-[rgba(8,12,20,0.18)] text-[rgba(245,251,255,0.95)]`}
-              onClick={() => setShowCancelModal(false)}
-            >
-              Keep Loading
-            </button>
-            <button
-              type="button"
-              className={`${CONFIRM_BUTTON_BASE} border border-[rgba(193,32,11,0.95)] bg-[rgba(156,23,8,0.9)] text-[rgba(255,240,240,0.98)]`}
-              onClick={() => {
-                setShowCancelModal(false)
-                if (onCancel) {
-                  onCancel()
-                  return
-                }
-                void cancelConnection()
-              }}
-            >
-              Cancel Only
-            </button>
-            <button
-              type="button"
-              className={`${CONFIRM_BUTTON_BASE} border border-[rgba(255,120,120,0.95)] bg-[rgba(150,0,0,0.62)] text-[rgba(255,245,245,0.98)]`}
-              onClick={() => {
-                setShowCancelModal(false)
-                if (onCancel) {
-                  onCancel({ shutdownHosted: true })
-                  return
-                }
-                void cancelConnection({ shutdownHosted: true })
-              }}
-            >
-              Cancel + Shutdown Hosted
-            </button>
-          </>
-        }
-      >
-        <p className="m-0 font-serif text-[2.4cqh] text-[rgba(233,242,255,0.88)]">
-          Choose whether to only cancel this client connection, or also request shutdown of the hosted server.
-        </p>
-      </OverlayModal>
     </>
   )
 }
