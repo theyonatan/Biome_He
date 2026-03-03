@@ -38,8 +38,8 @@ const PauseScenesView = ({
       <section className="absolute top-[var(--edge-top-xl)] left-[var(--edge-left)] w-[70%] z-[3] flex flex-col">
         <h2 className={`${HEADING_BASE} text-heading text-text-primary font-normal text-left`}>Scenes</h2>
         <p className="m-0 font-serif text-caption text-text-muted max-w-[103.12cqh] text-left">
-          All of your {seeds.length} {seeds.length === 1 ? 'scene' : 'scenes'}. Add more by using the + button, or by
-          drag/pasting them in.
+          All of your {seeds.length} {seeds.length === 1 ? 'scene' : 'scenes'}. Use the buttons to add more scenes, or
+          drag/paste them in.
         </p>
         {uploadError && <p className="!mt-[0.6cqh] !text-[rgba(255,180,180,0.92)]">{uploadError}</p>}
         <input ref={fileInputRef} type="file" accept="image/*" onChange={onImageUpload} style={{ display: 'none' }} />
