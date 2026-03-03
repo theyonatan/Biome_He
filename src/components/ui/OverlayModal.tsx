@@ -29,7 +29,7 @@ const OverlayModal = ({
           {onClose && (
             <button
               type="button"
-              className="border border-[rgba(245,251,255,0.7)] bg-[rgba(8,12,20,0.18)] text-[rgba(245,251,255,0.95)] font-serif text-[2.22cqh] px-[1.2cqh] py-[0.25cqh]"
+              className="cursor-pointer border border-[rgba(245,251,255,0.7)] bg-[rgba(8,12,20,0.18)] text-[rgba(245,251,255,0.95)] font-serif text-[2.22cqh] px-[1.2cqh] py-[0.25cqh]"
               onClick={onClose}
             >
               Close
