@@ -69,6 +69,7 @@ const createWindow = () => {
     resizable: true,
     center: true,
     frame: false,
+    show: false,
     backgroundColor: '#000000',
     title: 'Biome',
     icon: path.join(__dirname, '../../app-icon.png'),
@@ -116,6 +117,10 @@ const createWindow = () => {
     if (!mainWindow) return
     const [width, height] = mainWindow.getSize()
     mainWindow.webContents.send('window-resized', { width, height })
+  })
+
+  mainWindow.once('ready-to-show', () => {
+    mainWindow?.show()
   })
 
   mainWindow.on('closed', () => {
