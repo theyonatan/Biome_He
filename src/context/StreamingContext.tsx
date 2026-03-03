@@ -10,7 +10,7 @@ import {
 } from './streamingLifecycleMachine'
 import useWebSocket from '../hooks/useWebSocket'
 import useGameInput from '../hooks/useGameInput'
-import { useConfig, STANDALONE_PORT, ENGINE_MODES, DEFAULT_WORLD_ENGINE_MODEL } from '../hooks/useConfig'
+import { useConfig, ENGINE_MODES, DEFAULT_WORLD_ENGINE_MODEL } from '../hooks/useConfig'
 import useEngine from '../hooks/useEngine'
 import useSeeds from '../hooks/useSeeds'
 import { createLogger } from '../utils/logger'
@@ -36,7 +36,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
 
-  const { config, isStandaloneMode, engineMode } = useConfig()
+  const { config, isStandaloneMode, engineMode, standalonePort } = useConfig()
   const {
     status: engineStatus,
     startServer,
@@ -283,8 +283,6 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
       setEngineError(errorMsg)
       // Don't transition to main menu immediately - wait for user to dismiss the error
     }
-
-    const standalonePort = config.gpu_server?.port ?? STANDALONE_PORT
 
     // Clear WS logs before starting a new connection
     clearWsLogs()

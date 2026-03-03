@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { getConfigDir } from '../lib/paths.js'
 import type { AppConfig } from '../../src/types/app.js'
-import { STANDALONE_PORT, DEFAULT_WORLD_ENGINE_MODEL, ENGINE_MODES } from '../../src/constants/configShared.js'
+import { HOSTED_DEFAULT_PORT, DEFAULT_WORLD_ENGINE_MODEL, ENGINE_MODES } from '../../src/constants/configShared.js'
 
 const CONFIG_FILENAME = 'config.json'
 
@@ -18,7 +18,7 @@ function getConfigPath(): string {
 const defaultConfig: AppConfig = {
   gpu_server: {
     host: 'localhost',
-    port: STANDALONE_PORT,
+    port: HOSTED_DEFAULT_PORT,
     use_ssl: false
   },
   api_keys: {
