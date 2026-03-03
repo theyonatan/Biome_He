@@ -15,6 +15,10 @@ import { SPARK_TUNING } from './portalSparksTuning'
 // Edge map sampling resolution (width; height derived from aspect)
 const EDGE_SAMPLE_W = 128
 
+// Reference canvas CSS height used to normalize particle speeds and sizes
+// so the effect looks identical at any resolution.
+const REFERENCE_CANVAS_H = 720
+
 // Core border-radius from CSS: `43% 54% 46% 57% / 48% 55% 45% 52%`
 // Order: top-left, top-right, bottom-right, bottom-left
 const BORDER_RADII_X = [0.43, 0.54, 0.46, 0.57]
@@ -233,6 +237,7 @@ export class PortalSparksRenderer {
   private canvasW = 0
   private canvasH = 0
   private dpr = 1
+  private spatialScale = 1
   private glowR = 0.55
   private glowG = 0.81
   private glowB = 0.96
@@ -368,6 +373,7 @@ export class PortalSparksRenderer {
     this.canvasW = cssW
     this.canvasH = cssH
     this.dpr = dpr
+    this.spatialScale = cssH / REFERENCE_CANVAS_H
     const pw = Math.floor(cssW * dpr)
     const ph = Math.floor(cssH * dpr)
     if (this.canvas.width === pw && this.canvas.height === ph) return
@@ -460,8 +466,14 @@ export class PortalSparksRenderer {
 
     // --- Spawn ---
     this.spawnAccum += SPARK_TUNING.SPAWN_RATE * this.intensity * dtClamped
+    const ss = this.spatialScale
     while (this.spawnAccum >= 1 && this.activeCount < SPARK_TUNING.MAX_PARTICLES) {
-      spawnParticle(this.particles, this.activeCount * FLOATS_PER_PARTICLE, this.edgePoints, this.edgeCount)
+      const off = this.activeCount * FLOATS_PER_PARTICLE
+      spawnParticle(this.particles, off, this.edgePoints, this.edgeCount)
+      // Scale velocities and size so the effect looks the same at any resolution
+      this.particles[off + P_VX] *= ss
+      this.particles[off + P_VY] *= ss
+      this.particles[off + P_SIZE] *= ss
       this.activeCount++
       this.spawnAccum -= 1
     }
