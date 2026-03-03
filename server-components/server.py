@@ -670,7 +670,7 @@ async def health():
 # ============================================================================
 
 
-def _generate_thumbnail_jpeg_bytes(file_path: str, size: int = 80) -> bytes:
+def _generate_thumbnail_jpeg_bytes(file_path: str, size: int = 300) -> bytes:
     """Generate a square JPEG thumbnail and return bytes."""
     import io
 
@@ -771,7 +771,7 @@ async def _handle_seeds_list_with_thumbnails(msg: dict) -> dict:
 
         if include_thumbnail and file_path and os.path.exists(file_path):
             try:
-                thumb_bytes = await asyncio.to_thread(_generate_thumbnail_jpeg_bytes, file_path, 80)
+                thumb_bytes = await asyncio.to_thread(_generate_thumbnail_jpeg_bytes, file_path)
                 thumbnail_base64 = base64.b64encode(thumb_bytes).decode("ascii")
             except Exception as exc:
                 logger.error(f"Failed to generate thumbnail for {filename}: {exc}")
@@ -828,7 +828,7 @@ async def _handle_seeds_thumbnail(msg: dict) -> dict:
         return {"success": False, "error": "Seed file not found"}
 
     try:
-        thumbnail_bytes = await asyncio.to_thread(_generate_thumbnail_jpeg_bytes, file_path, 80)
+        thumbnail_bytes = await asyncio.to_thread(_generate_thumbnail_jpeg_bytes, file_path)
         thumbnail_base64 = base64.b64encode(thumbnail_bytes).decode("ascii")
         return {"success": True, "data": {"thumbnail_base64": thumbnail_base64}}
     except Exception as e:
