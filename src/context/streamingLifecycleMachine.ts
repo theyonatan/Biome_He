@@ -128,6 +128,7 @@ export const streamingLifecycleReducer = (
   const enteredLoading = inLoadingState && state.lastPortalState !== PORTAL_STATES.LOADING
   if (enteredLoading) {
     next.loadingConnectionRequestSeq = state.loadingConnectionRequestSeq + 1
+    next.loadingAttempted = false
     next.effects.clearEngineErrorOnLoadingEntry = true
     next.effects.runLoadingConnection = true
   }

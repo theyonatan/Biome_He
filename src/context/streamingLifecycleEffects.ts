@@ -33,6 +33,7 @@ type CreateHandlersArgs = {
   setEngineError: (value: string | null) => void
   setWarmConnectionJobSeq: (value: number) => void
   warmBootstrapSentRef: { current: boolean }
+  warmFlowCancelledRef: { current: boolean }
   setConnectionLost: (value: boolean) => void
   setSettingsOpen: (value: boolean) => void
   setIsPaused: (value: boolean) => void
@@ -57,6 +58,7 @@ export const createStreamingLifecycleEffectHandlers = ({
   setEngineError,
   setWarmConnectionJobSeq,
   warmBootstrapSentRef,
+  warmFlowCancelledRef,
   setConnectionLost,
   setSettingsOpen,
   setIsPaused,
@@ -74,6 +76,7 @@ export const createStreamingLifecycleEffectHandlers = ({
       log.info('Intentional reconnect in loading state - suppressing engine error')
     },
     loadingFailureError: (errorMsg) => {
+      if (warmFlowCancelledRef.current) return
       log.error('Connection error during loading state')
       setEngineError(errorMsg)
     },

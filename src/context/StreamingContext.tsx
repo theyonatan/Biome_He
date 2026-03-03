@@ -103,6 +103,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
   const inputLoopRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const lastAppliedModelRef = useRef<string | null>(null)
   const warmBootstrapSentRef = useRef(false)
+  const warmFlowCancelledRef = useRef(false)
 
   const hasReceivedFrame = frame !== null
   const isStreaming = state === states.STREAMING
@@ -276,9 +277,10 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (loadingConnectionJobSeq === 0) return
 
-    let cancelled = false
+    warmFlowCancelledRef.current = false
 
     const handleServerError = (err: unknown) => {
+      if (warmFlowCancelledRef.current) return
       const errorMsg = err instanceof Error ? err.message : String(err)
       log.error('Server error:', errorMsg)
       setEngineError(errorMsg)
@@ -304,15 +306,15 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
       startServer,
       connect,
       onServerError: handleServerError,
-      isCancelled: () => cancelled,
+      isCancelled: () => warmFlowCancelledRef.current,
       log
     }).catch((err) => {
-      if (cancelled) return
+      if (warmFlowCancelledRef.current) return
       handleServerError(err)
     })
 
     return () => {
-      cancelled = true
+      warmFlowCancelledRef.current = true
     }
   }, [loadingConnectionJobSeq])
 
@@ -325,6 +327,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
       setEngineError,
       setWarmConnectionJobSeq: setLoadingConnectionJobSeq,
       warmBootstrapSentRef,
+      warmFlowCancelledRef,
       setConnectionLost,
       setSettingsOpen,
       setIsPaused,
@@ -416,6 +419,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
 
   // Cleanup helper for logout/dismiss
   const cleanupState = useCallback(() => {
+    warmFlowCancelledRef.current = true
     exitPointerLock()
     disconnect()
     setEngineError(null)
