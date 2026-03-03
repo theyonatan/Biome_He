@@ -48,6 +48,8 @@ const MenuSettingsView = ({ onBack, onFixEngine }: MenuSettingsViewProps) => {
   const [menuModelsLoading, setMenuModelsLoading] = useState(false)
   const [menuModelsError, setMenuModelsError] = useState<string | null>(null)
   const [showFixModal, setShowFixModal] = useState(false)
+  const [showModeSwitchModal, setShowModeSwitchModal] = useState(false)
+  const [pendingEngineMode, setPendingEngineMode] = useState<'server' | 'standalone' | null>(null)
 
   const configServerUrl = `${config.gpu_server.use_ssl ? 'https' : 'http'}://${config.gpu_server.host}:${config.gpu_server.port}`
   const [menuServerUrl, setMenuServerUrl] = useState(configServerUrl)
@@ -151,8 +153,27 @@ const MenuSettingsView = ({ onBack, onFixEngine }: MenuSettingsViewProps) => {
   }, [menuServerUrl, config, configServerUrl, saveConfig])
 
   const handleEngineModeChange = (mode: 'server' | 'standalone') => {
+    if (mode === menuEngineMode) return
+    if (isStreaming) {
+      setPendingEngineMode(mode)
+      setShowModeSwitchModal(true)
+      return
+    }
     setMenuEngineMode(mode)
     autoSaveEngineMode(mode)
+  }
+
+  const handleConfirmEngineModeSwitch = () => {
+    if (!pendingEngineMode) return
+    setMenuEngineMode(pendingEngineMode)
+    autoSaveEngineMode(pendingEngineMode)
+    setPendingEngineMode(null)
+    setShowModeSwitchModal(false)
+  }
+
+  const handleCancelEngineModeSwitch = () => {
+    setPendingEngineMode(null)
+    setShowModeSwitchModal(false)
   }
 
   const handleWorldModelChange = (model: string) => {
@@ -292,6 +313,17 @@ const MenuSettingsView = ({ onBack, onFixEngine }: MenuSettingsViewProps) => {
           description="This will run repair/setup and open the installation log screen."
           onCancel={() => setShowFixModal(false)}
           onConfirm={handleConfirmFixEngine}
+        />
+      )}
+
+      {showModeSwitchModal && (
+        <ConfirmModal
+          title="Switch Engine Mode?"
+          description="Changing between hosted and standalone will interrupt your current session."
+          onCancel={handleCancelEngineModeSwitch}
+          onConfirm={handleConfirmEngineModeSwitch}
+          confirmLabel="Switch Mode"
+          cancelLabel="Keep Current"
         />
       )}
     </div>
