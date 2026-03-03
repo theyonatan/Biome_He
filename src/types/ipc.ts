@@ -1,4 +1,5 @@
 import type { AppConfig, EngineStatus } from './app'
+import type { PortalSparksTuning } from '../lib/portalSparksTuning'
 
 export type ModelAvailability = {
   id: string
@@ -56,6 +57,9 @@ export type IpcCommandMap = {
   'window-toggle-maximize': { args: []; return: void }
   'window-close': { args: []; return: void }
   'quit-app': { args: []; return: void }
+
+  // Debug
+  'write-spark-tuning': { args: [tuning: PortalSparksTuning]; return: void }
 }
 
 /**

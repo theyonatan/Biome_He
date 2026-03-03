@@ -5,6 +5,7 @@ import { registerModelsIpc } from './models.js'
 import { registerEngineIpc } from './engine.js'
 import { registerServerIpc } from './server.js'
 import { registerWindowIpc } from './window.js'
+import { registerDebugIpc } from './debug.js'
 
 export function registerAllIpc(): void {
   registerConfigIpc()
@@ -14,4 +15,5 @@ export function registerAllIpc(): void {
   registerEngineIpc()
   registerServerIpc()
   registerWindowIpc()
+  registerDebugIpc()
 }

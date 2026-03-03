@@ -20,6 +20,8 @@ import WindowControls from './components/WindowControls'
 import ServerLogDisplay from './components/ServerLogDisplay'
 import useBackgroundCycle from './hooks/useBackgroundCycle'
 import useSceneGlowColor from './hooks/useSceneGlowColor'
+import { PORTAL_SPARKS_DEBUG } from './constants'
+import PortalSparksConfigurator from './components/PortalSparksConfigurator'
 
 const LAUNCH_PRE_SHRINK_MS = 420
 
@@ -294,6 +296,7 @@ const AppShell = () => {
         )}
         <ShutdownOverlay />
       </div>
+      {PORTAL_SPARKS_DEBUG && <PortalSparksConfigurator />}
     </div>
   )
 }

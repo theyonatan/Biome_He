@@ -10,29 +10,7 @@
  * of additive-blended streak quads.
  */
 
-// --- Tuning constants ---
-const MAX_PARTICLES = 900
-const SPAWN_RATE = 600 // particles per second at intensity 1.0
-const LIFETIME_MIN = 0.2
-const LIFETIME_MAX = 0.6
-const TANGENT_SPEED_MIN = 120 // CSS px/s — along the ring (primary)
-const TANGENT_SPEED_MAX = 260
-const RADIAL_SPEED_MIN = 25 // CSS px/s — gentle outward drift
-const RADIAL_SPEED_MAX = 65
-// Elliptical gravity: pulls particles back toward the ring.
-// Tuned so tangentSpeed ≈ omega * radius gives near-circular orbits
-// that gradually spiral out due to the radial kick.
-const GRAVITY_STRENGTH = 2.5 // ω² for the harmonic oscillator
-const SIZE_MIN = 3.0 // px (before DPR)
-const SIZE_MAX = 7.0
-const STREAK_ASPECT = 8.0
-const BRIGHTNESS_MIN = 0.7
-const BRIGHTNESS_MAX = 1.0
-const HOT_SPARK_CHANCE = 0.12
-const HOT_SPARK_MULT = 1.8
-const FADE_OUT_START = 0.65
-// Global spin: rotates all particles around the portal center (rad/s)
-const GLOBAL_SPIN = -0.8
+import { SPARK_TUNING } from './portalSparksTuning'
 
 // Edge map sampling resolution (width; height derived from aspect)
 const EDGE_SAMPLE_W = 128
@@ -219,17 +197,22 @@ function spawnParticle(out: Float32Array, offset: number, edgePoints: Float32Arr
 
   // Velocity: primarily tangential (sweeping along the ring),
   // with gentle radial outward drift — creates spiral-out effect
-  const tangentSpeed = TANGENT_SPEED_MIN + Math.random() * (TANGENT_SPEED_MAX - TANGENT_SPEED_MIN)
-  const radialSpeed = RADIAL_SPEED_MIN + Math.random() * (RADIAL_SPEED_MAX - RADIAL_SPEED_MIN)
+  const tangentSpeed =
+    SPARK_TUNING.TANGENT_SPEED_MIN + Math.random() * (SPARK_TUNING.TANGENT_SPEED_MAX - SPARK_TUNING.TANGENT_SPEED_MIN)
+  const radialSpeed =
+    SPARK_TUNING.RADIAL_SPEED_MIN + Math.random() * (SPARK_TUNING.RADIAL_SPEED_MAX - SPARK_TUNING.RADIAL_SPEED_MIN)
   // All particles travel the same direction (CW)
   out[offset + P_VX] = tx * tangentSpeed + nx * radialSpeed
   out[offset + P_VY] = ty * tangentSpeed + ny * radialSpeed
 
   out[offset + P_AGE] = 0
-  out[offset + P_LIFETIME] = LIFETIME_MIN + Math.random() * (LIFETIME_MAX - LIFETIME_MIN)
-  const baseBrightness = BRIGHTNESS_MIN + Math.random() * (BRIGHTNESS_MAX - BRIGHTNESS_MIN)
-  out[offset + P_BRIGHTNESS] = Math.random() < HOT_SPARK_CHANCE ? baseBrightness * HOT_SPARK_MULT : baseBrightness
-  out[offset + P_SIZE] = SIZE_MIN + Math.random() * (SIZE_MAX - SIZE_MIN)
+  out[offset + P_LIFETIME] =
+    SPARK_TUNING.LIFETIME_MIN + Math.random() * (SPARK_TUNING.LIFETIME_MAX - SPARK_TUNING.LIFETIME_MIN)
+  const baseBrightness =
+    SPARK_TUNING.BRIGHTNESS_MIN + Math.random() * (SPARK_TUNING.BRIGHTNESS_MAX - SPARK_TUNING.BRIGHTNESS_MIN)
+  out[offset + P_BRIGHTNESS] =
+    Math.random() < SPARK_TUNING.HOT_SPARK_CHANCE ? baseBrightness * SPARK_TUNING.HOT_SPARK_MULT : baseBrightness
+  out[offset + P_SIZE] = SPARK_TUNING.SIZE_MIN + Math.random() * (SPARK_TUNING.SIZE_MAX - SPARK_TUNING.SIZE_MIN)
 }
 
 export class PortalSparksRenderer {
@@ -280,11 +263,11 @@ export class PortalSparksRenderer {
   private handleContextRestored: () => void
 
   constructor(private canvas: HTMLCanvasElement) {
-    this.particles = new Float32Array(MAX_PARTICLES * FLOATS_PER_PARTICLE)
-    this.quadVerts = new Float32Array(MAX_PARTICLES * VERTS_PER_QUAD * FLOATS_PER_VERTEX)
+    this.particles = new Float32Array(SPARK_TUNING.MAX_PARTICLES * FLOATS_PER_PARTICLE)
+    this.quadVerts = new Float32Array(SPARK_TUNING.MAX_PARTICLES * VERTS_PER_QUAD * FLOATS_PER_VERTEX)
 
-    this.indices = new Uint32Array(MAX_PARTICLES * INDICES_PER_QUAD)
-    for (let i = 0; i < MAX_PARTICLES; i++) {
+    this.indices = new Uint32Array(SPARK_TUNING.MAX_PARTICLES * INDICES_PER_QUAD)
+    for (let i = 0; i < SPARK_TUNING.MAX_PARTICLES; i++) {
       const vi = i * VERTS_PER_QUAD
       const ii = i * INDICES_PER_QUAD
       this.indices[ii] = vi
@@ -476,8 +459,8 @@ export class PortalSparksRenderer {
     const dtClamped = Math.min(dt, 0.05)
 
     // --- Spawn ---
-    this.spawnAccum += SPAWN_RATE * this.intensity * dtClamped
-    while (this.spawnAccum >= 1 && this.activeCount < MAX_PARTICLES) {
+    this.spawnAccum += SPARK_TUNING.SPAWN_RATE * this.intensity * dtClamped
+    while (this.spawnAccum >= 1 && this.activeCount < SPARK_TUNING.MAX_PARTICLES) {
       spawnParticle(this.particles, this.activeCount * FLOATS_PER_PARTICLE, this.edgePoints, this.edgeCount)
       this.activeCount++
       this.spawnAccum -= 1
@@ -505,7 +488,7 @@ export class PortalSparksRenderer {
 
       // --- Global spin: rotate position + velocity CW around portal center ---
       {
-        const spinAngle = -GLOBAL_SPIN * dtClamped // negative = CW in screen space
+        const spinAngle = -SPARK_TUNING.GLOBAL_SPIN * dtClamped // negative = CW in screen space
         const cs = Math.cos(spinAngle)
         const sn = Math.sin(spinAngle)
         const rx = this.particles[off + P_X] - this.edgeCx
@@ -535,10 +518,10 @@ export class PortalSparksRenderer {
       let gravityMul: number
       if (d > 1.0) {
         // Outside: normal attractive gravity
-        gravityMul = -GRAVITY_STRENGTH
+        gravityMul = -SPARK_TUNING.GRAVITY_STRENGTH
       } else {
         // Inside: repulsive push outward (stronger the deeper inside)
-        gravityMul = GRAVITY_STRENGTH * 3.0
+        gravityMul = SPARK_TUNING.GRAVITY_STRENGTH * 3.0
       }
 
       const gxLocal = gravityMul * lx
@@ -566,7 +549,10 @@ export class PortalSparksRenderer {
       // Fade
       const lifeFrac = age / lifetime
       const fadeIn = Math.min(1, lifeFrac / 0.1)
-      const fadeOut = lifeFrac > FADE_OUT_START ? 1 - (lifeFrac - FADE_OUT_START) / (1 - FADE_OUT_START) : 1
+      const fadeOut =
+        lifeFrac > SPARK_TUNING.FADE_OUT_START
+          ? 1 - (lifeFrac - SPARK_TUNING.FADE_OUT_START) / (1 - SPARK_TUNING.FADE_OUT_START)
+          : 1
       const alpha = brightness * fadeIn * fadeOut * this.intensity
 
       // Streak direction from velocity
@@ -587,7 +573,7 @@ export class PortalSparksRenderer {
       const clipY = 1 - (py / this.canvasH) * 2
 
       // Streak half-extents
-      const halfLong = (size * STREAK_ASPECT * 0.5) / this.canvas.width
+      const halfLong = (size * SPARK_TUNING.STREAK_ASPECT * 0.5) / this.canvas.width
       const halfShort = (size * 0.5) / this.canvas.height
       const cdx = dirX * halfLong * 2
       const cdy = -dirY * halfLong * 2
@@ -658,7 +644,7 @@ export class PortalSparksRenderer {
     let debugIdx = 0
     const dotSize = 2 * this.dpr
 
-    for (let i = 0; i < this.edgeCount && debugIdx < MAX_PARTICLES; i += step) {
+    for (let i = 0; i < this.edgeCount && debugIdx < SPARK_TUNING.MAX_PARTICLES; i += step) {
       const ei = i * 4
       const px = this.edgePoints[ei]
       const py = this.edgePoints[ei + 1]
