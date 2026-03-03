@@ -83,40 +83,14 @@ const PauseOverlay = ({ isActive }: { isActive: boolean }) => {
     if (!isMountedRef.current) return
     setUploadError(null)
 
-    try {
-      const nextThumbs: Record<string, string> = Object.fromEntries(
-        seedList
-          .filter((seed) => Boolean(seed.thumbnail_base64))
-          .map((seed) => [seed.filename, `data:image/jpeg;base64,${seed.thumbnail_base64}`])
-      )
+    const nextThumbs: Record<string, string> = Object.fromEntries(
+      seedList
+        .filter((seed) => Boolean(seed.thumbnail_base64))
+        .map((seed) => [seed.filename, `data:image/jpeg;base64,${seed.thumbnail_base64}`])
+    )
 
-      // Fallback: fetch thumbnails for visible items that came back without inline thumb data.
-      const visibleSeeds = seedList.slice(0, 14)
-      const missingVisible = visibleSeeds.filter((seed) => !nextThumbs[seed.filename])
-      if (missingVisible.length > 0) {
-        const fetchedThumbs = await Promise.all(
-          missingVisible.map(async (seed) => {
-            try {
-              const result = await wsRequest<{ thumbnail_base64: string }>('seeds_thumbnail', {
-                filename: seed.filename
-              })
-              return [seed.filename, `data:image/jpeg;base64,${result.thumbnail_base64}`] as const
-            } catch {
-              return null
-            }
-          })
-        )
-        for (const entry of fetchedThumbs) {
-          if (!entry) continue
-          nextThumbs[entry[0]] = entry[1]
-        }
-      }
-
-      if (!isMountedRef.current) return
-      setThumbnails(nextThumbs)
-    } catch (thumbErr) {
-      console.error('[PauseOverlay] Thumbnail hydration failed:', thumbErr)
-    }
+    if (!isMountedRef.current) return
+    setThumbnails(nextThumbs)
   }, [wsRequest])
 
   useEffect(() => {

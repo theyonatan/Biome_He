@@ -747,29 +747,25 @@ async def _handle_seeds_list() -> dict:
 
 
 async def _handle_seeds_list_with_thumbnails(msg: dict) -> dict:
-    thumbnail_limit = int(msg.get("thumbnail_limit", 24))
-    thumbnail_limit = max(1, min(200, thumbnail_limit))
-
     async with rescan_lock:
         pass
 
     cache_count = len(safe_seeds_cache)
     safe_count = sum(1 for data in safe_seeds_cache.values() if data.get("is_safe", False))
     logger.info(
-        "[SEEDS] seeds_list_with_thumbnails: cache=%d safe=%d thumbnail_limit=%d",
+        "[SEEDS] seeds_list_with_thumbnails: cache=%d safe=%d",
         cache_count,
         safe_count,
-        thumbnail_limit,
     )
 
     async def build_seed_entry(
-        filename: str, data: dict, include_thumbnail: bool
+        filename: str, data: dict
     ) -> tuple[str, dict]:
         file_path = str(data.get("path", ""))
         is_default = not file_path.startswith(str(UPLOADS_DIR))
         thumbnail_base64: str | None = None
 
-        if include_thumbnail and file_path and os.path.exists(file_path):
+        if file_path and os.path.exists(file_path):
             try:
                 thumb_bytes = await asyncio.to_thread(_generate_thumbnail_jpeg_bytes, file_path)
                 thumbnail_base64 = base64.b64encode(thumb_bytes).decode("ascii")
@@ -791,8 +787,8 @@ async def _handle_seeds_list_with_thumbnails(msg: dict) -> dict:
     ordered_items = sorted(safe_seeds_cache.items(), key=lambda item: item[0].lower())
     entries = await asyncio.gather(
         *(
-            build_seed_entry(filename, data, idx < thumbnail_limit)
-            for idx, (filename, data) in enumerate(ordered_items)
+            build_seed_entry(filename, data)
+            for filename, data in ordered_items
         )
     )
     seeds_with_thumbnails = dict(entries)
