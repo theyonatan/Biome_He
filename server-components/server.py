@@ -5,9 +5,9 @@ Low-latency WebSocket server that orchestrates WorldEngine and Safety modules.
 This server acts as a unified interface for both world generation and safety checking.
 
 Usage:
-    python server.py --host 0.0.0.0 --port 7897
+    python server.py --host 0.0.0.0 --port 7987
 
-Client connects via WebSocket to ws://localhost:7897/ws
+Client connects via WebSocket to ws://localhost:7987/ws
 """
 
 # Immediate startup logging before any imports that could fail
@@ -1545,7 +1545,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Biome Server")
     parser.add_argument("--host", default="0.0.0.0", help="Host to bind to")
-    parser.add_argument("--port", type=int, default=7897, help="Port to bind to")
+    parser.add_argument("--port", type=int, default=7987, help="Port to bind to")
     parser.add_argument("--parent-pid", type=int, default=None, help="PID of parent process; server exits if parent dies")
     args = parser.parse_args()
 

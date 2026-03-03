@@ -1,14 +1,9 @@
 import { useState, useEffect, useCallback, createContext, useContext, type ReactNode } from 'react'
 import { invoke } from '../bridge'
 import type { AppConfig, EngineMode } from '../types/app'
-import {
-  STANDALONE_DEFAULT_PORT,
-  HOSTED_DEFAULT_PORT,
-  DEFAULT_WORLD_ENGINE_MODEL,
-  ENGINE_MODES
-} from '../constants/configShared'
+import { STANDALONE_PORT, DEFAULT_WORLD_ENGINE_MODEL, ENGINE_MODES } from '../constants/configShared'
 
-export { STANDALONE_DEFAULT_PORT, HOSTED_DEFAULT_PORT, DEFAULT_WORLD_ENGINE_MODEL, ENGINE_MODES }
+export { STANDALONE_PORT, DEFAULT_WORLD_ENGINE_MODEL, ENGINE_MODES }
 
 type EngineModes = (typeof ENGINE_MODES)[keyof typeof ENGINE_MODES]
 
@@ -28,7 +23,6 @@ type ConfigContextValue = {
   engineMode: EngineMode
   isStandaloneMode: boolean
   isServerMode: boolean
-  standalonePort: number
 }
 
 const ConfigContext = createContext<ConfigContextValue | null>(null)
@@ -93,16 +87,17 @@ export const ConfigProvider = ({ children }: { children: ReactNode }) => {
 
   const getUrl = useCallback(() => {
     if (!config) {
-      return `http://localhost:${STANDALONE_DEFAULT_PORT}`
+      return `http://localhost:${STANDALONE_PORT}`
     }
 
     if (engineMode === ENGINE_MODES.STANDALONE) {
-      return `http://localhost:${STANDALONE_DEFAULT_PORT}`
+      const configuredPort = config.gpu_server?.port ?? STANDALONE_PORT
+      return `http://localhost:${configuredPort}`
     }
 
     const { host, port, use_ssl } = config.gpu_server
     const protocol = use_ssl ? 'https' : 'http'
-    return `${protocol}://${host}:${port ?? HOSTED_DEFAULT_PORT}`
+    return `${protocol}://${host}:${port}`
   }, [engineMode, config?.gpu_server])
 
   const saveGpuServerUrl = useCallback(
@@ -155,8 +150,7 @@ export const ConfigProvider = ({ children }: { children: ReactNode }) => {
     hasHuggingFaceKey: !!config.api_keys.huggingface,
     engineMode,
     isStandaloneMode: engineMode === ENGINE_MODES.STANDALONE,
-    isServerMode: engineMode === ENGINE_MODES.SERVER,
-    standalonePort: STANDALONE_DEFAULT_PORT
+    isServerMode: engineMode === ENGINE_MODES.SERVER
   }
 
   return <ConfigContext.Provider value={value}>{children}</ConfigContext.Provider>
