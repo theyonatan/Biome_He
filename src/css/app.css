@@ -65,6 +65,18 @@
   --color-border-light: rgba(245, 249, 255, 0.8);
   --color-border-medium: rgba(245, 249, 255, 0.52);
 
+  /* Interactive surface colors */
+  --color-surface-btn-hover: rgba(245, 251, 255, 0.9);
+  --color-surface-btn-ghost: rgba(8, 12, 20, 0.18);
+  --color-surface-modal: rgba(8, 12, 20, 0.92);
+  --color-text-btn-hover: rgba(15, 20, 32, 0.95);
+  --color-text-modal: rgba(246, 249, 255, 0.95);
+  --color-text-modal-muted: rgba(233, 242, 255, 0.82);
+  --color-border-modal: rgba(245, 251, 255, 0.66);
+  --color-border-btn-ghost: rgba(245, 251, 255, 0.7);
+  --color-border-focus: rgba(245, 251, 255, 0.8);
+  --color-overlay-scrim: rgba(2, 6, 16, 0.55);
+
   /* Scene action colors */
   --color-action-bg: rgba(8, 12, 20, 0.72);
   --color-action-pinned: rgba(255, 196, 56, 0.98);

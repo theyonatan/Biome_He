@@ -32,7 +32,7 @@ const WindowControls = () => {
       >
         <button
           type="button"
-          className={`${WINDOW_CONTROL_BASE} outline-0 outline-[rgba(245,251,255,0.8)] transition-[background-color,color,outline-width] duration-[160ms] ease-in-out hover:bg-[rgba(245,251,255,0.9)] hover:text-[rgba(15,20,32,0.95)] hover:outline-2`}
+          className={`${WINDOW_CONTROL_BASE} outline-0 outline-[var(--color-border-focus)] transition-[background-color,color,outline-width] duration-[160ms] ease-in-out hover:bg-[var(--color-surface-btn-hover)] hover:text-[var(--color-text-btn-hover)] hover:outline-2`}
           onClick={minimize}
           aria-label="Minimize"
           style={noDragRegionStyle}
@@ -41,7 +41,7 @@ const WindowControls = () => {
         </button>
         <button
           type="button"
-          className={`${WINDOW_CONTROL_BASE} outline-0 outline-[rgba(245,251,255,0.8)] transition-[background-color,color,outline-width] duration-[160ms] ease-in-out hover:bg-[rgba(245,251,255,0.9)] hover:text-[rgba(15,20,32,0.95)] hover:outline-2`}
+          className={`${WINDOW_CONTROL_BASE} outline-0 outline-[var(--color-border-focus)] transition-[background-color,color,outline-width] duration-[160ms] ease-in-out hover:bg-[var(--color-surface-btn-hover)] hover:text-[var(--color-text-btn-hover)] hover:outline-2`}
           onClick={toggleMaximize}
           aria-label="Maximize"
           style={noDragRegionStyle}

@@ -14,7 +14,7 @@ const variantClasses: Record<ButtonVariant, string> = {
   danger:
     'border-[rgba(193,32,11,0.95)] outline-[rgba(193,32,11,0.95)] bg-[rgba(156,23,8,0.9)] text-[rgba(255,240,240,0.98)]',
   ghost:
-    'border-[rgba(245,251,255,0.8)] outline-[rgba(245,251,255,0.8)] bg-[rgba(8,12,20,0.28)] text-text-secondary hover:bg-[rgba(245,251,255,0.9)] hover:text-[rgba(15,20,32,0.95)] hover:-translate-y-px'
+    'border-[var(--color-border-focus)] outline-[var(--color-border-focus)] bg-[rgba(8,12,20,0.28)] text-text-secondary hover:bg-[var(--color-surface-btn-hover)] hover:text-[var(--color-text-btn-hover)] hover:-translate-y-px'
 }
 
 const Button = ({ variant, children, className = '', ...rest }: ButtonProps) => (

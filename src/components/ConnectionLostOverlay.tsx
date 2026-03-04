@@ -12,7 +12,7 @@ const ConnectionLostOverlay = () => {
     <div
       className={`connection-lost-overlay absolute inset-0 z-200 flex items-center justify-center bg-darkest/90 backdrop-blur-[4px] ${connectionLost ? 'active pointer-events-auto visible opacity-100' : 'pointer-events-none invisible opacity-0'}`}
     >
-      <div className="border border-[rgba(245,251,255,0.66)] bg-[rgba(8,12,20,0.92)] text-[rgba(246,249,255,0.95)] w-[58.33cqh] p-[1.8cqh_2.84cqh] flex flex-col items-center gap-[1.2cqh] animate-[connectionLostFadeIn_0.4s_ease-out]">
+      <div className="border border-[var(--color-border-modal)] bg-[var(--color-surface-modal)] text-[var(--color-text-modal)] w-[58.33cqh] p-[1.8cqh_2.84cqh] flex flex-col items-center gap-[1.2cqh] animate-[connectionLostFadeIn_0.4s_ease-out]">
         <div className="w-[8.5cqh] h-[8.5cqh] text-[rgba(255,120,120,0.9)] animate-[connectionLostPulse_2s_ease-in-out_infinite]">
           <svg
             viewBox="0 0 24 24"
@@ -33,13 +33,13 @@ const ConnectionLostOverlay = () => {
           </svg>
         </div>
         <h3 className="m-0 mb-[0.2cqh] font-serif font-medium text-[3.91cqh]">Connection Lost</h3>
-        <p className="m-0 font-serif text-[rgba(233,242,255,0.82)] text-[2.4cqh] text-center">
+        <p className="m-0 font-serif text-[var(--color-text-modal-muted)] text-[2.4cqh] text-center">
           The connection to World Engine was interrupted
         </p>
         <div className="flex justify-end mt-[1.2cqh] w-full">
           <button
             type="button"
-            className={`${CONFIRM_BUTTON_BASE} bg-[rgba(245,251,255,0.9)] text-[rgba(15,20,32,0.95)]`}
+            className={`${CONFIRM_BUTTON_BASE} bg-[var(--color-surface-btn-hover)] text-[var(--color-text-btn-hover)]`}
             onClick={handleDismiss}
           >
             Reconnect
