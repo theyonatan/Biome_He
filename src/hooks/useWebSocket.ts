@@ -164,6 +164,11 @@ export const useWebSocket = (): WebSocketHook => {
             setConnectionState('error')
             break
           }
+          case 'warning': {
+            const warningMessage = (msg.message as string) ?? 'Server warning'
+            setError(warningMessage)
+            break
+          }
           default:
             log.debug('Message:', msg.type, msg)
         }
