@@ -261,37 +261,48 @@ const PauseOverlay = ({ isActive }: { isActive: boolean }) => {
       reader.readAsDataURL(blob)
     })
 
-  const uploadSeedData = async (filename: string, base64Data: string) => {
+  const isImageFile = (file: File) =>
+    file.type.startsWith('image/') || /\.(png|jpe?g|webp|gif|bmp|tiff?|avif|heic|heif)$/i.test(file.name)
+
+  const uploadImageFiles = async (files: File[]) => {
+    if (uploadingImage) return
+
+    const imageFiles = files.filter(isImageFile)
+    if (imageFiles.length === 0) {
+      setUploadError('Please drop image files only')
+      return
+    }
+
     setUploadingImage(true)
     setUploadError(null)
+
+    const failed: string[] = []
     try {
-      await wsRequest('seeds_upload', { filename, data: base64Data })
+      for (const file of imageFiles) {
+        try {
+          const base64Data = await readBlobAsBase64(file)
+          await wsRequest('seeds_upload', { filename: file.name, data: base64Data })
+        } catch {
+          failed.push(file.name)
+        }
+      }
       await refreshSeeds()
-    } catch (err) {
-      throw err instanceof Error ? err : new Error(String(err))
+      if (failed.length > 0) {
+        setUploadError(`Failed to upload: ${failed.join(', ')}`)
+      }
     } finally {
       setUploadingImage(false)
     }
   }
 
   const handleImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    if (!file.type.startsWith('image/')) {
-      setUploadError('Please select an image file')
-      event.target.value = ''
-      return
-    }
-
-    try {
-      const base64Data = await readBlobAsBase64(file)
-      await uploadSeedData(file.name, base64Data)
-    } catch (err) {
-      setUploadError(err instanceof Error ? err.message : 'Failed to upload image')
-    }
-
+    const files = Array.from(event.target.files || [])
+    await uploadImageFiles(files)
     event.target.value = ''
+  }
+
+  const handleImageDrop = (files: File[]) => {
+    void uploadImageFiles(files)
   }
 
   const handleClipboardUpload = async () => {
@@ -324,8 +335,7 @@ const PauseOverlay = ({ isActive }: { isActive: boolean }) => {
       }
       const extension = extensionMap[imageType] || 'png'
       const filename = `clipboard-${Date.now()}.${extension}`
-      const base64Data = await readBlobAsBase64(imageBlob)
-      await uploadSeedData(filename, base64Data)
+      await uploadImageFiles([new File([imageBlob], filename, { type: imageType || 'image/png' })])
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : 'Failed to read image from clipboard')
     }
@@ -366,6 +376,7 @@ const PauseOverlay = ({ isActive }: { isActive: boolean }) => {
           onTogglePin={togglePinnedScene}
           onRemoveScene={removeScene}
           onImageUpload={handleImageUpload}
+          onImageDrop={handleImageDrop}
           onClipboardUpload={handleClipboardUpload}
           onBack={() => setView('main')}
         />

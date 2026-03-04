@@ -1,4 +1,4 @@
-import { useRef, type ChangeEvent } from 'react'
+import { useRef, useState, type ChangeEvent, type DragEvent } from 'react'
 import type { SeedRecord } from '../types/app'
 import SceneCard from './SceneCard'
 import MenuButton from './ui/MenuButton'
@@ -14,6 +14,7 @@ interface PauseScenesViewProps {
   onTogglePin: (filename: string) => void
   onRemoveScene: (seed: SeedRecord) => void
   onImageUpload: (event: ChangeEvent<HTMLInputElement>) => void
+  onImageDrop: (files: File[]) => void
   onClipboardUpload: () => void
   onBack: () => void
 }
@@ -28,13 +29,85 @@ const PauseScenesView = ({
   onTogglePin,
   onRemoveScene,
   onImageUpload,
+  onImageDrop,
   onClipboardUpload,
   onBack
 }: PauseScenesViewProps) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const dragDepthRef = useRef(0)
+  const [isDragActive, setIsDragActive] = useState(false)
+
+  const hasImagePayload = (event: DragEvent<HTMLDivElement>): boolean => {
+    const dt = event.dataTransfer
+    if (!dt) return false
+
+    // During dragenter/dragover, Chromium/Electron may expose only "Files"
+    // in types and leave files[] empty until drop.
+    const types = Array.from(dt.types || [])
+    if (types.includes('Files')) return true
+
+    if (dt.items && dt.items.length > 0) {
+      return Array.from(dt.items).some((item) => item.kind === 'file')
+    }
+
+    if (dt.files && dt.files.length > 0) {
+      return Array.from(dt.files).some((file) => file.type.startsWith('image/'))
+    }
+
+    return false
+  }
+
+  const handleDragEnter = (event: DragEvent<HTMLDivElement>) => {
+    if (!hasImagePayload(event)) return
+    event.preventDefault()
+    event.stopPropagation()
+    dragDepthRef.current += 1
+    setIsDragActive(true)
+  }
+
+  const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
+    if (!hasImagePayload(event)) return
+    event.preventDefault()
+    event.stopPropagation()
+    event.dataTransfer.dropEffect = 'copy'
+  }
+
+  const handleDragLeave = (event: DragEvent<HTMLDivElement>) => {
+    if (!isDragActive) return
+    event.preventDefault()
+    event.stopPropagation()
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1)
+    if (dragDepthRef.current === 0) {
+      setIsDragActive(false)
+    }
+  }
+
+  const handleDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+    dragDepthRef.current = 0
+    setIsDragActive(false)
+    const files = Array.from(event.dataTransfer.files || [])
+    if (files.length === 0) return
+    onImageDrop(files)
+  }
 
   return (
-    <div className="overlay-darken absolute inset-0 p-[3.8%_4%] z-[2]">
+    <div
+      className="overlay-darken absolute inset-0 p-[3.8%_4%] z-[2]"
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {isDragActive && (
+        <div
+          className="absolute inset-[2.4cqh] z-[20] border border-[rgba(245,249,255,0.86)] bg-[rgba(248,248,245,0.12)] pointer-events-none grid place-items-center"
+          aria-hidden="true"
+        >
+          <span className="font-serif text-[3.11cqh] text-[rgba(245,249,255,0.95)]">Drop images to add scenes</span>
+        </div>
+      )}
       <section className="absolute top-[var(--edge-top-xl)] left-[var(--edge-left)] w-[70%] z-[3] flex flex-col">
         <h2 className={`${HEADING_BASE} text-heading text-text-primary font-normal text-left`}>Scenes</h2>
         <p className="m-0 font-serif text-caption text-text-muted max-w-[103.12cqh] text-left">
