@@ -35,12 +35,12 @@ const PauseMainView = ({
   <div className="absolute inset-0 p-[3.8%_4%]">
     <SocialCtaRow rowClassName="pause-cta-row" />
 
-    <section className="absolute top-[var(--edge-top-xl)] left-[var(--edge-left)] w-[80%] flex flex-col">
+    <section className="absolute top-[var(--edge-top-xl)] left-[var(--edge-left)] w-[77%] flex flex-col">
       <h2 className={`${HEADING_BASE} text-heading text-text-primary font-normal text-left`}>Pinned Scenes</h2>
       <p className="m-0 font-serif text-caption text-text-muted max-w-[103.12cqh] text-left">
         Your pinned scenes. Use the Scenes button to view, pin or upload more scenes.
       </p>
-      <div className="pause-scene-scroll overflow-y-auto pr-[0.8cqh] max-h-[50cqh] mt-[1.1cqh]">
+      <div className="pause-scene-scroll overflow-y-auto pr-[0.8cqh] max-h-[62cqh] mt-[1.1cqh]">
         <div className="grid grid-cols-[repeat(auto-fill,25.78cqh)] gap-[1.28cqh] w-full">
           {pinnedScenes.length > 0 ? (
             pinnedScenes.map((seed) => (
