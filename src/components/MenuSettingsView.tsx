@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { invoke } from '../bridge'
-import { SETTINGS_MUTED_TEXT } from '../styles'
+import { HEADING_BASE, SETTINGS_MUTED_TEXT } from '../styles'
 import { useConfig, ENGINE_MODES } from '../hooks/useConfig'
 import { useStreaming } from '../context/StreamingContext'
 import type { AppConfig } from '../types/app'
-import ViewLabel from './ui/ViewLabel'
 import MenuButton from './ui/MenuButton'
 import SettingsButton from './ui/SettingsButton'
 import SettingsSection from './ui/SettingsSection'
@@ -255,98 +254,101 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
 
   return (
     <div className="overlay-darken absolute inset-0 z-[9] pointer-events-auto">
-      <div className="menu-settings-panel absolute flex flex-col z-[1] top-[var(--edge-top-lg)] right-[var(--edge-right)] w-auto max-w-[105.56cqh] max-h-[78%] gap-[2.3cqh] pr-[0.71cqh] overflow-y-auto overflow-x-hidden [scrollbar-width:none]">
-        <SettingsSection title="Engine Mode" description="how will you run the model? as part of Biome, or elsewhere?">
-          <SettingsToggle
-            options={[
-              { value: 'server', label: 'Server' },
-              { value: 'standalone', label: 'Standalone' }
-            ]}
-            value={menuEngineMode}
-            onChange={(v) => handleEngineModeChange(v as 'server' | 'standalone')}
-          />
-        </SettingsSection>
-
-        {menuEngineMode === 'server' && (
-          <SettingsSection title="Server URL" description="the address of the GPU server running the model">
-            <SettingsTextInput
-              value={menuServerUrl}
-              onChange={setMenuServerUrl}
-              onBlur={handleServerUrlBlur}
-              placeholder="http://localhost:8000"
+      <section className="absolute top-[var(--edge-top-xl)] left-[var(--edge-left)] w-[90%] z-[3] flex flex-col">
+        <h2 className={`${HEADING_BASE} text-heading text-text-primary font-normal text-left`}>Settings</h2>
+        <p className="m-0 font-serif text-caption text-text-muted max-w-[103.12cqh] text-left">
+          Tweak your world to your liking.
+        </p>
+        <div className="pause-scene-scroll overflow-y-auto pr-[0.8cqh] max-h-[62cqh] mt-[1.1cqh] relative z-[4] flex flex-col gap-[2.3cqh] w-[60%]">
+          <SettingsSection
+            title="Engine Mode"
+            description="how will you run the model? as part of Biome, or elsewhere?"
+          >
+            <SettingsToggle
+              options={[
+                { value: 'server', label: 'Server' },
+                { value: 'standalone', label: 'Standalone' }
+              ]}
+              value={menuEngineMode}
+              onChange={(v) => handleEngineModeChange(v as 'server' | 'standalone')}
             />
           </SettingsSection>
-        )}
 
-        {menuEngineMode === 'standalone' && (
-          <SettingsSection
-            title="World Engine"
-            description={
-              <span className="inline-flex items-center gap-[0.71cqh]">
-                is the local engine healthy?{' '}
-                {engineReady === null ? (
-                  'checking...'
-                ) : engineReady ? (
-                  <>
-                    yes
-                    <span className="inline-block w-[0.98cqh] h-[0.98cqh] rounded-full bg-[rgba(100,220,100,0.95)] shadow-[0_0_5px_1px_rgba(100,220,100,0.4)]" />
-                  </>
-                ) : (
-                  <>
-                    no
-                    <span className="inline-block w-[0.98cqh] h-[0.98cqh] rounded-full bg-[rgba(255,120,80,0.95)] shadow-[0_0_5px_1px_rgba(255,120,80,0.4)]" />
-                  </>
-                )}
-              </span>
-            }
-          >
-            <div className="flex justify-end">
-              <SettingsButton variant="ghost" onClick={() => setShowFixModal(true)}>
-                Reinstall
-              </SettingsButton>
-            </div>
-          </SettingsSection>
-        )}
-
-        <SettingsSection title="World Model" description="which Overworld model will simulate your world?">
-          <SettingsSelect
-            options={menuModelOptions.map((model) => ({
-              value: model.id,
-              label: model.id.replace(/^Overworld\//, ''),
-              prefix: model.isLocal ? 'local' : 'download'
-            }))}
-            value={menuWorldModel}
-            onChange={handleWorldModelChange}
-            disabled={menuModelsLoading}
-          />
-          {menuModelsError && (
-            <p
-              className={`${SETTINGS_MUTED_TEXT} text-right [text-shadow:0_1px_2px_rgba(0,0,0,0.5)] [margin:0.35cqh_0_0.8cqh]`}
-            >
-              {menuModelsError}
-            </p>
+          {menuEngineMode === 'server' && (
+            <SettingsSection title="Server URL" description="the address of the GPU server running the model">
+              <SettingsTextInput
+                value={menuServerUrl}
+                onChange={setMenuServerUrl}
+                onBlur={handleServerUrlBlur}
+                placeholder="http://localhost:8000"
+              />
+            </SettingsSection>
           )}
-        </SettingsSection>
 
-        <SettingsSection
-          title="Mouse Sensitivity"
-          description="how much should the camera move when you move your mouse?"
-        >
-          <SettingsSlider
-            min={10}
-            max={100}
-            value={menuMouseSensitivity}
-            onChange={handleMouseSensitivityChange}
-            label={`${menuMouseSensitivity}%`}
-          />
-        </SettingsSection>
-      </div>
+          {menuEngineMode === 'standalone' && (
+            <SettingsSection
+              title="World Engine"
+              description={
+                <span className="inline-flex items-center gap-[0.71cqh]">
+                  is the local engine healthy?{' '}
+                  {engineReady === null ? (
+                    'checking...'
+                  ) : engineReady ? (
+                    <>
+                      yes
+                      <span className="inline-block w-[0.98cqh] h-[0.98cqh] rounded-full bg-[rgba(100,220,100,0.95)] shadow-[0_0_5px_1px_rgba(100,220,100,0.4)]" />
+                    </>
+                  ) : (
+                    <>
+                      no
+                      <span className="inline-block w-[0.98cqh] h-[0.98cqh] rounded-full bg-[rgba(255,120,80,0.95)] shadow-[0_0_5px_1px_rgba(255,120,80,0.4)]" />
+                    </>
+                  )}
+                </span>
+              }
+            >
+              <div className="flex justify-start">
+                <SettingsButton variant="ghost" onClick={() => setShowFixModal(true)}>
+                  Reinstall
+                </SettingsButton>
+              </div>
+            </SettingsSection>
+          )}
 
-      <ViewLabel>Settings</ViewLabel>
+          <SettingsSection title="World Model" description="which Overworld model will simulate your world?">
+            <SettingsSelect
+              options={menuModelOptions.map((model) => ({
+                value: model.id,
+                label: model.id.replace(/^Overworld\//, ''),
+                prefix: model.isLocal ? 'local' : 'download'
+              }))}
+              value={menuWorldModel}
+              onChange={handleWorldModelChange}
+              disabled={menuModelsLoading}
+            />
+            {menuModelsError && (
+              <p className={`${SETTINGS_MUTED_TEXT} text-left [margin:0.35cqh_0_0.8cqh]`}>{menuModelsError}</p>
+            )}
+          </SettingsSection>
+
+          <SettingsSection
+            title="Mouse Sensitivity"
+            description="how much should the camera move when you move your mouse?"
+          >
+            <SettingsSlider
+              min={10}
+              max={100}
+              value={menuMouseSensitivity}
+              onChange={handleMouseSensitivityChange}
+              label={`${menuMouseSensitivity}%`}
+            />
+          </SettingsSection>
+        </div>
+      </section>
 
       <MenuButton
         variant="primary"
-        className="absolute z-[1] right-[var(--edge-right)] bottom-[var(--edge-bottom)] min-w-[132px] m-0 p-[0.9cqh_2.67cqh] box-border appearance-none text-[3.91cqh] tracking-tight pointer-events-auto"
+        className="absolute right-[var(--edge-right)] bottom-[var(--edge-bottom)] w-btn-w px-0"
         onClick={() => {
           void handleBackClick()
         }}

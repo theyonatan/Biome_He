@@ -120,7 +120,7 @@
   --portal-tilt: -8deg;
   --portal-center-x: 88.9cqh;
   --portal-center-y: 50cqh;
-  --portal-settings-left: 20%;
+  --portal-settings-right: 80%;
   --vortex-warp-x: 1;
   --vortex-warp-y: 1;
   --vortex-speed-mult: 1;
@@ -427,19 +427,6 @@
     background:
       radial-gradient(circle at 50% 53%, rgba(4, 8, 14, 0.34) 0%, rgba(4, 8, 14, 0.26) 36%, rgba(4, 8, 14, 0.14) 72%),
       linear-gradient(to bottom, rgba(4, 8, 14, 0.2) 0%, rgba(4, 8, 14, 0.28) 100%);
-  }
-
-  .menu-settings-panel::-webkit-scrollbar {
-    width: 0;
-    min-width: 6px;
-  }
-  .menu-settings-panel::-webkit-scrollbar-track {
-    background: transparent;
-    border-radius: 999px;
-  }
-  .menu-settings-panel::-webkit-scrollbar-thumb {
-    background: transparent;
-    border-radius: 999px;
   }
 
   /* --- VIDEO CONTAINER --- */

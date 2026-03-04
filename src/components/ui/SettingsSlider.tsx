@@ -44,7 +44,7 @@ const SettingsSlider = ({ value, onChange, min, max, label }: SettingsSliderProp
   )
 
   return (
-    <div className="flex flex-col items-end gap-[0.4cqh]">
+    <div className="flex flex-col items-start gap-[0.4cqh]">
       <div
         ref={trackRef}
         className={`relative w-full ${SETTINGS_CONTROL_BASE} cursor-pointer leading-[1.2] p-[0.275cqh_1.42cqh] text-[1.33cqh] ${SETTINGS_OUTLINE_HOVER}`}

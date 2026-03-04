@@ -3,7 +3,7 @@ export const SETTINGS_CONTROL_BASE = 'border border-border-medium bg-surface-btn
 
 /** Font + layout + padding for settings inputs */
 export const SETTINGS_CONTROL_TEXT =
-  'font-serif leading-[1.2] text-right text-text-primary p-[0.55cqh_1.42cqh] text-[2.67cqh]'
+  'font-serif leading-[1.2] text-left text-text-primary p-[0.55cqh_1.42cqh] text-[2.67cqh]'
 
 /** Outline hover interaction for settings controls */
 export const SETTINGS_OUTLINE_HOVER =

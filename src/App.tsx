@@ -151,7 +151,7 @@ const AppShell = () => {
         )}
         {isMainUi && !isConnected && !isEnteringLoading && (
           <div
-            className={`absolute top-1/2 z-8 w-[42.67cqh] cursor-pointer transition-[transform,left] duration-[180ms] ease-out ${!isConnected && isSettingsOpen ? 'left-[var(--portal-settings-left)] pointer-events-none' : 'left-[49%] pointer-events-auto'}`}
+            className={`absolute top-1/2 z-8 w-[42.67cqh] cursor-pointer transition-[transform,left] duration-[180ms] ease-out ${!isConnected && isSettingsOpen ? 'left-[var(--portal-settings-right)] pointer-events-none' : 'left-[49%] pointer-events-auto'}`}
             style={{ transform: `translate(-50%, -50%) scale(${isPortalHovered ? 1.05 : 1})` }}
             onMouseEnter={() => setIsPortalHovered(true)}
             onMouseLeave={() => setIsPortalHovered(false)}
