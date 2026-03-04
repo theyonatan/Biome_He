@@ -22,10 +22,9 @@ type MenuModelOption = {
 
 type MenuSettingsViewProps = {
   onBack: () => void
-  onFixEngine?: () => void
 }
 
-const MenuSettingsView = ({ onBack, onFixEngine }: MenuSettingsViewProps) => {
+const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
   const { config, saveConfig } = useConfig()
   const {
     engineStatus,
@@ -60,6 +59,9 @@ const MenuSettingsView = ({ onBack, onFixEngine }: MenuSettingsViewProps) => {
   const [showFixModal, setShowFixModal] = useState(false)
   const [showModeSwitchModal, setShowModeSwitchModal] = useState(false)
   const [showLocalInstallLog, setShowLocalInstallLog] = useState(false)
+  const [installLogs, setInstallLogs] = useState<string[]>([])
+  const [isExportingInstallDiagnostics, setIsExportingInstallDiagnostics] = useState(false)
+  const [installExportStatus, setInstallExportStatus] = useState<string | null>(null)
 
   const configServerUrl = `${config.gpu_server.use_ssl ? 'https' : 'http'}://${config.gpu_server.host}:${config.gpu_server.port}`
   const [menuServerUrl, setMenuServerUrl] = useState(configServerUrl)
@@ -208,16 +210,46 @@ const MenuSettingsView = ({ onBack, onFixEngine }: MenuSettingsViewProps) => {
 
   const handleConfirmFixEngine = async () => {
     setShowFixModal(false)
-    if (onFixEngine) {
-      onFixEngine()
-    } else {
-      setShowLocalInstallLog(true)
-    }
+    setInstallExportStatus(null)
+    setInstallLogs([])
+    setShowLocalInstallLog(true)
     try {
       await setupEngine()
       await checkEngineStatus()
     } catch {
       // Error is surfaced by engineSetupError and server logs.
+    }
+  }
+
+  const handleExportInstallDiagnostics = async () => {
+    if (isExportingInstallDiagnostics) return
+
+    setIsExportingInstallDiagnostics(true)
+    setInstallExportStatus(null)
+    try {
+      const meta = await invoke('get-runtime-diagnostics-meta')
+      const report = {
+        generated_at: new Date().toISOString(),
+        runtime: meta,
+        install_state: {
+          engine_setup_in_progress: engineSetupInProgress,
+          setup_progress: setupProgress,
+          engine_setup_error: engineSetupError
+        },
+        logs: installLogs
+      }
+
+      const result = await invoke('export-loading-diagnostics', JSON.stringify(report, null, 2))
+      if (result.canceled) {
+        setInstallExportStatus('Export canceled')
+      } else {
+        setInstallExportStatus('Diagnostics exported')
+      }
+    } catch (exportErr) {
+      const message = exportErr instanceof Error ? exportErr.message : 'Export failed'
+      setInstallExportStatus(message)
+    } finally {
+      setIsExportingInstallDiagnostics(false)
     }
   }
 
@@ -344,7 +376,7 @@ const MenuSettingsView = ({ onBack, onFixEngine }: MenuSettingsViewProps) => {
         />
       )}
 
-      {!onFixEngine && showLocalInstallLog && (
+      {showLocalInstallLog && (
         <div className="absolute inset-0 z-[12] pointer-events-none flex items-center justify-center bg-[rgba(2,6,16,0.62)] backdrop-blur-sm">
           <div className="w-[135.11cqh] max-w-[92vw] pointer-events-auto">
             <ServerLogDisplay
@@ -360,19 +392,38 @@ const MenuSettingsView = ({ onBack, onFixEngine }: MenuSettingsViewProps) => {
               }
               errorMessage={engineSetupError}
               showDismiss={false}
+              onLogsChange={setInstallLogs}
               headerAction={
                 !engineSetupInProgress ? (
-                  <button
-                    type="button"
-                    className="loading-inline-logs-close"
-                    onClick={() => setShowLocalInstallLog(false)}
-                    aria-label="Close install logs"
-                  >
-                    Close
-                  </button>
+                  <div className="flex items-center gap-[0.8cqh]">
+                    {engineSetupError && (
+                      <button
+                        type="button"
+                        className="loading-inline-logs-close"
+                        onClick={() => void handleExportInstallDiagnostics()}
+                        disabled={isExportingInstallDiagnostics}
+                        title="Export installation logs and environment diagnostics"
+                      >
+                        {isExportingInstallDiagnostics ? 'Exporting...' : 'Export Logs'}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="loading-inline-logs-close"
+                      onClick={() => setShowLocalInstallLog(false)}
+                      aria-label="Close install logs"
+                    >
+                      Close
+                    </button>
+                  </div>
                 ) : null
               }
             />
+            {installExportStatus && (
+              <div className="mt-[0.45cqh] text-right font-serif text-[2cqh] leading-[1.1] text-[rgba(245,249,255,0.78)]">
+                {installExportStatus}
+              </div>
+            )}
           </div>
         </div>
       )}

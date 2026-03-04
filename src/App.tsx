@@ -17,7 +17,6 @@ import PauseOverlay from './components/PauseOverlay'
 import ConnectionLostOverlay from './components/ConnectionLostOverlay'
 import ShutdownOverlay from './components/ShutdownOverlay'
 import WindowControls from './components/WindowControls'
-import ServerLogDisplay from './components/ServerLogDisplay'
 import useBackgroundCycle from './hooks/useBackgroundCycle'
 import useSceneGlowColor from './hooks/useSceneGlowColor'
 import { PORTAL_SPARKS_DEBUG } from './constants'
@@ -27,7 +26,6 @@ const LAUNCH_PRE_SHRINK_MS = 420
 
 const AppShell = () => {
   const [isPortalHovered, setIsPortalHovered] = useState(false)
-  const [showInstallLog, setShowInstallLog] = useState(false)
   const [isLaunchShrinking, setIsLaunchShrinking] = useState(false)
   const [isEnteringLoading, setIsEnteringLoading] = useState(false)
   const [isReturningToMenu, setIsReturningToMenu] = useState(false)
@@ -41,18 +39,8 @@ const AppShell = () => {
     toggleSettings,
     transitionTo
   } = usePortal()
-  const {
-    isStreaming,
-    isPaused,
-    connectionState,
-    warning,
-    connectionLost,
-    statusStage,
-    setupProgress,
-    engineSetupError,
-    engineSetupInProgress,
-    prepareReturnToMainMenu
-  } = useStreaming()
+  const { isStreaming, isPaused, connectionState, warning, connectionLost, statusStage, prepareReturnToMainMenu } =
+    useStreaming()
   const {
     images,
     currentIndex,
@@ -68,7 +56,6 @@ const AppShell = () => {
   } = useBackgroundCycle(
     isPortalHovered ||
       (!isConnected && isSettingsOpen) ||
-      showInstallLog ||
       isLaunchShrinking ||
       isEnteringLoading ||
       isReturningToMenu ||
@@ -85,9 +72,8 @@ const AppShell = () => {
   const backgroundBlurPx = isMainUi ? (isSettingsOpen ? 14 : 2) : 0
   const portalGlowRgb = useSceneGlowColor(images, currentIndex)
   const nextSceneGlowRgb = useSceneGlowColor(images, nextIndex)
-  const showMenuHome = isMainUi && !isConnected && !isSettingsOpen && !showInstallLog
+  const showMenuHome = isMainUi && !isConnected && !isSettingsOpen
   const showMenuSettings = isMainUi && !isConnected && isSettingsOpen
-  const showInstallLogView = isMainUi && !isConnected && showInstallLog
   const loadingProgressPercent = Math.max(0, Math.min(100, Math.round(statusStage?.percent ?? 0)))
   const loadingLayerStyle = {
     '--vortex-progress-percent': loadingProgressPercent.toString()
@@ -130,7 +116,6 @@ const AppShell = () => {
       portalState === portalStates.MAIN_MENU &&
       connectionState !== 'connecting' &&
       !isSettingsOpen &&
-      !showInstallLog &&
       !isEnteringLoading &&
       !isLaunchShrinking
     ) {
@@ -211,46 +196,7 @@ const AppShell = () => {
             </MenuButton>
           </div>
         )}
-        {showMenuSettings && (
-          <MenuSettingsView
-            onBack={toggleSettings}
-            onFixEngine={() => {
-              setShowInstallLog(true)
-            }}
-          />
-        )}
-        {showInstallLogView && (
-          <div className="absolute inset-0 z-[12] pointer-events-none flex items-center justify-center bg-[rgba(2,6,16,0.62)] backdrop-blur-sm">
-            <div className="w-[135.11cqh] max-w-[92vw] pointer-events-auto">
-              <ServerLogDisplay
-                variant="loading-inline"
-                title="WORLD ENGINE INSTALL"
-                showProgress={engineSetupInProgress}
-                progressMessage={
-                  engineSetupInProgress
-                    ? setupProgress || 'Installing World Engine...'
-                    : engineSetupError
-                      ? 'World Engine installation failed.'
-                      : 'World Engine installation complete.'
-                }
-                errorMessage={engineSetupError}
-                showDismiss={false}
-                headerAction={
-                  !engineSetupInProgress ? (
-                    <button
-                      type="button"
-                      className="loading-inline-logs-close"
-                      onClick={() => setShowInstallLog(false)}
-                      aria-label="Close install logs"
-                    >
-                      Close
-                    </button>
-                  ) : null
-                }
-              />
-            </div>
-          </div>
-        )}
+        {showMenuSettings && <MenuSettingsView onBack={toggleSettings} />}
 
         {isStreamingUi && (
           <main
