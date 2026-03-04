@@ -109,7 +109,7 @@ const PauseScenesView = ({
           <span className="font-serif text-[3.11cqh] text-[rgba(245,249,255,0.95)]">Drop images to add scenes</span>
         </div>
       )}
-      <section className="absolute top-[var(--edge-top-xl)] left-[var(--edge-left)] w-[90%] z-[3] flex flex-col">
+      <section className="absolute top-[var(--edge-top-xl)] left-[var(--edge-left)] w-[92%] z-[3] flex flex-col">
         <h2 className={`${HEADING_BASE} text-heading text-text-primary font-normal text-left`}>Scenes</h2>
         <p className="m-0 font-serif text-caption text-text-muted max-w-[103.12cqh] text-left">
           All of your {seeds.length} {seeds.length === 1 ? 'scene' : 'scenes'}. Use the buttons to add more scenes, or
