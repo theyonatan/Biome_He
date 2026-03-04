@@ -135,6 +135,7 @@ export const createStreamingLifecycleEffectHandlers = ({
     },
     connectionLost: () => {
       log.info('Connection lost detected')
+      exitPointerLock()
       setConnectionLost(true)
     },
     clearConnectionLost: () => setConnectionLost(false)

@@ -67,6 +67,7 @@ export type StreamingContextValue = {
   disconnect: () => void
   logout: () => Promise<void>
   dismissConnectionLost: () => Promise<void>
+  reconnectAfterConnectionLost: () => Promise<void>
   cancelConnection: () => Promise<void>
   prepareReturnToMainMenu: () => Promise<void>
   reset: () => void

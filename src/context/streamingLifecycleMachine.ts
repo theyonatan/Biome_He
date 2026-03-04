@@ -46,6 +46,7 @@ const emptyEffects = (): StreamingLifecycleEffects => ({
 export type StreamingLifecycleState = {
   loadingAttempted: boolean
   wasConnectedInStreamingState: boolean
+  connectionLostSignaled: boolean
   hadEngineError: boolean
   intentionalReconnectInProgress: boolean
   loadingTransitionRequestedForIntentionalReconnect: boolean
@@ -60,6 +61,7 @@ export type StreamingLifecycleState = {
 export const initialStreamingLifecycleState: StreamingLifecycleState = {
   loadingAttempted: false,
   wasConnectedInStreamingState: false,
+  connectionLostSignaled: false,
   hadEngineError: false,
   intentionalReconnectInProgress: false,
   loadingTransitionRequestedForIntentionalReconnect: false,
@@ -204,19 +206,28 @@ export const streamingLifecycleReducer = (
 
   if (inStreamingState && ACTIVE_CONNECTION_STATES.has(connectionState)) {
     next.wasConnectedInStreamingState = true
+    next.connectionLostSignaled = false
   }
 
   if (next.wasConnectedInStreamingState && inStreamingState && FAILURE_CONNECTION_STATES.has(connectionState)) {
-    if (next.intentionalReconnectInProgress) {
-      next.effects.suppressedIntentionalConnectionLost = true
-    } else {
-      next.effects.connectionLost = true
+    if (!next.connectionLostSignaled) {
+      if (next.intentionalReconnectInProgress) {
+        next.effects.suppressedIntentionalConnectionLost = true
+      } else {
+        next.effects.connectionLost = true
+      }
+      next.connectionLostSignaled = true
     }
+  }
+
+  if (!inStreamingState) {
+    next.connectionLostSignaled = false
   }
 
   if (inMainMenuState) {
     next.loadingAttempted = false
     next.wasConnectedInStreamingState = false
+    next.connectionLostSignaled = false
     next.intentionalReconnectInProgress = false
     next.loadingTransitionRequestedForIntentionalReconnect = false
     next.effects.clearConnectionLost = true

@@ -107,7 +107,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
 
   const hasReceivedFrame = frame !== null
   const isStreaming = state === states.STREAMING
-  const inputEnabled = isStreaming && isReady && !isPaused && !settingsOpen
+  const inputEnabled = isStreaming && isReady && !isPaused && !settingsOpen && !connectionLost
   const canUnpause = pauseElapsedMs >= UNLOCK_DELAY_MS
 
   // Track elapsed time since pause for unlock delay
@@ -202,6 +202,10 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
 
   // Pointer lock controls
   const requestPointerLock = useCallback(() => {
+    if (connectionLost) {
+      return false
+    }
+
     // https://github.com/electron/electron/issues/33587 seems like there's no way around the pointerLock cooldown
     // Enforce browser pointer-lock cooldown after an unlock to avoid dropped lock requests.
     if (isPaused && !canUnpause) {
@@ -213,7 +217,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
 
     containerRef.current?.requestPointerLock()
     return true
-  }, [isPaused, canUnpause, pauseElapsedMs])
+  }, [connectionLost, isPaused, canUnpause, pauseElapsedMs])
 
   const exitPointerLock = useCallback(() => {
     if (document.pointerLockElement) {
@@ -222,13 +226,13 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
   }, [])
 
   const togglePointerLock = useCallback(() => {
-    if (!isStreaming || !isReady) return
+    if (!isStreaming || !isReady || connectionLost) return
     if (document.pointerLockElement) {
       document.exitPointerLock()
       return
     }
     requestPointerLock()
-  }, [isStreaming, isReady, requestPointerLock])
+  }, [isStreaming, isReady, connectionLost, requestPointerLock])
 
   const handleReset = useCallback(() => {
     reset()
@@ -414,8 +418,8 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
   }, [])
 
   const handleContainerClick = useCallback(() => {
-    if (isStreaming && isReady) requestPointerLock()
-  }, [isStreaming, isReady, requestPointerLock])
+    if (isStreaming && isReady && !connectionLost) requestPointerLock()
+  }, [isStreaming, isReady, connectionLost, requestPointerLock])
 
   // Cleanup helper for logout/dismiss
   const cleanupState = useCallback(() => {
@@ -449,12 +453,17 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
   }, [cleanupState, stopServerIfRunning, shutdown])
 
   const dismissConnectionLost = useCallback(async () => {
-    log.info('Dismissing connection lost overlay')
+    log.info('Acknowledging connection lost overlay')
+    setConnectionLost(false)
+  }, [])
+
+  const reconnectAfterConnectionLost = useCallback(async () => {
+    log.info('Reconnecting after connection lost')
     setConnectionLost(false)
     cleanupState()
-    await stopServerIfRunning()
-    await shutdown()
-  }, [cleanupState, stopServerIfRunning, shutdown])
+    warmBootstrapSentRef.current = false
+    transitionTo(states.LOADING)
+  }, [cleanupState, transitionTo, states.LOADING])
 
   const cancelConnection = useCallback(async () => {
     log.info('Cancelling connection')
@@ -545,6 +554,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     disconnect,
     logout,
     dismissConnectionLost,
+    reconnectAfterConnectionLost,
     cancelConnection,
     prepareReturnToMainMenu,
     reset,
