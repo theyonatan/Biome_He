@@ -748,6 +748,18 @@ async def _handle_seeds_list() -> dict:
     async with rescan_lock:
         pass
 
+    def _uploaded_at(data: dict) -> float:
+        file_path = str(data.get("path", ""))
+        is_default = not file_path.startswith(str(UPLOADS_DIR))
+        if is_default:
+            return 0.0
+        try:
+            if file_path and os.path.exists(file_path):
+                return float(os.path.getmtime(file_path))
+        except Exception:
+            pass
+        return float(data.get("checked_at", 0) or 0)
+
     all_seeds = {
         filename: {
             "filename": filename,
@@ -755,6 +767,7 @@ async def _handle_seeds_list() -> dict:
             "is_safe": data.get("is_safe", False),
             "is_default": not str(data.get("path", "")).startswith(str(UPLOADS_DIR)),
             "checked_at": data.get("checked_at", 0),
+            "uploaded_at": _uploaded_at(data),
         }
         for filename, data in safe_seeds_cache.items()
     }
@@ -778,6 +791,15 @@ async def _handle_seeds_list_with_thumbnails(msg: dict) -> dict:
     ) -> tuple[str, dict]:
         file_path = str(data.get("path", ""))
         is_default = not file_path.startswith(str(UPLOADS_DIR))
+        uploaded_at = 0.0
+        if not is_default:
+            try:
+                if file_path and os.path.exists(file_path):
+                    uploaded_at = float(os.path.getmtime(file_path))
+            except Exception:
+                uploaded_at = 0.0
+            if uploaded_at <= 0:
+                uploaded_at = float(data.get("checked_at", 0) or 0)
         thumbnail_base64: str | None = None
 
         if file_path and os.path.exists(file_path):
@@ -795,6 +817,7 @@ async def _handle_seeds_list_with_thumbnails(msg: dict) -> dict:
                 "is_safe": data.get("is_safe", False),
                 "is_default": is_default,
                 "checked_at": data.get("checked_at", 0),
+                "uploaded_at": uploaded_at,
                 "thumbnail_base64": thumbnail_base64,
             },
         )

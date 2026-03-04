@@ -31,13 +31,47 @@ const PauseOverlay = ({ isActive }: { isActive: boolean }) => {
   const hasHydratedPinnedRef = useRef(false)
 
   type SeedsWithThumbsResponse = {
-    seeds: Record<string, { filename: string; is_safe: boolean; is_default: boolean; thumbnail_base64: string | null }>
+    seeds: Record<
+      string,
+      {
+        filename: string
+        is_safe: boolean
+        is_default: boolean
+        checked_at?: number
+        uploaded_at?: number
+        thumbnail_base64: string | null
+      }
+    >
     count: number
   }
 
   type SeedsListResponse = {
-    seeds: Record<string, { filename: string; is_safe: boolean; is_default: boolean }>
+    seeds: Record<
+      string,
+      {
+        filename: string
+        is_safe: boolean
+        is_default: boolean
+        checked_at?: number
+        uploaded_at?: number
+      }
+    >
     count: number
+  }
+
+  const sortSeedsByRecency = (
+    a: { filename: string; is_default: boolean; uploaded_at?: number; checked_at?: number },
+    b: { filename: string; is_default: boolean; uploaded_at?: number; checked_at?: number }
+  ) => {
+    // Non-default (uploaded) seeds first; default bundled seeds always last.
+    if (a.is_default !== b.is_default) return a.is_default ? 1 : -1
+
+    // Within uploaded seeds, newest uploads first.
+    const aTime = Number(a.uploaded_at ?? a.checked_at ?? 0)
+    const bTime = Number(b.uploaded_at ?? b.checked_at ?? 0)
+    if (aTime !== bTime) return bTime - aTime
+
+    return a.filename.localeCompare(b.filename)
   }
 
   const loadSeedsAndThumbnails = useCallback(async () => {
@@ -51,9 +85,11 @@ const PauseOverlay = ({ isActive }: { isActive: boolean }) => {
           filename,
           is_safe: Boolean(info.is_safe ?? false),
           is_default: Boolean(info.is_default ?? true),
+          checked_at: Number(info.checked_at ?? 0),
+          uploaded_at: Number(info.uploaded_at ?? 0),
           thumbnail_base64: typeof info.thumbnail_base64 === 'string' ? info.thumbnail_base64 : null
         }))
-        .sort((a, b) => a.filename.localeCompare(b.filename))
+        .sort(sortSeedsByRecency)
     } catch {
       // ignore
     }
@@ -67,9 +103,11 @@ const PauseOverlay = ({ isActive }: { isActive: boolean }) => {
           filename,
           is_safe: Boolean(info.is_safe ?? false),
           is_default: Boolean(info.is_default ?? true),
+          checked_at: Number(info.checked_at ?? 0),
+          uploaded_at: Number(info.uploaded_at ?? 0),
           thumbnail_base64: null
         }))
-        .sort((a, b) => a.filename.localeCompare(b.filename))
+        .sort(sortSeedsByRecency)
     }
 
     console.log(`[PauseOverlay] Loaded ${seedList.length} seeds`)
