@@ -32,7 +32,7 @@ const WindowControls = () => {
       >
         <button
           type="button"
-          className={`${WINDOW_CONTROL_BASE} outline-0 outline-[var(--color-border-light)] transition-[background-color,color,outline-width] duration-[160ms] ease-in-out hover:bg-[var(--color-surface-btn-hover)] hover:text-[var(--color-text-inverse)] hover:outline-2`}
+          className={`${WINDOW_CONTROL_BASE} outline-0 outline-border-light transition-[background-color,color,outline-width] duration-[160ms] ease-in-out hover:bg-surface-btn-hover hover:text-text-inverse hover:outline-2`}
           onClick={minimize}
           aria-label="Minimize"
           style={noDragRegionStyle}
@@ -41,7 +41,7 @@ const WindowControls = () => {
         </button>
         <button
           type="button"
-          className={`${WINDOW_CONTROL_BASE} outline-0 outline-[var(--color-border-light)] transition-[background-color,color,outline-width] duration-[160ms] ease-in-out hover:bg-[var(--color-surface-btn-hover)] hover:text-[var(--color-text-inverse)] hover:outline-2`}
+          className={`${WINDOW_CONTROL_BASE} outline-0 outline-border-light transition-[background-color,color,outline-width] duration-[160ms] ease-in-out hover:bg-surface-btn-hover hover:text-text-inverse hover:outline-2`}
           onClick={toggleMaximize}
           aria-label="Maximize"
           style={noDragRegionStyle}
@@ -61,7 +61,7 @@ const WindowControls = () => {
         </button>
         <button
           type="button"
-          className={`${WINDOW_CONTROL_BASE} outline-0 outline-[var(--color-close-hover)] transition-[background-color,color,outline-width] duration-[160ms] ease-in-out hover:bg-[var(--color-close-hover)] hover:text-white hover:outline-2`}
+          className={`${WINDOW_CONTROL_BASE} outline-0 outline-danger-dark transition-[background-color,color,outline-width] duration-[160ms] ease-in-out hover:bg-danger-dark hover:text-white hover:outline-2`}
           onClick={close}
           aria-label="Close"
           style={noDragRegionStyle}

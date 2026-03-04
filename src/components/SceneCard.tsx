@@ -1,16 +1,14 @@
 import type { SeedRecord } from '../types/app'
 
 const ACTION_BASE =
-  'w-[5cqh] h-[5cqh] grid place-items-center bg-[var(--color-action-bg)] text-[2.54cqh] leading-none rounded-[2px] cursor-pointer transition-[background,color,border-color] duration-[140ms] ease-in-out border'
+  'w-[5cqh] h-[5cqh] grid place-items-center bg-[var(--color-surface-btn-ghost)] text-[2.54cqh] leading-none rounded-[2px] cursor-pointer transition-[color,border-color] duration-[140ms] ease-in-out border'
 
-const ACTION_PINNED =
-  'text-[var(--color-action-pinned)] border-[var(--color-action-pinned-border)] hover:bg-[var(--color-action-pinned-hover-bg)] hover:text-[var(--color-action-pinned-hover)] hover:border-[var(--color-action-pinned-hover-border)]'
+const ACTION_PINNED = 'text-warm border-warm/70 hover:text-[var(--color-warm-bright)] hover:border-warm'
 
 const ACTION_UNPINNED =
-  'text-[var(--color-action-unpin)] border-[var(--color-action-unpin-border)] hover:text-[var(--color-action-unpin-hover)] hover:border-[var(--color-action-unpin-hover-border)]'
+  'text-text-muted border-[var(--color-border-subtle)] hover:text-text-primary hover:border-border-light'
 
-const ACTION_DELETE =
-  'text-[var(--color-action-delete)] border-[var(--color-action-delete-border)] hover:text-[var(--color-action-delete-hover)] hover:border-[var(--color-action-delete-hover-border)]'
+const ACTION_DELETE = 'text-error-muted border-error/50 hover:text-[var(--color-error-bright)] hover:border-error'
 
 const PinnedIcon = () => (
   <svg

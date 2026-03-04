@@ -7,7 +7,7 @@ import Button from './ui/Button'
 import ServerLogDisplay from './ServerLogDisplay'
 
 const INLINE_ERROR_MAX_LENGTH = 80
-const ERROR_DETAIL_CLASS = 'font-serif text-[3.2cqh] leading-[1.15] text-[rgba(255,205,205,0.96)]'
+const ERROR_DETAIL_CLASS = 'font-serif text-[3.2cqh] leading-[1.15] text-[var(--color-error-bright)]'
 
 type TerminalDisplayProps = {
   onCancel?: () => void

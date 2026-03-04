@@ -10,7 +10,7 @@ const getLogClass = (line: string): string => {
     return 'text-text-error'
   }
   if (line.includes('[WARNING]') || line.includes('Warning:')) {
-    return 'text-[rgba(255,200,100,0.9)]'
+    return 'text-warm/90'
   }
   if (line.includes('[INFO]')) {
     return 'text-hud/90'
@@ -110,7 +110,7 @@ const ServerLogDisplay = ({
               {title ?? (showProgress ? 'INSTALLING WORLD ENGINE' : 'ENGINE OUTPUT')}
             </span>
             <span
-              className={`w-[1.07cqh] h-[1.07cqh] rounded-full ${isLoadingInline ? 'bg-[rgba(255,255,255,0.82)]' : `bg-warm/90 ${showDismiss ? 'bg-[rgba(255,100,100,0.9)] !animate-none' : 'animate-[indicatorPulse_1s_ease-in-out_infinite]'}`}`}
+              className={`w-[1.07cqh] h-[1.07cqh] rounded-full ${isLoadingInline ? 'bg-[rgba(255,255,255,0.82)]' : `bg-warm/90 ${showDismiss ? 'bg-error-muted !animate-none' : 'animate-[indicatorPulse_1s_ease-in-out_infinite]'}`}`}
             />
           </div>
           {headerAction}
@@ -158,7 +158,7 @@ const ServerLogDisplay = ({
       </div>
       {showDismiss && (
         <button
-          className={`mx-[2.13cqh] my-[1cqh] px-[2.67cqh] py-[0.6cqh] bg-[rgba(255,100,100,0.15)] border border-[rgba(255,100,100,0.4)] rounded-panel text-text-error font-mono text-[1.78cqh] tracking-wider cursor-pointer outline-0 outline-[rgba(255,100,100,0.6)] ${INTERACTIVE_TRANSITION} duration-200 hover:bg-[rgba(255,100,100,0.25)] hover:border-[rgba(255,100,100,0.6)] hover:outline-2`}
+          className={`mx-[2.13cqh] my-[1cqh] px-[2.67cqh] py-[0.6cqh] bg-error/15 border border-error/40 rounded-panel text-text-error font-mono text-[1.78cqh] tracking-wider cursor-pointer outline-0 outline-error/60 ${INTERACTIVE_TRANSITION} duration-200 hover:bg-error/25 hover:border-error/60 hover:outline-2`}
           onClick={onDismiss}
         >
           DISMISS

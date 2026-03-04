@@ -36,15 +36,19 @@
   --font-serif: 'Salernomi J', 'Times New Roman', Georgia, serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
+  /* Semantic palette */
   --color-hud: #78fff5;
   --color-warm: #ffc864;
+  --color-warm-bright: rgba(255, 210, 80, 1);
   --color-hot: #64ff96;
   --color-error: #ff7878;
+  --color-error-bright: rgba(255, 170, 170, 1);
+  --color-error-muted: rgba(255, 100, 100, 0.9);
   --color-danger: #ff5050;
+  --color-danger-dark: #dc3232;
   --color-dark: #0a0e12;
   --color-darker: #080c10;
   --color-darkest: #020617;
-  --color-close-hover: #dc3232;
 
   /* Text colors */
   --color-text-primary: rgba(245, 249, 255, 0.95);
@@ -53,6 +57,7 @@
   --color-text-inverse: rgba(15, 20, 32, 0.95);
   --color-text-hud: rgba(230, 255, 255, 0.9);
   --color-text-error: rgba(255, 100, 100, 0.9);
+  --color-text-modal-muted: rgba(233, 242, 255, 0.82);
 
   /* Surface/background colors */
   --color-surface-btn-primary: rgba(245, 249, 255, 0.95);
@@ -70,23 +75,6 @@
 
   /* Overlay colors */
   --color-overlay-scrim: rgba(2, 6, 16, 0.55);
-  --color-text-modal-muted: rgba(233, 242, 255, 0.82);
-
-  /* Scene action colors */
-  --color-action-bg: rgba(8, 12, 20, 0.72);
-  --color-action-pinned: rgba(255, 196, 56, 0.98);
-  --color-action-pinned-border: rgba(255, 210, 90, 0.9);
-  --color-action-pinned-hover-bg: rgba(20, 18, 8, 0.82);
-  --color-action-pinned-hover: rgba(255, 210, 80, 1);
-  --color-action-pinned-hover-border: rgba(255, 220, 100, 1);
-  --color-action-unpin: rgba(200, 210, 225, 0.88);
-  --color-action-unpin-border: rgba(200, 210, 225, 0.6);
-  --color-action-unpin-hover: rgba(255, 255, 255, 1);
-  --color-action-unpin-hover-border: rgba(255, 255, 255, 0.9);
-  --color-action-delete: rgba(255, 100, 100, 0.95);
-  --color-action-delete-border: rgba(255, 110, 110, 0.82);
-  --color-action-delete-hover: rgba(255, 170, 170, 1);
-  --color-action-delete-hover-border: rgba(255, 180, 180, 1);
 
   /* Font sizes */
   --text-body: 3.73cqh;

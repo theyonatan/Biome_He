@@ -115,7 +115,7 @@ const PauseScenesView = ({
           All of your {seeds.length} {seeds.length === 1 ? 'scene' : 'scenes'}. Use the buttons to add more scenes, or
           drag/paste them in.
         </p>
-        {uploadError && <p className="!mt-[0.6cqh] !text-[rgba(255,180,180,0.92)]">{uploadError}</p>}
+        {uploadError && <p className="!mt-[0.6cqh] !text-[var(--color-error-bright)]">{uploadError}</p>}
         <input ref={fileInputRef} type="file" accept="image/*" onChange={onImageUpload} style={{ display: 'none' }} />
         <div className="pause-scene-scroll overflow-y-auto pr-[0.8cqh] max-h-[62cqh] mt-[1.1cqh] relative z-[4]">
           <div className="grid grid-cols-[repeat(auto-fill,25.78cqh)] gap-[1.28cqh] w-full">
