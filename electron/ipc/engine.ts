@@ -1,7 +1,7 @@
 import { ipcMain, shell, BrowserWindow } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
-import { execFileSync, spawn } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
 import { createInterface } from 'node:readline'
 import { getEngineDir, getUvDir, getResourcePath, SERVER_COMPONENT_FILES } from '../lib/paths.js'
 import { getUvBinaryPath, getUvEnvVars } from '../lib/uv.js'
@@ -9,6 +9,18 @@ import { getHiddenWindowOptions, getUvArchiveName, getVenvPythonPath } from '../
 import { getServerState } from '../lib/serverState.js'
 
 const UV_VERSION = '0.9.26'
+
+function execFileAsync(file: string, args: string[], options?: Parameters<typeof execFile>[2]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    execFile(file, args, options ?? {}, (error) => {
+      if (error) {
+        reject(error)
+        return
+      }
+      resolve()
+    })
+  })
+}
 
 function emitToAllWindows(channel: string, ...args: unknown[]): void {
   for (const win of BrowserWindow.getAllWindows()) {
@@ -160,7 +172,7 @@ async function installUv(): Promise<string> {
 }
 
 export function registerEngineIpc(): void {
-  ipcMain.handle('check-engine-status', (_event, source?: string) => {
+  ipcMain.handle('check-engine-status', async (_event, source?: string) => {
     const caller = source ?? 'unknown'
     logEngineToConsoleAndUi(`[ENGINE] check-engine-status: start (caller=${caller})`)
     const engineDir = getEngineDir()
@@ -173,9 +185,8 @@ export function registerEngineIpc(): void {
     if (fs.existsSync(uvBinary)) {
       try {
         logEngineToConsoleAndUi('[ENGINE] check-engine-status: validating uv binary...')
-        execFileSync(uvBinary, ['--version'], {
-          ...getHiddenWindowOptions(),
-          stdio: 'pipe'
+        await execFileAsync(uvBinary, ['--version'], {
+          ...getHiddenWindowOptions()
         })
         uvInstalled = true
         logEngineToConsoleAndUi('[ENGINE] check-engine-status: uv binary ok')
@@ -200,11 +211,10 @@ export function registerEngineIpc(): void {
           logEngineToConsoleAndUi(
             '[ENGINE] check-engine-status: validating synced dependencies via uv run python --version...'
           )
-          execFileSync(uvBinary, ['run', 'python', '--version'], {
+          await execFileAsync(uvBinary, ['run', 'python', '--version'], {
             cwd: engineDir,
             env: { ...process.env, ...uvEnv, UV_FROZEN: '1' },
-            ...getHiddenWindowOptions(),
-            stdio: 'pipe'
+            ...getHiddenWindowOptions()
           })
           dependenciesSynced = true
           logEngineToConsoleAndUi('[ENGINE] check-engine-status: dependency validation ok')

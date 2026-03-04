@@ -285,7 +285,7 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
               <span className="inline-flex items-center gap-[0.71cqh]">
                 is the local engine healthy?{' '}
                 {engineReady === null ? (
-                  'unknown'
+                  'checking...'
                 ) : engineReady ? (
                   <>
                     yes
