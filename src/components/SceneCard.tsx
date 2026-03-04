@@ -67,57 +67,78 @@ interface SceneCardProps {
   onRemove?: (seed: SeedRecord) => void
 }
 
-const SceneCard = ({ seed, thumbnailSrc, isPinned, pinVariant, onSelect, onTogglePin, onRemove }: SceneCardProps) => (
-  <button
-    type="button"
-    className="w-full aspect-video rounded-[var(--radius-card)] border border-[var(--color-border-medium)] bg-[var(--color-surface-card)] p-0 cursor-pointer overflow-hidden group/scene relative"
-    title={seed.filename}
-    onClick={() => onSelect(seed.filename)}
-  >
-    <img className="w-full h-full object-cover block" src={thumbnailSrc || ''} alt={seed.filename} />
-    <span className="absolute top-1 right-1 flex flex-col gap-1 opacity-0 transition-opacity duration-[140ms] ease-in-out group-hover/scene:opacity-100">
-      <span
-        role="button"
-        tabIndex={0}
-        className={`pause-scene-action ${isPinned ? 'is-pinned' : 'is-default'}`}
-        title={isPinned ? 'Unpin scene' : 'Pin scene'}
-        onClick={(event) => {
-          event.stopPropagation()
-          onTogglePin(seed.filename)
-        }}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault()
-            event.stopPropagation()
-            onTogglePin(seed.filename)
-          }
-        }}
-      >
-        {pinVariant === 'pinned-only' || isPinned ? <PinnedIcon /> : <UnpinnedIcon />}
-      </span>
-      {!seed.is_default && onRemove && (
-        <span
-          role="button"
-          tabIndex={0}
-          className="pause-scene-action is-delete"
-          title="Remove scene"
-          onClick={(event) => {
-            event.stopPropagation()
-            void onRemove(seed)
-          }}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault()
-              event.stopPropagation()
-              void onRemove(seed)
-            }
-          }}
-        >
-          <DeleteIcon />
+const SceneCard = ({ seed, thumbnailSrc, isPinned, pinVariant, onSelect, onTogglePin, onRemove }: SceneCardProps) => {
+  const isUnsafe = !seed.is_safe
+
+  return (
+    <button
+      type="button"
+      className={`w-full aspect-video rounded-[var(--radius-card)] border border-[var(--color-border-medium)] bg-[var(--color-surface-card)] p-0 overflow-hidden group/scene relative ${
+        isUnsafe ? 'cursor-not-allowed border-[rgba(184,188,198,0.72)] bg-[rgba(42,47,56,0.62)]' : 'cursor-pointer'
+      }`}
+      title={seed.filename}
+      aria-disabled={isUnsafe}
+      onClick={() => {
+        if (isUnsafe) return
+        onSelect(seed.filename)
+      }}
+    >
+      <img
+        className={`w-full h-full object-cover block ${isUnsafe ? 'grayscale brightness-[0.45] contrast-[0.8]' : ''}`}
+        src={thumbnailSrc || ''}
+        alt={seed.filename}
+      />
+      {isUnsafe && (
+        <span className="absolute left-1 top-1 px-[0.58cqh] py-[0.18cqh] text-[1.11cqh] font-semibold tracking-[0.08em] uppercase text-[rgba(16,20,28,0.95)] bg-[rgba(214,218,228,0.92)]">
+          Unsafe
         </span>
       )}
-    </span>
-  </button>
-)
+      <span className="absolute top-1 right-1 flex flex-col gap-1 opacity-0 transition-opacity duration-[140ms] ease-in-out group-hover/scene:opacity-100 group-focus-within/scene:opacity-100">
+        {!isUnsafe && (
+          <span
+            role="button"
+            tabIndex={0}
+            className={`pause-scene-action ${isPinned ? 'is-pinned' : 'is-default'}`}
+            title={isPinned ? 'Unpin scene' : 'Pin scene'}
+            onClick={(event) => {
+              event.stopPropagation()
+              onTogglePin(seed.filename)
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault()
+                event.stopPropagation()
+                onTogglePin(seed.filename)
+              }
+            }}
+          >
+            {pinVariant === 'pinned-only' || isPinned ? <PinnedIcon /> : <UnpinnedIcon />}
+          </span>
+        )}
+        {!seed.is_default && onRemove && (
+          <span
+            role="button"
+            tabIndex={0}
+            className="pause-scene-action is-delete"
+            title="Remove scene"
+            onClick={(event) => {
+              event.stopPropagation()
+              void onRemove(seed)
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault()
+                event.stopPropagation()
+                void onRemove(seed)
+              }
+            }}
+          >
+            <DeleteIcon />
+          </span>
+        )}
+      </span>
+    </button>
+  )
+}
 
 export default SceneCard
