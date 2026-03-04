@@ -109,7 +109,7 @@ const PauseScenesView = ({
           <span className="font-serif text-[3.11cqh] text-[rgba(245,249,255,0.95)]">Drop images to add scenes</span>
         </div>
       )}
-      <section className="absolute top-[var(--edge-top-xl)] left-[var(--edge-left)] w-[70%] z-[3] flex flex-col">
+      <section className="absolute top-[var(--edge-top-xl)] left-[var(--edge-left)] w-[90%] z-[3] flex flex-col">
         <h2 className={`${HEADING_BASE} text-heading text-text-primary font-normal text-left`}>Scenes</h2>
         <p className="m-0 font-serif text-caption text-text-muted max-w-[103.12cqh] text-left">
           All of your {seeds.length} {seeds.length === 1 ? 'scene' : 'scenes'}. Use the buttons to add more scenes, or
@@ -118,7 +118,7 @@ const PauseScenesView = ({
         {uploadError && <p className="!mt-[0.6cqh] !text-[rgba(255,180,180,0.92)]">{uploadError}</p>}
         <input ref={fileInputRef} type="file" accept="image/*" onChange={onImageUpload} style={{ display: 'none' }} />
         <div className="pause-scene-scroll overflow-y-auto pr-[0.8cqh] max-h-[62cqh] mt-[1.1cqh] relative z-[4]">
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(25.78cqh,1fr))] gap-[1.28cqh] w-full">
+          <div className="grid grid-cols-[repeat(auto-fill,25.78cqh)] gap-[1.28cqh] w-full">
             <div
               className={`relative w-full aspect-video border border-[rgba(245,249,255,0.84)] bg-[rgba(248,248,245,0.14)] p-0 overflow-hidden grid grid-cols-2 ${uploadingImage ? 'opacity-60 pointer-events-none' : ''}`}
             >
