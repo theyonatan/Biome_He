@@ -14,7 +14,6 @@ import {
   clearServerState,
   stopServerSync
 } from '../lib/serverState.js'
-import { readConfigSync } from './config.js'
 
 async function runUvSyncWithMirroredLogs(uvBinary: string, cwd: string, env: NodeJS.ProcessEnv): Promise<void> {
   await new Promise<void>((resolve, reject) => {
@@ -120,9 +119,8 @@ export function registerServerIpc(): void {
       PYTHONUNBUFFERED: '1'
     }
 
-    // Pass through HuggingFace token
-    const config = readConfigSync()
-    const hfToken = config.api_keys?.huggingface || process.env.HF_TOKEN || process.env.HUGGING_FACE_HUB_TOKEN || ''
+    // Pass through HuggingFace token from environment
+    const hfToken = process.env.HF_TOKEN || process.env.HUGGING_FACE_HUB_TOKEN || ''
 
     if (hfToken) {
       console.log(`[ENGINE] HuggingFace token configured (${Math.min(hfToken.length, 4)}... chars)`)

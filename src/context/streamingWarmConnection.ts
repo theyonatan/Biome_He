@@ -1,9 +1,10 @@
+import { STANDALONE_PORT, localhostUrl } from '../types/settings'
+
 type WarmConnectionOptions = {
-  standalonePort: number
   currentServerPort: number | null
   isStandaloneMode: boolean
   endpointUrl: string | null
-  gpuServer: { host: string; port: number; use_ssl?: boolean }
+  serverUrl: string
   isServerRunning: boolean
   checkServerReady: () => Promise<boolean>
   checkPortInUse: (port: number) => Promise<boolean>
@@ -33,7 +34,7 @@ const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 
 const normalizeWsEndpoint = (endpoint: string, preferSecure: boolean): string => {
   let raw = endpoint.trim()
-  if (!raw) return preferSecure ? 'wss://localhost/ws' : 'ws://localhost/ws'
+  if (!raw) raw = localhostUrl(STANDALONE_PORT)
 
   if (!/^[a-z]+:\/\//i.test(raw)) {
     raw = `${preferSecure ? 'wss' : 'ws'}://${raw}`
@@ -125,11 +126,10 @@ const findFirstOpenStandalonePort = async (
 }
 
 export const runWarmConnectionFlow = async ({
-  standalonePort,
   currentServerPort,
   isStandaloneMode,
   endpointUrl,
-  gpuServer,
+  serverUrl,
   isServerRunning,
   checkServerReady,
   checkPortInUse,
@@ -141,13 +141,14 @@ export const runWarmConnectionFlow = async ({
   isCancelled,
   log
 }: WarmConnectionOptions): Promise<void> => {
-  const rawEndpoint = endpointUrl || `${gpuServer.host}:${gpuServer.port}`
-  const preferSecureTransport = isStandaloneMode ? false : Boolean(gpuServer.use_ssl)
-  let wsUrl = normalizeWsEndpoint(rawEndpoint, preferSecureTransport)
+  // In server mode, derive WS URL from the configured server URL (or override endpoint).
+  // In standalone mode, wsUrl is always overwritten below with localhost:{port}.
+  const preferSecureTransport = !isStandaloneMode && serverUrl.startsWith('https')
+  let wsUrl = normalizeWsEndpoint(endpointUrl || serverUrl, preferSecureTransport)
 
   if (isStandaloneMode) {
     log.info('Standalone mode enabled, checking server state...')
-    let selectedPort = standalonePort
+    let selectedPort = STANDALONE_PORT
 
     // Only attach to an already-running server when it's Biome's managed process.
     if (isServerRunning) {
@@ -156,7 +157,7 @@ export const runWarmConnectionFlow = async ({
         const status = await checkEngineStatus()
         if (status?.server_port) selectedPort = status.server_port
       }
-      wsUrl = normalizeWsEndpoint(`localhost:${selectedPort}`, false)
+      wsUrl = normalizeWsEndpoint(localhostUrl(selectedPort), false)
 
       const serverAlreadyReady = await checkServerReady()
       if (serverAlreadyReady) {
@@ -173,17 +174,17 @@ export const runWarmConnectionFlow = async ({
         }
       }
     } else {
-      const openPort = await findFirstOpenStandalonePort(standalonePort, checkPortInUse, log)
+      const openPort = await findFirstOpenStandalonePort(STANDALONE_PORT, checkPortInUse, log)
       if (openPort === null) {
         onServerError(
           new Error(
-            `No open standalone port found in range ${standalonePort}-${standalonePort + STANDALONE_PORT_SCAN_LIMIT - 1}.`
+            `No open standalone port found in range ${STANDALONE_PORT}-${STANDALONE_PORT + STANDALONE_PORT_SCAN_LIMIT - 1}.`
           )
         )
         return
       }
       selectedPort = openPort
-      wsUrl = normalizeWsEndpoint(`localhost:${selectedPort}`, false)
+      wsUrl = normalizeWsEndpoint(localhostUrl(selectedPort), false)
 
       const status = await checkEngineStatus()
       if (!status?.uv_installed || !status?.repo_cloned || !status?.dependencies_synced) {

@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { invoke } from '../bridge'
 import { HEADING_BASE, SETTINGS_MUTED_TEXT } from '../styles'
-import { useConfig, ENGINE_MODES } from '../hooks/useConfig'
+import { useSettings } from '../hooks/useSettings'
+import { ENGINE_MODES } from '../types/settings'
 import { useStreaming } from '../context/StreamingContext'
-import type { AppConfig } from '../types/app'
 import MenuButton from './ui/MenuButton'
 import SettingsButton from './ui/SettingsButton'
 import SettingsSection from './ui/SettingsSection'
@@ -24,7 +24,7 @@ type MenuSettingsViewProps = {
 }
 
 const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
-  const { config, saveConfig } = useConfig()
+  const { settings, saveSettings } = useSettings()
   const {
     engineStatus,
     checkEngineStatus,
@@ -40,15 +40,15 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
   // Convert streaming scale (0.1-3.0) to menu scale (10-100)
   const streamingToMenu = (v: number) => Math.round(10 + ((v - 0.1) * 90) / 2.9)
 
-  const configEngineMode = config.features?.engine_mode
-  const configWorldModel = config.features?.world_engine_model || 'Overworld/Waypoint-1-Small'
+  const configEngineMode = settings.engine_mode
+  const configWorldModel = settings.engine_model
 
   const [menuEngineMode, setMenuEngineMode] = useState<'server' | 'standalone'>(() =>
     configEngineMode === ENGINE_MODES.SERVER ? 'server' : 'standalone'
   )
   const [menuWorldModel, setMenuWorldModel] = useState(configWorldModel)
   const [menuMouseSensitivity, setMenuMouseSensitivity] = useState(() =>
-    streamingToMenu(config.features?.mouse_sensitivity ?? mouseSensitivity)
+    streamingToMenu(settings.mouse_sensitivity ?? mouseSensitivity)
   )
   const [menuModelOptions, setMenuModelOptions] = useState<MenuModelOption[]>([
     { id: configWorldModel, isLocal: false }
@@ -62,7 +62,7 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
   const [isExportingInstallDiagnostics, setIsExportingInstallDiagnostics] = useState(false)
   const [installExportStatus, setInstallExportStatus] = useState<string | null>(null)
 
-  const configServerUrl = `${config.gpu_server.use_ssl ? 'https' : 'http'}://${config.gpu_server.host}:${config.gpu_server.port}`
+  const configServerUrl = settings.server_url
   const [menuServerUrl, setMenuServerUrl] = useState(configServerUrl)
 
   const engineReady = engineStatus
@@ -116,9 +116,9 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
   useEffect(() => {
     setMenuEngineMode(configEngineMode === ENGINE_MODES.SERVER ? 'server' : 'standalone')
     setMenuWorldModel(configWorldModel)
-    setMenuMouseSensitivity(streamingToMenu(config.features?.mouse_sensitivity ?? mouseSensitivity))
+    setMenuMouseSensitivity(streamingToMenu(settings.mouse_sensitivity ?? mouseSensitivity))
     setMenuServerUrl(configServerUrl)
-  }, [configEngineMode, configWorldModel, config.features?.mouse_sensitivity, mouseSensitivity, configServerUrl])
+  }, [configEngineMode, configWorldModel, settings.mouse_sensitivity, mouseSensitivity, configServerUrl])
 
   const handleServerUrlBlur = useCallback(() => {
     try {
@@ -145,43 +145,34 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
   }
 
   const applyDraftSettings = useCallback(async () => {
-    let nextGpuServer = config.gpu_server
+    let nextServerUrl = menuServerUrl
     try {
-      const parsed = new URL(menuServerUrl)
-      nextGpuServer = {
-        ...config.gpu_server,
-        host: parsed.hostname,
-        port: Number(parsed.port) || (parsed.protocol === 'https:' ? 443 : 80),
-        use_ssl: parsed.protocol === 'https:'
-      }
+      // Validate the URL
+      new URL(nextServerUrl)
     } catch {
+      nextServerUrl = configServerUrl
       setMenuServerUrl(configServerUrl)
     }
 
     const engineModeValue = menuEngineMode === 'server' ? ENGINE_MODES.SERVER : ENGINE_MODES.STANDALONE
     const streamingValue = 0.1 + ((menuMouseSensitivity - 10) * 2.9) / 90
 
-    const nextConfig: AppConfig = {
-      ...config,
-      gpu_server: nextGpuServer,
-      features: {
-        ...config.features,
-        engine_mode: engineModeValue,
-        world_engine_model: menuWorldModel,
-        mouse_sensitivity: streamingValue
-      }
-    }
-
-    await saveConfig(nextConfig)
+    await saveSettings({
+      ...settings,
+      server_url: nextServerUrl,
+      engine_mode: engineModeValue,
+      engine_model: menuWorldModel,
+      mouse_sensitivity: streamingValue
+    })
     setMouseSensitivity(streamingValue)
   }, [
-    config,
+    settings,
     configServerUrl,
     menuEngineMode,
     menuMouseSensitivity,
     menuServerUrl,
     menuWorldModel,
-    saveConfig,
+    saveSettings,
     setMouseSensitivity
   ])
 

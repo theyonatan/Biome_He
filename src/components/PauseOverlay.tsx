@@ -5,7 +5,7 @@ import type { SeedRecord, SeedRecordWithThumbnail } from '../types/app'
 import MenuSettingsView from './MenuSettingsView'
 import PauseMainView from './PauseMainView'
 import PauseScenesView from './PauseScenesView'
-import { useConfig } from '../hooks/useConfig'
+import { useSettings } from '../hooks/useSettings'
 import { PAUSE_VIEW, PAUSE_OVERLAY_CRT, type PauseViewKey } from '../constants'
 import { viewFadeVariants } from '../transitions'
 
@@ -20,7 +20,7 @@ const PauseOverlay = ({ isActive }: { isActive: boolean }) => {
     sendPromptWithSeed,
     wsRequest
   } = useStreaming()
-  const { config, isLoaded, saveConfig } = useConfig()
+  const { settings, isLoaded, saveSettings } = useSettings()
   const [view, setView] = useState<PauseViewKey>(PAUSE_VIEW.MAIN)
   const [seeds, setSeeds] = useState<SeedRecord[]>([])
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({})
@@ -204,8 +204,8 @@ const PauseOverlay = ({ isActive }: { isActive: boolean }) => {
   useEffect(() => {
     if (!isLoaded || hasHydratedPinnedRef.current) return
 
-    const fromConfig = Array.isArray(config.features?.pinned_scenes)
-      ? config.features.pinned_scenes.filter((value) => typeof value === 'string')
+    const fromConfig = Array.isArray(settings.pinned_scenes)
+      ? settings.pinned_scenes.filter((value) => typeof value === 'string')
       : []
 
     if (fromConfig.length > 0) {
@@ -229,24 +229,21 @@ const PauseOverlay = ({ isActive }: { isActive: boolean }) => {
     }
 
     hasHydratedPinnedRef.current = true
-  }, [isLoaded, config.features?.pinned_scenes])
+  }, [isLoaded, settings.pinned_scenes])
 
   useEffect(() => {
     if (!isLoaded || !hasHydratedPinnedRef.current) return
 
-    const currentPinned = Array.isArray(config.features?.pinned_scenes) ? config.features.pinned_scenes : []
+    const currentPinned = Array.isArray(settings.pinned_scenes) ? settings.pinned_scenes : []
     const nextPinned = pinnedSceneIds
 
     if (JSON.stringify(currentPinned) === JSON.stringify(nextPinned)) return
 
-    void saveConfig({
-      ...config,
-      features: {
-        ...config.features,
-        pinned_scenes: nextPinned
-      }
+    void saveSettings({
+      ...settings,
+      pinned_scenes: nextPinned
     })
-  }, [pinnedSceneIds, isLoaded, config, saveConfig])
+  }, [pinnedSceneIds, isLoaded, settings, saveSettings])
 
   const pinnedScenes = useMemo(() => seeds.filter((s) => pinnedSceneIds.includes(s.filename)), [seeds, pinnedSceneIds])
   const pauseLockoutRemainingMs = Math.max(0, unlockDelayMs - pauseElapsedMs)

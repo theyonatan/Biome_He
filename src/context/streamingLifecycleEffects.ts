@@ -1,4 +1,4 @@
-import { DEFAULT_WORLD_ENGINE_MODEL } from '../hooks/useConfig'
+import { DEFAULT_WORLD_ENGINE_MODEL } from '../types/settings'
 import type { StreamingLifecycleEffects, StreamingLifecycleState } from './streamingLifecycleMachine'
 import type { PortalState } from './portalStateMachine'
 
@@ -29,7 +29,7 @@ type PortalStatesLike = {
 type CreateHandlersArgs = {
   log: { info: (...args: unknown[]) => void; error: (...args: unknown[]) => void }
   lifecycleState: StreamingLifecycleState
-  config: { features?: { world_engine_model?: string | null } } | null
+  settings: { engine_model?: string | null } | null
   setEngineError: (value: string | null) => void
   setWarmConnectionJobSeq: (value: number) => void
   warmBootstrapSentRef: { current: boolean }
@@ -54,7 +54,7 @@ type LifecycleEffectHandlers = {
 export const createStreamingLifecycleEffectHandlers = ({
   log,
   lifecycleState,
-  config,
+  settings,
   setEngineError,
   setWarmConnectionJobSeq,
   warmBootstrapSentRef,
@@ -83,7 +83,7 @@ export const createStreamingLifecycleEffectHandlers = ({
     clearEngineErrorOnLoadingEntry: () => setEngineError(null),
     runLoadingConnection: () => setWarmConnectionJobSeq(lifecycleState.loadingConnectionRequestSeq),
     startIntentionalReconnect: () => {
-      const selectedModel = config?.features?.world_engine_model || DEFAULT_WORLD_ENGINE_MODEL
+      const selectedModel = settings?.engine_model || DEFAULT_WORLD_ENGINE_MODEL
       log.info('Model changed in settings while streaming - reconnecting to start a fresh session:', selectedModel)
       warmBootstrapSentRef.current = false
       setConnectionLost(false)

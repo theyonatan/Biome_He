@@ -10,7 +10,8 @@ import {
 } from './streamingLifecycleMachine'
 import useWebSocket from '../hooks/useWebSocket'
 import useGameInput from '../hooks/useGameInput'
-import { useConfig, STANDALONE_PORT, ENGINE_MODES, DEFAULT_WORLD_ENGINE_MODEL } from '../hooks/useConfig'
+import { useSettings } from '../hooks/useSettings'
+import { ENGINE_MODES, DEFAULT_WORLD_ENGINE_MODEL } from '../types/settings'
 import useEngine from '../hooks/useEngine'
 import useSeeds from '../hooks/useSeeds'
 import { createLogger } from '../utils/logger'
@@ -36,7 +37,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
 
-  const { config, isStandaloneMode, engineMode } = useConfig()
+  const { settings, isStandaloneMode, engineMode } = useSettings()
   const {
     status: engineStatus,
     startServer,
@@ -89,7 +90,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
   const [pauseElapsedMs, setPauseElapsedMs] = useState(0)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [showStats, setShowStats] = useState(false)
-  const [mouseSensitivity, setMouseSensitivity] = useState(() => config.features?.mouse_sensitivity ?? 1.0)
+  const [mouseSensitivity, setMouseSensitivity] = useState(() => settings.mouse_sensitivity ?? 1.0)
   const [fps, setFps] = useState(0)
   const [connectionLost, setConnectionLost] = useState(false)
   const [engineError, setEngineError] = useState<string | null>(null)
@@ -172,7 +173,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     if (!isConnected) return
     if (warmBootstrapSentRef.current) return
 
-    const selectedModel = config?.features?.world_engine_model || DEFAULT_WORLD_ENGINE_MODEL
+    const selectedModel = settings?.engine_model || DEFAULT_WORLD_ENGINE_MODEL
     log.info('Loading connected - bootstrapping session with model+seed:', selectedModel)
     // Use the default seed image as the immediate placeholder frame so transition
     // to streaming never shows a blank frame while waiting for server output.
@@ -185,15 +186,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     sendModel(selectedModel, 'default.png')
     lastAppliedModelRef.current = selectedModel
     warmBootstrapSentRef.current = true
-  }, [
-    state,
-    states.LOADING,
-    isConnected,
-    config?.features?.world_engine_model,
-    sendModel,
-    setPlaceholderFrame,
-    wsRequest
-  ])
+  }, [state, states.LOADING, isConnected, settings?.engine_model, sendModel, setPlaceholderFrame, wsRequest])
 
   useEffect(() => {
     if (!isConnected) {
@@ -255,7 +248,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
         portalState: state,
         connectionState,
         transportError: error,
-        configWorldEngineModel: config?.features?.world_engine_model,
+        engineModel: settings?.engine_model,
         lastAppliedModel: lastAppliedModelRef.current,
         engineError,
         statusCode,
@@ -270,7 +263,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     state,
     connectionState,
     error,
-    config?.features?.world_engine_model,
+    settings?.engine_model,
     engineError,
     statusCode,
     hasReceivedFrame,
@@ -293,17 +286,14 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
       // Don't transition to main menu immediately - wait for user to dismiss the error
     }
 
-    const standalonePort = config.gpu_server?.port ?? STANDALONE_PORT
-
     // Clear WS logs before starting a new connection
     clearWsLogs()
 
     runWarmConnectionFlow({
-      standalonePort,
       currentServerPort: serverPort,
       isStandaloneMode,
       endpointUrl,
-      gpuServer: config.gpu_server,
+      serverUrl: settings.server_url,
       isServerRunning,
       checkServerReady,
       checkPortInUse,
@@ -329,7 +319,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     const handlers = createStreamingLifecycleEffectHandlers({
       log,
       lifecycleState,
-      config,
+      settings,
       setEngineError,
       setWarmConnectionJobSeq: setLoadingConnectionJobSeq,
       warmBootstrapSentRef,
@@ -355,7 +345,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     states.LOADING,
     states.STREAMING,
     disconnect,
-    config?.features?.world_engine_model,
+    settings?.engine_model,
     exitPointerLock,
     requestPointerLock,
     sendPause

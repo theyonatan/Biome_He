@@ -1,4 +1,5 @@
-import type { AppConfig, EngineStatus } from './app'
+import type { EngineStatus } from './app'
+import type { Settings } from './settings'
 import type { PortalSparksTuning } from '../lib/portalSparksTuning'
 
 export type ModelAvailability = {
@@ -29,12 +30,12 @@ export type ExportDiagnosticsResult = {
  * This is the single source of truth for all invoke() calls.
  */
 export type IpcCommandMap = {
-  // Config
-  'read-config': { args: []; return: AppConfig }
-  'read-default-config': { args: []; return: AppConfig }
-  'write-config': { args: [config: AppConfig]; return: void }
-  'get-config-path-str': { args: []; return: string }
-  'open-config': { args: []; return: void }
+  // Settings
+  'read-settings': { args: []; return: Settings }
+  'read-default-settings': { args: []; return: Settings }
+  'write-settings': { args: [settings: Settings]; return: void }
+  'get-settings-path-str': { args: []; return: string }
+  'open-settings': { args: []; return: void }
 
   // Models
   'list-waypoint-models': { args: []; return: string[] }

@@ -1,4 +1,4 @@
-import { registerConfigIpc } from './config.js'
+import { registerSettingsIpc } from './settings.js'
 import { registerBackgroundsIpc } from './backgrounds.js'
 import { registerSeedsIpc } from './seeds.js'
 import { registerModelsIpc } from './models.js'
@@ -8,7 +8,7 @@ import { registerWindowIpc } from './window.js'
 import { registerDebugIpc } from './debug.js'
 
 export function registerAllIpc(): void {
-  registerConfigIpc()
+  registerSettingsIpc()
   registerBackgroundsIpc()
   registerSeedsIpc()
   registerModelsIpc()

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { invoke } from '../bridge'
 import { useStreaming } from '../context/StreamingContext'
 import { useVortex } from '../context/VortexContext'
-import { useConfig } from '../hooks/useConfig'
+import { useSettings } from '../hooks/useSettings'
 import Button from './ui/Button'
 import ServerLogDisplay from './ServerLogDisplay'
 
@@ -16,7 +16,7 @@ type TerminalDisplayProps = {
 const TerminalDisplay = ({ onCancel }: TerminalDisplayProps) => {
   const { connectionState, statusStage, engineError, error, cancelConnection, wsLogs, wsAllLogs } = useStreaming()
   const { setErrorMode } = useVortex()
-  const { isServerMode } = useConfig()
+  const { isServerMode } = useSettings()
   const [showLogsPanel, setShowLogsPanel] = useState(false)
   const [isExportingDiagnostics, setIsExportingDiagnostics] = useState(false)
   const [exportStatus, setExportStatus] = useState<string | null>(null)

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, type CSSProperties } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ConfigProvider } from './hooks/useConfig'
+import { SettingsProvider } from './hooks/useSettings'
 import { PortalProvider, usePortal } from './context/PortalContext'
 import { StreamingProvider, useStreaming } from './context/StreamingContext'
 import { VortexProvider } from './context/VortexContext'
@@ -290,7 +290,7 @@ const App = () => {
   useAppStartup()
 
   return (
-    <ConfigProvider>
+    <SettingsProvider>
       <PortalProvider>
         <StreamingProvider>
           <VortexProvider>
@@ -298,7 +298,7 @@ const App = () => {
           </VortexProvider>
         </StreamingProvider>
       </PortalProvider>
-    </ConfigProvider>
+    </SettingsProvider>
   )
 }
 
