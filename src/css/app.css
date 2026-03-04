@@ -65,6 +65,24 @@
   --color-border-light: rgba(245, 249, 255, 0.8);
   --color-border-medium: rgba(245, 249, 255, 0.52);
 
+  /* Scene action colors */
+  --color-action-bg: rgba(8, 12, 20, 0.72);
+  --color-action-pinned: rgba(255, 196, 56, 0.98);
+  --color-action-pinned-border: rgba(255, 210, 90, 0.9);
+  --color-action-pinned-hover-bg: rgba(20, 18, 8, 0.82);
+  --color-action-pinned-hover: rgba(255, 210, 80, 1);
+  --color-action-pinned-hover-border: rgba(255, 220, 100, 1);
+  --color-action-unpin: rgba(200, 210, 225, 0.88);
+  --color-action-unpin-border: rgba(200, 210, 225, 0.6);
+  --color-action-unpin-hover-bg: rgba(12, 16, 24, 0.82);
+  --color-action-unpin-hover: rgba(220, 228, 240, 1);
+  --color-action-unpin-hover-border: rgba(220, 228, 240, 0.85);
+  --color-action-delete: rgba(255, 100, 100, 0.95);
+  --color-action-delete-border: rgba(255, 110, 110, 0.82);
+  --color-action-delete-hover-bg: rgba(24, 8, 8, 0.82);
+  --color-action-delete-hover: rgba(255, 120, 120, 1);
+  --color-action-delete-hover-border: rgba(255, 130, 130, 1);
+
   /* Font sizes */
   --text-body: 3.73cqh;
   --text-heading: 7.82cqh;
@@ -405,51 +423,6 @@
   }
   .pause-scene-scroll::-webkit-scrollbar-thumb:hover {
     background: linear-gradient(to bottom, rgba(240, 247, 255, 0.92), rgba(184, 206, 233, 0.72));
-  }
-
-  .pause-scene-action {
-    width: 5cqh;
-    height: 5cqh;
-    display: grid;
-    place-items: center;
-    border: 1px solid rgba(245, 249, 255, 0.7);
-    background: rgba(8, 12, 20, 0.72);
-    color: rgba(245, 249, 255, 0.92);
-    font-size: 2.54cqh;
-    line-height: 1;
-    border-radius: 2px;
-    cursor: pointer;
-    transition:
-      background 140ms ease,
-      color 140ms ease,
-      border-color 140ms ease;
-  }
-  .pause-scene-action.is-pinned {
-    color: rgba(255, 196, 56, 0.98);
-    border-color: rgba(255, 210, 90, 0.9);
-  }
-  .pause-scene-action.is-pinned:hover {
-    background: rgba(20, 18, 8, 0.82);
-    color: rgba(255, 210, 80, 1);
-    border-color: rgba(255, 220, 100, 1);
-  }
-  .pause-scene-action.is-default {
-    color: rgba(200, 210, 225, 0.88);
-    border-color: rgba(200, 210, 225, 0.6);
-  }
-  .pause-scene-action.is-default:hover {
-    background: rgba(12, 16, 24, 0.82);
-    color: rgba(220, 228, 240, 1);
-    border-color: rgba(220, 228, 240, 0.85);
-  }
-  .pause-scene-action.is-delete {
-    color: rgba(255, 100, 100, 0.95);
-    border-color: rgba(255, 110, 110, 0.82);
-  }
-  .pause-scene-action.is-delete:hover {
-    background: rgba(24, 8, 8, 0.82);
-    color: rgba(255, 120, 120, 1);
-    border-color: rgba(255, 130, 130, 1);
   }
 
   /* --- MENU CHROME --- */

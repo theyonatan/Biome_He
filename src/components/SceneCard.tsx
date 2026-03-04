@@ -1,5 +1,17 @@
 import type { SeedRecord } from '../types/app'
 
+const ACTION_BASE =
+  'w-[5cqh] h-[5cqh] grid place-items-center bg-[var(--color-action-bg)] text-[2.54cqh] leading-none rounded-[2px] cursor-pointer transition-[background,color,border-color] duration-[140ms] ease-in-out border'
+
+const ACTION_PINNED =
+  'text-[var(--color-action-pinned)] border-[var(--color-action-pinned-border)] hover:bg-[var(--color-action-pinned-hover-bg)] hover:text-[var(--color-action-pinned-hover)] hover:border-[var(--color-action-pinned-hover-border)]'
+
+const ACTION_UNPINNED =
+  'text-[var(--color-action-unpin)] border-[var(--color-action-unpin-border)] hover:bg-[var(--color-action-unpin-hover-bg)] hover:text-[var(--color-action-unpin-hover)] hover:border-[var(--color-action-unpin-hover-border)]'
+
+const ACTION_DELETE =
+  'text-[var(--color-action-delete)] border-[var(--color-action-delete-border)] hover:bg-[var(--color-action-delete-hover-bg)] hover:text-[var(--color-action-delete-hover)] hover:border-[var(--color-action-delete-hover-border)]'
+
 const PinnedIcon = () => (
   <svg
     className="w-[66%] h-[66%]"
@@ -98,7 +110,7 @@ const SceneCard = ({ seed, thumbnailSrc, isPinned, pinVariant, onSelect, onToggl
           <span
             role="button"
             tabIndex={0}
-            className={`pause-scene-action ${isPinned ? 'is-pinned' : 'is-default'}`}
+            className={`${ACTION_BASE} ${isPinned ? ACTION_PINNED : ACTION_UNPINNED}`}
             title={isPinned ? 'Unpin scene' : 'Pin scene'}
             onClick={(event) => {
               event.stopPropagation()
@@ -119,7 +131,7 @@ const SceneCard = ({ seed, thumbnailSrc, isPinned, pinVariant, onSelect, onToggl
           <span
             role="button"
             tabIndex={0}
-            className="pause-scene-action is-delete"
+            className={`${ACTION_BASE} ${ACTION_DELETE}`}
             title="Remove scene"
             onClick={(event) => {
               event.stopPropagation()
