@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { invoke } from '../bridge'
 import { useStreaming } from '../context/StreamingContext'
 import ServerLogDisplay from './ServerLogDisplay'
@@ -13,23 +13,29 @@ const EngineInstallModal = ({ onClose }: EngineInstallModalProps) => {
   const [isExportingInstallDiagnostics, setIsExportingInstallDiagnostics] = useState(false)
   const [installExportStatus, setInstallExportStatus] = useState<string | null>(null)
 
+  const buildDiagnosticsPayload = useCallback(async () => {
+    const meta = await invoke('get-runtime-diagnostics-meta')
+    const system = await invoke('get-system-diagnostics')
+    return {
+      generated_at: new Date().toISOString(),
+      runtime: meta,
+      system,
+      install_state: {
+        engine_setup_in_progress: engineSetupInProgress,
+        setup_progress: setupProgress,
+        engine_setup_error: engineSetupError
+      },
+      logs: installLogs
+    }
+  }, [engineSetupError, engineSetupInProgress, installLogs, setupProgress])
+
   const handleExportInstallDiagnostics = async () => {
     if (isExportingInstallDiagnostics) return
 
     setIsExportingInstallDiagnostics(true)
     setInstallExportStatus(null)
     try {
-      const meta = await invoke('get-runtime-diagnostics-meta')
-      const report = {
-        generated_at: new Date().toISOString(),
-        runtime: meta,
-        install_state: {
-          engine_setup_in_progress: engineSetupInProgress,
-          setup_progress: setupProgress,
-          engine_setup_error: engineSetupError
-        },
-        logs: installLogs
-      }
+      const report = await buildDiagnosticsPayload()
 
       const result = await invoke('export-loading-diagnostics', JSON.stringify(report, null, 2))
       if (result.canceled) {
@@ -60,22 +66,22 @@ const EngineInstallModal = ({ onClose }: EngineInstallModalProps) => {
                 : 'World Engine installation complete.'
           }
           errorMessage={engineSetupError}
+          reportContext={{
+            flow: 'engine-install',
+            engine_setup_in_progress: engineSetupInProgress,
+            setup_progress: setupProgress,
+            engine_setup_error: engineSetupError
+          }}
+          buildDiagnosticsPayload={buildDiagnosticsPayload}
+          showExportAction={!engineSetupInProgress && !!engineSetupError}
+          onExportAction={() => void handleExportInstallDiagnostics()}
+          isExportingAction={isExportingInstallDiagnostics}
+          exportActionLabel="Export Logs"
           showDismiss={false}
           onLogsChange={setInstallLogs}
           headerAction={
             !engineSetupInProgress ? (
               <div className="flex items-center gap-[0.8cqh]">
-                {engineSetupError && (
-                  <button
-                    type="button"
-                    className="loading-inline-logs-close"
-                    onClick={() => void handleExportInstallDiagnostics()}
-                    disabled={isExportingInstallDiagnostics}
-                    title="Export installation logs and environment diagnostics"
-                  >
-                    {isExportingInstallDiagnostics ? 'Exporting...' : 'Export Logs'}
-                  </button>
-                )}
                 <button
                   type="button"
                   className="loading-inline-logs-close"
