@@ -16,7 +16,7 @@ const WindowControlButton = ({
 }) => (
   <button
     type="button"
-    className={`flex items-center justify-center w-[23px] h-4 m-0 p-0 rounded-sm text-[9px] leading-none cursor-pointer bg-surface-btn-ghost text-text-primary font-serif border border-border-light outline-0 transition-[background-color,color,border-color] duration-[160ms] ease-in-out ${hoverBg} hover:border-transparent`}
+    className={`flex items-center justify-center w-[35px] h-6 m-0 p-0 rounded-sm text-[14px] leading-none cursor-pointer bg-surface-btn-ghost text-text-primary font-serif border border-border-light outline-0 transition-[background-color,color,border-color] duration-[160ms] ease-in-out ${hoverBg} hover:border-transparent`}
     onClick={onClick}
     aria-label={label}
     style={noDragRegionStyle}
@@ -55,7 +55,7 @@ const WindowControls = () => {
           &#x2014;
         </WindowControlButton>
         <WindowControlButton onClick={toggleMaximize} label="Maximize">
-          <svg width="9" height="9" viewBox="0 0 12 12" aria-hidden="true" className="block">
+          <svg width="14" height="14" viewBox="0 0 12 12" aria-hidden="true" className="block">
             <rect
               x="2.25"
               y="2.25"
