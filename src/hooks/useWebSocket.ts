@@ -1,17 +1,25 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createLogger } from '../utils/logger'
+import { WsRpcClient } from '../lib/wsRpc'
+import type { LoadingStage } from '../types/app'
 
 const log = createLogger('WebSocket')
+const MAX_VISIBLE_LOG_LINES = 500
 
 type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error'
 
 type WebSocketHook = {
   connectionState: ConnectionState
   statusCode: string | null
+  statusStage: LoadingStage | null
   error: string | null
+  warning: string | null
   frame: string | null
+  hasRealFrame: boolean
   frameId: number
   genTime: number | null
+  logs: string[]
+  allLogs: string[]
   connect: (endpointUrl: string) => void
   disconnect: () => void
   sendControl: (buttons?: string[], mouseDx?: number, mouseDy?: number) => boolean
@@ -20,7 +28,10 @@ type WebSocketHook = {
   sendPromptWithSeed: (promptOrFilename: string, seedUrl?: string) => void
   sendInitialSeed: (filename: string) => void
   sendModel: (model: string, seed?: string | null) => void
+  setPlaceholderFrame: (dataUrl: string | null) => void
   reset: () => void
+  request: <T = unknown>(type: string, params?: Record<string, unknown>, timeoutMs?: number) => Promise<T>
+  clearLogs: () => void
   isConnected: boolean
   isReady: boolean
   isLoading: boolean
@@ -31,13 +42,44 @@ export const useWebSocket = (): WebSocketHook => {
   const [frame, setFrame] = useState<string | null>(null)
   const [frameId, setFrameId] = useState(0)
   const [error, setError] = useState<string | null>(null)
+  const [warning, setWarning] = useState<string | null>(null)
   const [genTime, setGenTime] = useState<number | null>(null)
   const [isReady, setIsReady] = useState(false)
   const [statusCode, setStatusCode] = useState<string | null>(null)
+  const [statusStage, setStatusStage] = useState<LoadingStage | null>(null)
+  const [hasRealFrame, setHasRealFrame] = useState(false)
+  const [logs, setLogs] = useState<string[]>([])
+  const allLogsRef = useRef<string[]>([])
 
   const wsRef = useRef<WebSocket | null>(null)
   const isConnectingRef = useRef(false)
   const isReadyRef = useRef(false)
+  const rpcRef = useRef(new WsRpcClient())
+  const warningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const clearWarningTimer = useCallback(() => {
+    if (warningTimerRef.current) {
+      clearTimeout(warningTimerRef.current)
+      warningTimerRef.current = null
+    }
+  }, [])
+
+  const pushWarning = useCallback(
+    (message: string) => {
+      setWarning(message)
+      clearWarningTimer()
+      warningTimerRef.current = setTimeout(() => {
+        setWarning(null)
+        warningTimerRef.current = null
+      }, 3500)
+    },
+    [clearWarningTimer]
+  )
+
+  const clearLogs = useCallback(() => {
+    allLogsRef.current = []
+    setLogs([])
+  }, [])
 
   const connect = useCallback((endpointUrl: string) => {
     if (isConnectingRef.current || (wsRef.current && wsRef.current.readyState === WebSocket.OPEN)) {
@@ -52,7 +94,13 @@ export const useWebSocket = (): WebSocketHook => {
     isConnectingRef.current = true
     setConnectionState('connecting')
     setError(null)
+    setWarning(null)
+    clearWarningTimer()
     setStatusCode(null)
+    setStatusStage(null)
+    setHasRealFrame(false)
+    allLogsRef.current = []
+    setLogs([])
 
     let wsUrl: string
     if (endpointUrl.startsWith('ws://') || endpointUrl.startsWith('wss://')) {
@@ -61,8 +109,19 @@ export const useWebSocket = (): WebSocketHook => {
       wsUrl = `ws://${endpointUrl}/ws`
     }
 
-    const ws = new WebSocket(wsUrl)
+    let ws: WebSocket
+    try {
+      ws = new WebSocket(wsUrl)
+    } catch (err) {
+      isConnectingRef.current = false
+      setConnectionState('error')
+      setError(err instanceof Error ? err.message : 'Failed to create WebSocket connection')
+      return
+    }
     wsRef.current = ws
+
+    const rpc = rpcRef.current
+    rpc.attach(ws)
 
     ws.onopen = () => {
       if (wsRef.current !== ws) return
@@ -75,10 +134,26 @@ export const useWebSocket = (): WebSocketHook => {
       try {
         const msg = JSON.parse(event.data) as Record<string, unknown>
 
+        // Let RPC client consume response messages first
+        if (rpc.handleMessage(msg)) return
+
         switch (msg.type) {
           case 'status': {
-            const code = (msg.code || msg.status || msg.message || null) as string | null
+            const code = (typeof msg.code === 'string' ? msg.code : null) as string | null
             setStatusCode(code)
+            const rawStage = msg.stage as Partial<LoadingStage> | undefined
+            if (
+              rawStage &&
+              typeof rawStage.id === 'string' &&
+              typeof rawStage.label === 'string' &&
+              typeof rawStage.percent === 'number'
+            ) {
+              setStatusStage({
+                id: rawStage.id,
+                label: rawStage.label,
+                percent: Math.max(0, Math.min(100, Math.round(rawStage.percent)))
+              })
+            }
             if (code === 'ready') {
               setIsReady(true)
               isReadyRef.current = true
@@ -87,6 +162,7 @@ export const useWebSocket = (): WebSocketHook => {
           }
           case 'frame': {
             setFrame((msg.data as string) ?? null)
+            setHasRealFrame(true)
             setFrameId((msg.frame_id as number) ?? 0)
             if (typeof msg.gen_ms === 'number') {
               setGenTime(Math.round(msg.gen_ms))
@@ -102,9 +178,25 @@ export const useWebSocket = (): WebSocketHook => {
             }
             break
           }
+          case 'log': {
+            const line = String(msg.line ?? '')
+            allLogsRef.current = [...allLogsRef.current, line]
+            setLogs((prev) => {
+              const next = [...prev, line]
+              return next.length > MAX_VISIBLE_LOG_LINES ? next.slice(-MAX_VISIBLE_LOG_LINES) : next
+            })
+            break
+          }
           case 'error': {
             setError((msg.message as string) ?? 'Server error')
+            setWarning(null)
+            clearWarningTimer()
             setConnectionState('error')
+            break
+          }
+          case 'warning': {
+            const warningMessage = (msg.message as string) ?? 'Server warning'
+            pushWarning(warningMessage)
             break
           }
           default:
@@ -125,30 +217,41 @@ export const useWebSocket = (): WebSocketHook => {
     ws.onclose = () => {
       if (wsRef.current !== ws) return
       isConnectingRef.current = false
+      rpc.detach()
       wsRef.current = null
       setConnectionState('disconnected')
       setIsReady(false)
+      setWarning(null)
+      clearWarningTimer()
       setStatusCode(null)
+      setStatusStage(null)
       setFrame(null)
+      setHasRealFrame(false)
       setFrameId(0)
       setGenTime(null)
     }
   }, [])
 
   const disconnect = useCallback(() => {
+    isConnectingRef.current = false
+    isReadyRef.current = false
+    rpcRef.current.detach()
     if (wsRef.current) {
       wsRef.current.close()
       wsRef.current = null
     }
     setConnectionState('disconnected')
     setIsReady(false)
-    isReadyRef.current = false
+    setWarning(null)
+    clearWarningTimer()
     setFrame(null)
     setFrameId(0)
     setError(null)
     setGenTime(null)
     setStatusCode(null)
-  }, [])
+    setStatusStage(null)
+    setHasRealFrame(false)
+  }, [clearWarningTimer])
 
   const sendControl = useCallback((buttons: string[] = [], mouseDx = 0, mouseDy = 0) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
@@ -201,25 +304,42 @@ export const useWebSocket = (): WebSocketHook => {
     }
   }, [])
 
+  const setPlaceholderFrame = useCallback((dataUrl: string | null) => {
+    setFrame(dataUrl)
+  }, [])
+
   const reset = useCallback(() => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'reset' }))
     }
   }, [])
 
+  const request = useCallback(
+    <T = unknown>(type: string, params?: Record<string, unknown>, timeoutMs?: number): Promise<T> => {
+      return rpcRef.current.request<T>(type, params, timeoutMs)
+    },
+    []
+  )
+
   useEffect(() => {
     return () => {
       disconnect()
+      clearWarningTimer()
     }
-  }, [disconnect])
+  }, [disconnect, clearWarningTimer])
 
   return {
     connectionState,
     statusCode,
+    statusStage,
     error,
+    warning,
     frame,
+    hasRealFrame,
     frameId,
     genTime,
+    logs,
+    allLogs: allLogsRef.current,
     connect,
     disconnect,
     sendControl,
@@ -228,7 +348,10 @@ export const useWebSocket = (): WebSocketHook => {
     sendPromptWithSeed,
     sendInitialSeed,
     sendModel,
+    setPlaceholderFrame,
     reset,
+    request,
+    clearLogs,
     isConnected: connectionState === 'connected',
     isReady,
     isLoading: connectionState === 'connecting' || (connectionState === 'connected' && !isReady)

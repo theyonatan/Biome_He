@@ -1,5 +1,4 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback, useReducer, type ReactNode } from 'react'
-import { listen } from '@tauri-apps/api/event'
 import { usePortal } from './PortalContext'
 import { runWarmConnectionFlow } from './streamingWarmConnection'
 import { buildStreamingLifecycleSyncPayload } from './streamingLifecyclePayload'
@@ -11,12 +10,12 @@ import {
 } from './streamingLifecycleMachine'
 import useWebSocket from '../hooks/useWebSocket'
 import useGameInput from '../hooks/useGameInput'
-import { useConfig, STANDALONE_PORT, ENGINE_MODES, DEFAULT_WORLD_ENGINE_MODEL } from '../hooks/useConfig'
+import { useSettings } from '../hooks/useSettings'
+import { ENGINE_MODES, DEFAULT_WORLD_ENGINE_MODEL } from '../types/settings'
 import useEngine from '../hooks/useEngine'
 import useSeeds from '../hooks/useSeeds'
 import { createLogger } from '../utils/logger'
 import type { StreamingContextValue } from './streamingContextTypes'
-import type { EngineMode } from '../types/app'
 
 const log = createLogger('Streaming')
 
@@ -34,27 +33,22 @@ export const useStreaming = () => {
 }
 
 export const StreamingProvider = ({ children }: { children: ReactNode }) => {
-  const {
-    state,
-    states,
-    transitionTo,
-    shutdown,
-    isConnected: portalConnected,
-    isExpanded: portalExpanded
-  } = usePortal()
+  const { state, states, transitionTo, shutdown } = usePortal()
   const containerRef = useRef<HTMLDivElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
 
-  const { config, reloadConfig, saveConfig, isStandaloneMode, engineMode } = useConfig()
+  const { settings, isStandaloneMode, engineMode } = useSettings()
   const {
     status: engineStatus,
     startServer,
     stopServer,
     isServerRunning,
+    serverPort,
     isReady: engineReady,
     checkStatus: checkEngineStatus,
     checkServerReady,
     checkPortInUse,
+    probeServerHealth,
     serverLogPath,
     setupEngine,
     setupProgress,
@@ -64,10 +58,15 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
   const {
     connectionState,
     statusCode,
+    statusStage,
     error,
+    warning,
     frame,
+    hasRealFrame,
     frameId,
     genTime,
+    logs: wsLogs,
+    allLogs: wsAllLogs,
     connect,
     disconnect,
     sendControl,
@@ -76,25 +75,29 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     sendPromptWithSeed,
     sendInitialSeed,
     sendModel,
+    setPlaceholderFrame,
     reset,
+    request: wsRequest,
+    clearLogs: clearWsLogs,
     isConnected,
     isReady,
     isLoading
   } = useWebSocket()
-  const { initializeSeeds, openSeedsDir, seedsDir } = useSeeds()
+  const { getSeedsDirPath, openSeedsDir, seedsDir } = useSeeds()
 
   const [isPaused, setIsPaused] = useState(false)
   const [pausedAt, setPausedAt] = useState<number | null>(null)
   const [pauseElapsedMs, setPauseElapsedMs] = useState(0)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [showStats, setShowStats] = useState(false)
-  const [mouseSensitivity, setMouseSensitivity] = useState(1.0)
+  const [mouseSensitivity, setMouseSensitivity] = useState(() => settings.mouse_sensitivity ?? 1.0)
   const [fps, setFps] = useState(0)
   const [connectionLost, setConnectionLost] = useState(false)
   const [engineError, setEngineError] = useState<string | null>(null)
   const [endpointUrl, setEndpointUrl] = useState<string | null>(null)
   const [canvasReady, setCanvasReady] = useState(false)
-  const [warmConnectionJobSeq, setWarmConnectionJobSeq] = useState(0)
+  const [loadingConnectionJobSeq, setLoadingConnectionJobSeq] = useState(0)
+  const [pointerLockBlockedSeq, setPointerLockBlockedSeq] = useState(0)
   const [lifecycleState, dispatchLifecycle] = useReducer(streamingLifecycleReducer, initialStreamingLifecycleState)
 
   const prevEngineModeRef = useRef(engineMode)
@@ -103,10 +106,11 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
   const inputLoopRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const lastAppliedModelRef = useRef<string | null>(null)
   const warmBootstrapSentRef = useRef(false)
+  const warmFlowCancelledRef = useRef(false)
 
   const hasReceivedFrame = frame !== null
   const isStreaming = state === states.STREAMING
-  const inputEnabled = isStreaming && isReady && !isPaused && !settingsOpen
+  const inputEnabled = isStreaming && isReady && !isPaused && !settingsOpen && !connectionLost
   const canUnpause = pauseElapsedMs >= UNLOCK_DELAY_MS
 
   // Track elapsed time since pause for unlock delay
@@ -124,15 +128,6 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     return () => clearInterval(interval)
   }, [isPaused, pausedAt])
 
-  // Bottom panel visibility (persisted in config)
-  const bottomPanelHidden = config?.ui?.bottom_panel_hidden ?? false
-  const setBottomPanelHidden = useCallback(
-    async (hidden: boolean) => {
-      await saveConfig({ ...config, ui: { ...config.ui, bottom_panel_hidden: hidden } })
-    },
-    [config, saveConfig]
-  )
-
   // Check engine status on mount (for standalone mode)
   useEffect(() => {
     if (isStandaloneMode) {
@@ -145,8 +140,8 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     const prevMode = prevEngineModeRef.current
     prevEngineModeRef.current = engineMode
 
-    // Skip if mode hasn't actually changed, or if we're in COLD state (nothing to tear down)
-    if (prevMode === engineMode || !prevMode || state === states.COLD) return
+    // Skip if mode hasn't actually changed, or if we're in MAIN_MENU state (nothing to tear down)
+    if (prevMode === engineMode || !prevMode || state === states.MAIN_MENU) return
 
     log.info(`Engine mode changed: ${prevMode} -> ${engineMode}, performing teardown-and-reconnect`)
 
@@ -158,51 +153,66 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
       stopServer().catch((err) => log.error('Failed to stop server during mode switch:', err))
     }
 
-    // Clear any existing error and transition to WARM to re-trigger connection
+    // Clear any existing error and transition to LOADING to re-trigger connection
     setEngineError(null)
-    transitionTo(states.WARM)
-  }, [engineMode, state, states.COLD, states.WARM, disconnect, isServerRunning, stopServer, transitionTo])
+    transitionTo(states.LOADING)
+  }, [engineMode, state, states.MAIN_MENU, states.LOADING, disconnect, isServerRunning, stopServer, transitionTo])
 
-  // Initialize seeds on mount
+  // Resolve local seeds dir path on mount (does not require server availability)
   useEffect(() => {
-    initializeSeeds().catch((err) => {
-      log.error('Failed to initialize seeds:', err)
+    getSeedsDirPath().catch((err) => {
+      log.error('Failed to resolve seeds directory path:', err)
     })
-  }, [initializeSeeds])
+  }, [getSeedsDirPath])
 
-  // Bootstrap each new WARM websocket session deterministically:
+  // Bootstrap each new LOADING websocket session deterministically:
   // send model + seed together so server applies model first and can load seed
   // immediately when model load completes.
   useEffect(() => {
-    if (state !== states.WARM) return
+    if (state !== states.LOADING) return
     if (!isConnected) return
     if (warmBootstrapSentRef.current) return
 
-    const selectedModel = config?.features?.world_engine_model || DEFAULT_WORLD_ENGINE_MODEL
-    log.info('WARM connected - bootstrapping session with model+seed:', selectedModel)
+    const selectedModel = settings?.engine_model || DEFAULT_WORLD_ENGINE_MODEL
+    log.info('Loading connected - bootstrapping session with model+seed:', selectedModel)
+    // Use the default seed image as the immediate placeholder frame so transition
+    // to streaming never shows a blank frame while waiting for server output.
+    wsRequest<{ image_base64: string }>('seeds_image', { filename: 'default.png' })
+      .then((result) => {
+        if (!result?.image_base64) return
+        setPlaceholderFrame(`data:image/png;base64,${result.image_base64}`)
+      })
+      .catch(() => null)
     sendModel(selectedModel, 'default.png')
     lastAppliedModelRef.current = selectedModel
     warmBootstrapSentRef.current = true
-  }, [state, states.WARM, isConnected, config?.features?.world_engine_model, sendModel])
+  }, [state, states.LOADING, isConnected, settings?.engine_model, sendModel, setPlaceholderFrame, wsRequest])
 
   useEffect(() => {
     if (!isConnected) {
       warmBootstrapSentRef.current = false
+      setPlaceholderFrame(null)
     }
-  }, [isConnected])
+  }, [isConnected, setPlaceholderFrame])
 
   // Pointer lock controls
   const requestPointerLock = useCallback(() => {
+    if (connectionLost) {
+      return false
+    }
+
+    // https://github.com/electron/electron/issues/33587 seems like there's no way around the pointerLock cooldown
     // Enforce browser pointer-lock cooldown after an unlock to avoid dropped lock requests.
     if (isPaused && !canUnpause) {
       const remainingMs = Math.max(0, UNLOCK_DELAY_MS - pauseElapsedMs)
       log.info(`Pointer lock request blocked by cooldown (${remainingMs}ms remaining)`)
+      setPointerLockBlockedSeq((seq) => seq + 1)
       return false
     }
 
     containerRef.current?.requestPointerLock()
     return true
-  }, [isPaused, canUnpause, pauseElapsedMs])
+  }, [connectionLost, isPaused, canUnpause, pauseElapsedMs])
 
   const exitPointerLock = useCallback(() => {
     if (document.pointerLockElement) {
@@ -211,13 +221,13 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
   }, [])
 
   const togglePointerLock = useCallback(() => {
-    if (!isStreaming || !isReady) return
+    if (!isStreaming || !isReady || connectionLost) return
     if (document.pointerLockElement) {
       document.exitPointerLock()
       return
     }
     requestPointerLock()
-  }, [isStreaming, isReady, requestPointerLock])
+  }, [isStreaming, isReady, connectionLost, requestPointerLock])
 
   const handleReset = useCallback(() => {
     reset()
@@ -238,14 +248,11 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
         portalState: state,
         connectionState,
         transportError: error,
-        configWorldEngineModel: config?.features?.world_engine_model,
+        engineModel: settings?.engine_model,
         lastAppliedModel: lastAppliedModelRef.current,
         engineError,
         statusCode,
         hasReceivedFrame,
-        canvasReady,
-        portalConnected,
-        portalExpanded,
         socketReady: isReady,
         isPointerLocked,
         settingsOpen,
@@ -256,13 +263,10 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     state,
     connectionState,
     error,
-    config?.features?.world_engine_model,
+    settings?.engine_model,
     engineError,
     statusCode,
     hasReceivedFrame,
-    canvasReady,
-    portalConnected,
-    portalExpanded,
     isReady,
     isPointerLocked,
     settingsOpen,
@@ -270,56 +274,56 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
   ])
 
   useEffect(() => {
-    if (warmConnectionJobSeq === 0) return
+    if (loadingConnectionJobSeq === 0) return
 
-    let cancelled = false
-    let unlisten: (() => void) | null = null
+    warmFlowCancelledRef.current = false
 
     const handleServerError = (err: unknown) => {
+      if (warmFlowCancelledRef.current) return
       const errorMsg = err instanceof Error ? err.message : String(err)
       log.error('Server error:', errorMsg)
       setEngineError(errorMsg)
-      // Don't transition to cold immediately - wait for user to dismiss the error
+      // Don't transition to main menu immediately - wait for user to dismiss the error
     }
 
+    // Clear WS logs before starting a new connection
+    clearWsLogs()
+
     runWarmConnectionFlow({
-      standalonePort: STANDALONE_PORT,
+      currentServerPort: serverPort,
       isStandaloneMode,
       endpointUrl,
-      gpuServer: config.gpu_server,
+      serverUrl: settings.server_url,
       isServerRunning,
       checkServerReady,
       checkPortInUse,
+      probeServerHealthViaMain: probeServerHealth,
       checkEngineStatus,
       startServer,
       connect,
-      setUnlisten: (fn: () => void) => {
-        unlisten = fn
-      },
-      listenForServerReady: (onReady) => listen('server-ready', onReady),
       onServerError: handleServerError,
-      isCancelled: () => cancelled,
+      isCancelled: () => warmFlowCancelledRef.current,
       log
     }).catch((err) => {
-      if (cancelled) return
+      if (warmFlowCancelledRef.current) return
       handleServerError(err)
     })
 
     return () => {
-      cancelled = true
-      unlisten?.()
+      warmFlowCancelledRef.current = true
     }
-  }, [warmConnectionJobSeq])
+  }, [loadingConnectionJobSeq])
 
   useEffect(() => {
     const { effects } = lifecycleState
     const handlers = createStreamingLifecycleEffectHandlers({
       log,
       lifecycleState,
-      config,
+      settings,
       setEngineError,
-      setWarmConnectionJobSeq,
+      setWarmConnectionJobSeq: setLoadingConnectionJobSeq,
       warmBootstrapSentRef,
+      warmFlowCancelledRef,
       setConnectionLost,
       setSettingsOpen,
       setIsPaused,
@@ -337,12 +341,11 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
   }, [
     lifecycleState,
     transitionTo,
-    states.COLD,
-    states.HOT,
+    states.MAIN_MENU,
+    states.LOADING,
     states.STREAMING,
-    states.WARM,
     disconnect,
-    config?.features?.world_engine_model,
+    settings?.engine_model,
     exitPointerLock,
     requestPointerLock,
     sendPause
@@ -366,13 +369,12 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
 
     const img = new Image()
     img.onload = () => {
-      if (canvas.width !== img.width || canvas.height !== img.height) {
-        canvas.width = img.width
-        canvas.height = img.height
-      }
-      ctx.drawImage(img, 0, 0)
+      const targetW = canvas.width
+      const targetH = canvas.height
+      ctx.clearRect(0, 0, targetW, targetH)
+      ctx.drawImage(img, 0, 0, targetW, targetH)
     }
-    img.src = `data:image/jpeg;base64,${frame}`
+    img.src = frame.startsWith('data:') ? frame : `data:image/jpeg;base64,${frame}`
   }, [frame, canvasReady])
 
   // Input loop at 60hz
@@ -408,13 +410,15 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
   }, [])
 
   const handleContainerClick = useCallback(() => {
-    if (isStreaming && isReady) requestPointerLock()
-  }, [isStreaming, isReady, requestPointerLock])
+    if (isStreaming && isReady && !connectionLost) requestPointerLock()
+  }, [isStreaming, isReady, connectionLost, requestPointerLock])
 
   // Cleanup helper for logout/dismiss
   const cleanupState = useCallback(() => {
+    warmFlowCancelledRef.current = true
     exitPointerLock()
     disconnect()
+    setEngineError(null)
     setSettingsOpen(false)
     setIsPaused(false)
     setPausedAt(null)
@@ -441,49 +445,37 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
   }, [cleanupState, stopServerIfRunning, shutdown])
 
   const dismissConnectionLost = useCallback(async () => {
-    log.info('Dismissing connection lost overlay')
+    log.info('Acknowledging connection lost overlay')
+    setConnectionLost(false)
+  }, [])
+
+  const reconnectAfterConnectionLost = useCallback(async () => {
+    log.info('Reconnecting after connection lost')
     setConnectionLost(false)
     cleanupState()
-    await stopServerIfRunning()
-    await shutdown()
-  }, [cleanupState, stopServerIfRunning, shutdown])
+    warmBootstrapSentRef.current = false
+    transitionTo(states.LOADING)
+  }, [cleanupState, transitionTo, states.LOADING])
 
   const cancelConnection = useCallback(async () => {
     log.info('Cancelling connection')
     cleanupState()
     await stopServerIfRunning()
-    transitionTo(states.COLD)
-  }, [cleanupState, stopServerIfRunning, transitionTo, states.COLD])
+    transitionTo(states.MAIN_MENU)
+  }, [cleanupState, stopServerIfRunning, transitionTo, states.MAIN_MENU])
 
-  // Handle mode choice from the choice dialog (when user selects Standalone or Server)
-  const handleModeChoice = useCallback(
-    async (chosenMode: EngineMode) => {
-      log.info('Mode choice made:', chosenMode)
-      if (chosenMode === ENGINE_MODES.STANDALONE) {
-        // Start installation immediately
-        try {
-          await setupEngine()
-          log.info('Engine setup complete after mode choice')
-          // Config was already saved by EngineModeChoice, just refresh
-          await reloadConfig()
-          // Auto-start session after successful installation
-          log.info('Auto-starting session after engine setup')
-          transitionTo(states.WARM)
-        } catch (err) {
-          log.error('Engine setup failed:', err)
-          setEngineError(err instanceof Error ? err.message : String(err))
-        }
-      }
-      // For server mode, nothing special needed - config was already saved
-    },
-    [setupEngine, reloadConfig, transitionTo, states.WARM]
-  )
+  const prepareReturnToMainMenu = useCallback(async () => {
+    log.info('Preparing return to main menu')
+    cleanupState()
+    await stopServerIfRunning()
+  }, [cleanupState, stopServerIfRunning])
 
   const value: StreamingContextValue = {
     // Connection state
     connectionState,
     connectionLost,
     error,
+    warning,
     isConnected,
     isVideoReady: hasReceivedFrame && canvasReady,
     isReady,
@@ -496,6 +488,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     pauseElapsedMs,
     settingsOpen,
     statusCode,
+    statusStage,
 
     // Stats
     genTime,
@@ -508,12 +501,6 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     showStats,
     setShowStats,
 
-    // Local mode - no session management
-    sessionRemaining: null,
-    sessionExpired: false,
-    sessionTimeDisplay: null,
-    gpuAssignment: null,
-    setGpuAssignment: () => {},
     endpointUrl,
     setEndpointUrl,
 
@@ -530,28 +517,34 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     engineSetupInProgress,
     setupProgress,
     engineSetupError,
-    handleModeChoice,
 
     // Seeds
     openSeedsDir,
     seedsDir,
 
+    // WS RPC
+    wsRequest,
+    wsLogs,
+    wsAllLogs,
+    clearWsLogs,
+
     // Settings
     mouseSensitivity,
     setMouseSensitivity,
-    bottomPanelHidden,
-    setBottomPanelHidden,
 
     // Input state
     pressedKeys,
     isPointerLocked,
+    pointerLockBlockedSeq,
 
     // Actions
     connect,
     disconnect,
     logout,
     dismissConnectionLost,
+    reconnectAfterConnectionLost,
     cancelConnection,
+    prepareReturnToMainMenu,
     reset,
     sendPrompt,
     sendPromptWithSeed,
@@ -560,7 +553,6 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     exitPointerLock,
     registerContainerRef,
     registerCanvasRef,
-    registerVideoRef: () => {},
     handleContainerClick
   }
 

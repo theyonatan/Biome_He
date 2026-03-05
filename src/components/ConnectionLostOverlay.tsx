@@ -1,16 +1,19 @@
 import { useStreaming } from '../context/StreamingContext'
+import { CONFIRM_BUTTON_BASE } from '../styles'
 
 const ConnectionLostOverlay = () => {
-  const { connectionLost, dismissConnectionLost } = useStreaming()
+  const { connectionLost, reconnectAfterConnectionLost } = useStreaming()
 
   const handleDismiss = () => {
-    dismissConnectionLost()
+    void reconnectAfterConnectionLost()
   }
 
   return (
-    <div className={`connection-lost-overlay ${connectionLost ? 'active' : ''}`}>
-      <div className="connection-lost-content">
-        <div className="connection-lost-icon">
+    <div
+      className={`connection-lost-overlay absolute inset-0 z-200 flex items-center justify-center bg-darkest/90 backdrop-blur-[4px] ${connectionLost ? 'active pointer-events-auto visible opacity-100' : 'pointer-events-none invisible opacity-0'}`}
+    >
+      <div className="border border-[var(--color-border-medium)] bg-[var(--color-surface-modal)] text-[var(--color-text-primary)] w-[58.33cqh] p-[1.8cqh_2.84cqh] flex flex-col items-center gap-[1.2cqh] animate-[connectionLostFadeIn_0.4s_ease-out]">
+        <div className="w-[8.5cqh] h-[8.5cqh] text-error-muted animate-[connectionLostPulse_2s_ease-in-out_infinite]">
           <svg
             viewBox="0 0 24 24"
             fill="none"
@@ -18,6 +21,7 @@ const ConnectionLostOverlay = () => {
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
+            className="w-full h-full"
           >
             <line x1="1" y1="1" x2="23" y2="23" />
             <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55" />
@@ -28,10 +32,19 @@ const ConnectionLostOverlay = () => {
             <line x1="12" y1="20" x2="12.01" y2="20" />
           </svg>
         </div>
-        <span className="connection-lost-text">CONNECTION LOST</span>
-        <button className="connection-lost-button" onClick={handleDismiss}>
-          RECONNECT
-        </button>
+        <h3 className="m-0 mb-[0.2cqh] font-serif font-medium text-[3.91cqh]">Connection Lost</h3>
+        <p className="m-0 font-serif text-[var(--color-text-modal-muted)] text-[2.4cqh] text-center">
+          The connection to World Engine was interrupted
+        </p>
+        <div className="flex justify-end mt-[1.2cqh] w-full">
+          <button
+            type="button"
+            className={`${CONFIRM_BUTTON_BASE} bg-[var(--color-surface-btn-hover)] text-[var(--color-text-inverse)]`}
+            onClick={handleDismiss}
+          >
+            Reconnect
+          </button>
+        </div>
       </div>
     </div>
   )

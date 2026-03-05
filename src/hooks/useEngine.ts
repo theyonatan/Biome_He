@@ -1,9 +1,6 @@
 import { useState, useCallback } from 'react'
+import { invoke } from '../bridge'
 import type { EngineStatus } from '../types/app'
-
-const invoke = async <T>(cmd: string, args: Record<string, unknown> = {}): Promise<T> => {
-  return window.__TAURI_INTERNALS__.invoke<T>(cmd, args)
-}
 
 export type UseEngineResult = {
   status: EngineStatus | null
@@ -21,6 +18,7 @@ export type UseEngineResult = {
   checkServerRunning: () => Promise<boolean>
   checkServerReady: () => Promise<boolean>
   checkPortInUse: (port: number) => Promise<boolean>
+  probeServerHealth: (healthUrl: string, timeoutMs?: number) => Promise<boolean>
   isReady: boolean
   isServerRunning: boolean
   serverPort: number | null
@@ -37,7 +35,7 @@ export const useEngine = (): UseEngineResult => {
   const checkStatus = useCallback(async () => {
     try {
       setError(null)
-      const engineStatus = await invoke<EngineStatus>('check_engine_status')
+      const engineStatus = await invoke('check-engine-status', 'useEngine.checkStatus')
       setStatus(engineStatus)
       return engineStatus
     } catch (err) {
@@ -51,7 +49,10 @@ export const useEngine = (): UseEngineResult => {
       setIsLoading(true)
       setError(null)
       setSetupProgress('Installing uv...')
-      return await invoke<string>('install_uv')
+      const result = await invoke('install-uv')
+      const statusAfter = await invoke('check-engine-status', 'useEngine.installUv.post')
+      setStatus(statusAfter)
+      return result
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
       throw err
@@ -66,7 +67,10 @@ export const useEngine = (): UseEngineResult => {
       setIsLoading(true)
       setError(null)
       setSetupProgress('Setting up server components...')
-      return await invoke<string>('setup_server_components')
+      const result = await invoke('setup-server-components')
+      const statusAfter = await invoke('check-engine-status', 'useEngine.setupServerComponents.post')
+      setStatus(statusAfter)
+      return result
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
       throw err
@@ -81,7 +85,10 @@ export const useEngine = (): UseEngineResult => {
       setIsLoading(true)
       setError(null)
       setSetupProgress('Syncing dependencies...')
-      return await invoke<string>('sync_engine_dependencies')
+      const result = await invoke('sync-engine-dependencies')
+      const statusAfter = await invoke('check-engine-status', 'useEngine.syncDependencies.post')
+      setStatus(statusAfter)
+      return result
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
       throw err
@@ -97,21 +104,21 @@ export const useEngine = (): UseEngineResult => {
       setError(null)
 
       setSetupProgress('Checking uv installation...')
-      const currentStatus = await invoke<EngineStatus>('check_engine_status')
+      const currentStatus = await invoke('check-engine-status', 'useEngine.setupEngine.pre')
 
       if (!currentStatus.uv_installed) {
         setSetupProgress('Installing uv...')
-        await invoke('install_uv')
+        await invoke('install-uv')
       }
 
       setSetupProgress('Setting up server components...')
-      await invoke('setup_server_components')
+      await invoke('setup-server-components')
 
       setSetupProgress('Syncing dependencies (this may take a while)...')
-      await invoke('sync_engine_dependencies')
+      await invoke('sync-engine-dependencies')
 
       setSetupProgress('Verifying setup...')
-      const finalStatus = await invoke<EngineStatus>('check_engine_status')
+      const finalStatus = await invoke('check-engine-status', 'useEngine.setupEngine.post')
       setStatus(finalStatus)
 
       setSetupProgress(null)
@@ -129,8 +136,8 @@ export const useEngine = (): UseEngineResult => {
     try {
       setServerStarting(true)
       setError(null)
-      const result = await invoke<string>('start_engine_server', { port })
-      const newStatus = await invoke<EngineStatus>('check_engine_status')
+      const result = await invoke('start-engine-server', port)
+      const newStatus = await invoke('check-engine-status', 'useEngine.startServer.post')
       setStatus(newStatus)
       return result
     } catch (err) {
@@ -144,8 +151,8 @@ export const useEngine = (): UseEngineResult => {
   const stopServer = useCallback(async () => {
     try {
       setError(null)
-      const result = await invoke<string>('stop_engine_server')
-      const newStatus = await invoke<EngineStatus>('check_engine_status')
+      const result = await invoke('stop-engine-server')
+      const newStatus = await invoke('check-engine-status', 'useEngine.stopServer.post')
       setStatus(newStatus)
       return result
     } catch (err) {
@@ -156,9 +163,9 @@ export const useEngine = (): UseEngineResult => {
 
   const checkServerRunning = useCallback(async () => {
     try {
-      const running = await invoke<boolean>('is_server_running')
+      const running = await invoke('is-server-running')
       if (status?.server_running !== running) {
-        const newStatus = await invoke<EngineStatus>('check_engine_status')
+        const newStatus = await invoke('check-engine-status', 'useEngine.checkServerRunning.delta')
         setStatus(newStatus)
       }
       return running
@@ -169,7 +176,7 @@ export const useEngine = (): UseEngineResult => {
 
   const checkServerReady = useCallback(async () => {
     try {
-      return await invoke<boolean>('is_server_ready')
+      return await invoke('is-server-ready')
     } catch {
       return false
     }
@@ -177,7 +184,15 @@ export const useEngine = (): UseEngineResult => {
 
   const checkPortInUse = useCallback(async (port: number) => {
     try {
-      return await invoke<boolean>('is_port_in_use', { port })
+      return await invoke('is-port-in-use', port)
+    } catch {
+      return false
+    }
+  }, [])
+
+  const probeServerHealth = useCallback(async (healthUrl: string, timeoutMs?: number) => {
+    try {
+      return await invoke('probe-server-health', healthUrl, timeoutMs)
     } catch {
       return false
     }
@@ -199,6 +214,7 @@ export const useEngine = (): UseEngineResult => {
     checkServerRunning,
     checkServerReady,
     checkPortInUse,
+    probeServerHealth,
     isReady: !!(status?.uv_installed && status?.repo_cloned && status?.dependencies_synced),
     isServerRunning: status?.server_running ?? false,
     serverPort: status?.server_port ?? null,
