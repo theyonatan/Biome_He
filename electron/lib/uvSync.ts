@@ -1,16 +1,14 @@
 import { spawn } from 'node:child_process'
 import { createInterface } from 'node:readline'
 import { getHiddenWindowOptions } from './platform.js'
-import { emitToAllWindows } from './ipcUtils.js'
 
 export async function runUvSyncWithMirroredLogs(
   uvBinary: string,
   cwd: string,
   env: NodeJS.ProcessEnv,
-  options?: { logPrefix?: string; emitToUi?: boolean }
+  options?: { logPrefix?: string }
 ): Promise<void> {
   const prefix = options?.logPrefix ?? '[UV]'
-  const emitToUi = options?.emitToUi ?? false
 
   await new Promise<void>((resolve, reject) => {
     const child = spawn(uvBinary, ['sync', '--verbose', '--index-strategy', 'unsafe-best-match'], {
@@ -27,9 +25,6 @@ export async function runUvSyncWithMirroredLogs(
         console.error(prefixed)
       } else {
         console.log(prefixed)
-      }
-      if (emitToUi) {
-        emitToAllWindows('server-log', prefixed)
       }
       tail.push(prefixed)
       if (tail.length > 80) tail.shift()

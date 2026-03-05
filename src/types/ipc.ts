@@ -108,7 +108,6 @@ export type IpcCommandMap = {
  * Maps each IPC event channel to the payload type emitted from main to renderer.
  */
 export type IpcEventMap = {
-  'server-log': string
   'server-ready': boolean
   'server-stage': { id: string; label: string; percent: number }
   'window-resized': { width: number; height: number }
