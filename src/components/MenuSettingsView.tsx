@@ -251,6 +251,7 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
               value={menuWorldModel}
               onChange={handleWorldModelChange}
               disabled={menuModelsLoading}
+              allowCustom
             />
             {menuModelsError && (
               <p className={`${SETTINGS_MUTED_TEXT} text-left [margin:0.35cqh_0_0.8cqh]`}>{menuModelsError}</p>
