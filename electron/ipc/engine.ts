@@ -6,7 +6,6 @@ import { getEngineDir, getUvDir, getResourcePath, SERVER_COMPONENT_FILES } from 
 import { getUvBinaryPath, getUvEnvVars } from '../lib/uv.js'
 import { getHiddenWindowOptions, getUvArchiveName, getVenvPythonPath } from '../lib/platform.js'
 import { getServerState } from '../lib/serverState.js'
-import { emitToAllWindows } from '../lib/ipcUtils.js'
 import { runUvSyncWithMirroredLogs } from '../lib/uvSync.js'
 import { copyServerComponentFiles } from '../lib/serverFiles.js'
 
@@ -26,7 +25,6 @@ function execFileAsync(file: string, args: string[], options?: Parameters<typeof
 
 function logEngineToConsoleAndUi(message: string): void {
   console.log(message)
-  emitToAllWindows('server-log', message)
 }
 
 /** Unpack bundled server files to the engine directory */
@@ -237,7 +235,7 @@ export function registerEngineIpc(): void {
         UV_NO_EDITABLE: '1',
         UV_MANAGED_PYTHON: '1'
       },
-      { logPrefix: '[ENGINE]', emitToUi: true }
+      { logPrefix: '[ENGINE]' }
     )
     logEngineToConsoleAndUi('[ENGINE] uv sync finished for engine dependencies')
 
