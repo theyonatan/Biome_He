@@ -372,7 +372,7 @@ async def rescan_seeds() -> dict:
                 "checked_at": checked_at,
             }
 
-        status = "✓ SAFE" if safety_result.get("is_safe") else "✗ UNSAFE"
+        status = "SAFE" if safety_result.get("is_safe") else "UNSAFE"
         logger.info(f"  {filename}: {status}")
 
     save_seeds_cache(cache)
@@ -490,7 +490,7 @@ async def validate_and_update_cache() -> dict:
                     "checked_at": checked_at,
                 }
 
-            status = "✓ SAFE" if safety_result.get("is_safe") else "✗ UNSAFE"
+            status = "SAFE" if safety_result.get("is_safe") else "UNSAFE"
             logger.info(f"    {filename}: {status}")
 
     # Update cache if any changes were made
