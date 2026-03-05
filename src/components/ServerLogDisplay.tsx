@@ -1,8 +1,16 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { listen } from '../bridge'
+import { invoke, listen } from '../bridge'
 import { INTERACTIVE_TRANSITION } from '../styles'
 
 const MAX_ERROR_MESSAGE_CHARS = 220
+const MAX_REPORT_LOG_LINES = 220
+const MAX_GITHUB_BODY_CHARS = 1200
+const MAX_GITHUB_LOG_LINES = 10
+const MAX_GITHUB_LOG_CHARS = 450
+const DISCORD_HELP_URL = 'https://discord.gg/overworld'
+const GITHUB_NEW_ISSUE_URL = 'https://github.com/Overworldai/Biome/issues/new'
+
+type ReportContext = Record<string, unknown>
 
 // Determine log line color class based on content
 const getLogClass = (line: string): string => {
@@ -21,6 +29,40 @@ const getLogClass = (line: string): string => {
   return ''
 }
 
+function sanitizeText(text: string): string {
+  return text
+    .replace(/[A-Za-z]:\\Users\\[^\\\r\n]+/g, 'C:\\Users\\<redacted>')
+    .replace(/\/Users\/[^/\r\n]+/g, '/Users/<redacted>')
+    .replace(/\/home\/[^/\r\n]+/g, '/home/<redacted>')
+}
+
+function copyToClipboard(text: string): Promise<void> {
+  if (navigator.clipboard?.writeText) {
+    return navigator.clipboard.writeText(text)
+  }
+
+  return new Promise((resolve, reject) => {
+    try {
+      const textarea = document.createElement('textarea')
+      textarea.value = text
+      textarea.style.position = 'fixed'
+      textarea.style.left = '-9999px'
+      document.body.appendChild(textarea)
+      textarea.focus()
+      textarea.select()
+      const copied = document.execCommand('copy')
+      document.body.removeChild(textarea)
+      if (!copied) {
+        reject(new Error('Clipboard copy command failed'))
+        return
+      }
+      resolve()
+    } catch (error) {
+      reject(error)
+    }
+  })
+}
+
 const ServerLogDisplay = ({
   showDismiss = false,
   onDismiss,
@@ -32,7 +74,13 @@ const ServerLogDisplay = ({
   externalLogs = null,
   disableLiveIpc = false,
   title = null,
-  onLogsChange
+  onLogsChange,
+  reportContext,
+  buildDiagnosticsPayload,
+  showExportAction = false,
+  onExportAction,
+  isExportingAction = false,
+  exportActionLabel = 'Export Logs'
 }: {
   showDismiss?: boolean
   onDismiss?: () => void
@@ -45,10 +93,19 @@ const ServerLogDisplay = ({
   disableLiveIpc?: boolean
   title?: string | null
   onLogsChange?: (logs: string[]) => void
+  reportContext?: ReportContext
+  buildDiagnosticsPayload?: () => Promise<Record<string, unknown>>
+  showExportAction?: boolean
+  onExportAction?: () => void
+  isExportingAction?: boolean
+  exportActionLabel?: string
 }) => {
   const isLoadingInline = variant === 'loading-inline'
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [logs, setLogs] = useState<string[]>([])
+  const [reportActionStatus, setReportActionStatus] = useState<string | null>(null)
+  const [isCopyingReport, setIsCopyingReport] = useState(false)
+  const [isOpeningIssue, setIsOpeningIssue] = useState(false)
 
   useEffect(() => {
     if (disableLiveIpc || externalLogs !== null) return
@@ -95,6 +152,126 @@ const ServerLogDisplay = ({
     }
   }, [visibleLogs])
 
+  const buildDiagnosticsFallbackPayload = async (): Promise<Record<string, unknown>> => {
+    const runtimeMeta = await invoke('get-runtime-diagnostics-meta')
+    const system = await invoke('get-system-diagnostics')
+    const trimmedLogs = visibleLogs.slice(-MAX_REPORT_LOG_LINES).map((line) => sanitizeText(String(line ?? '')))
+    const safeError = errorMessage ? sanitizeText(errorMessage) : null
+    const safeProgress = progressMessage ? sanitizeText(progressMessage) : null
+
+    const report = {
+      generated_at: new Date().toISOString(),
+      runtime: runtimeMeta,
+      system,
+      context: reportContext ?? {},
+      ui_state: {
+        title,
+        variant,
+        show_progress: showProgress,
+        progress_message: safeProgress
+      },
+      error_message: safeError,
+      logs: trimmedLogs
+    }
+
+    return report
+  }
+
+  const handleCopyBugReport = async () => {
+    if (isCopyingReport) return
+    setIsCopyingReport(true)
+    setReportActionStatus(null)
+
+    try {
+      const payload = buildDiagnosticsPayload
+        ? await buildDiagnosticsPayload()
+        : await buildDiagnosticsFallbackPayload()
+      const reportText = JSON.stringify(payload, null, 2)
+      await copyToClipboard(reportText)
+      setReportActionStatus('Diagnostics copied')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to copy diagnostics'
+      setReportActionStatus(message)
+    } finally {
+      setIsCopyingReport(false)
+    }
+  }
+
+  const handleOpenGithubIssue = async () => {
+    if (isOpeningIssue) return
+    setIsOpeningIssue(true)
+    setReportActionStatus(null)
+
+    try {
+      const payload = buildDiagnosticsPayload
+        ? await buildDiagnosticsPayload()
+        : await buildDiagnosticsFallbackPayload()
+      const reportText = JSON.stringify(payload, null, 2)
+      let copiedDiagnostics = false
+      try {
+        await copyToClipboard(reportText)
+        copiedDiagnostics = true
+      } catch {
+        copiedDiagnostics = false
+      }
+
+      const firstLine = (errorMessage || progressMessage || 'Runtime error').split('\n')[0]?.trim() || 'Runtime error'
+      const issueTitle = `[Auto Bug Report] ${firstLine.slice(0, 76)}`
+      const runtime = payload.runtime as Record<string, unknown> | undefined
+      const appVersion = String(runtime?.app_version ?? 'unknown')
+      const platform = String(runtime?.platform ?? 'unknown')
+      const recentLogsRaw = visibleLogs.slice(-MAX_GITHUB_LOG_LINES).join('\n')
+      const recentLogsTrimmed =
+        recentLogsRaw.length > MAX_GITHUB_LOG_CHARS
+          ? `${recentLogsRaw.slice(0, MAX_GITHUB_LOG_CHARS)}\n... (truncated)`
+          : recentLogsRaw
+
+      const issueBody = [
+        '## What happened',
+        '<please describe what you were doing and what failed>',
+        '',
+        '## Environment',
+        `- App version: ${appVersion}`,
+        `- Platform: ${platform}`,
+        '',
+        '## Reproduction steps',
+        '1. ',
+        '2. ',
+        '3. ',
+        '',
+        '## Recent logs',
+        '```text',
+        recentLogsTrimmed || '<none>',
+        '```',
+        '',
+        '## Full diagnostics',
+        copiedDiagnostics
+          ? '- Full diagnostics JSON has been copied to clipboard. Paste it below before submitting.'
+          : '- Click "Copy Report" in-app and paste diagnostics JSON below.',
+        '',
+        '```json',
+        '<paste full diagnostics JSON here>',
+        '```'
+      ].join('\n')
+
+      const clippedIssueBody =
+        issueBody.length > MAX_GITHUB_BODY_CHARS
+          ? `${issueBody.slice(0, MAX_GITHUB_BODY_CHARS)}\n... (truncated)`
+          : issueBody
+
+      const url = `${GITHUB_NEW_ISSUE_URL}?title=${encodeURIComponent(issueTitle)}&body=${encodeURIComponent(clippedIssueBody)}`
+      window.open(url, '_blank', 'noopener,noreferrer')
+      setReportActionStatus(
+        copiedDiagnostics ? 'Opened GitHub issue form and copied diagnostics' : 'Opened GitHub issue form'
+      )
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to open issue form'
+      setReportActionStatus(message)
+    } finally {
+      setIsOpeningIssue(false)
+    }
+  }
+
   return (
     <div
       className={`select-text flex flex-col overflow-hidden ${isLoadingInline ? 'static w-full h-full max-h-[70vh] border border-[rgba(255,255,255,0.55)] bg-[rgba(0,0,0,0.72)] opacity-100 !animate-none' : 'absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[70%] max-h-[50%] z-100 bg-[rgba(8,12,16,0.95)] border border-warm/30 rounded-[1.42cqh] opacity-0 animate-[serverLogFadeIn_0.3s_ease_forwards] shadow-[0_0_30px_rgba(0,0,0,0.6),0_0_15px_rgba(255,200,100,0.1)]'}`}
@@ -135,6 +312,48 @@ const ServerLogDisplay = ({
         <div className="flex flex-col gap-[0.4cqh] px-[2.13cqh] py-[0.8cqh] bg-error/10 border-b border-error/30">
           <div className="font-mono text-[1.96cqh] text-error/90">{displayErrorMessage}</div>
           <div className="font-mono text-[1.6cqh] text-white/50 italic">Open Settings to reinstall the engine.</div>
+          <div className="flex items-center gap-[0.8cqh] pt-[0.25cqh]">
+            {showExportAction && onExportAction && (
+              <button
+                type="button"
+                className={`cursor-pointer border border-[rgba(245,251,255,0.7)] bg-[rgba(8,12,20,0.18)] text-[rgba(245,251,255,0.95)] font-serif text-[1.8cqh] px-[1.2cqh] py-[0.25cqh] ${INTERACTIVE_TRANSITION} duration-200 hover:bg-[rgba(245,251,255,0.9)] hover:text-[rgba(15,20,32,0.95)]`}
+                onClick={onExportAction}
+                disabled={isExportingAction}
+                title="Export diagnostics JSON"
+              >
+                {isExportingAction ? 'Exporting...' : exportActionLabel}
+              </button>
+            )}
+            <button
+              type="button"
+              className={`cursor-pointer border border-[rgba(245,251,255,0.7)] bg-[rgba(8,12,20,0.18)] text-[rgba(245,251,255,0.95)] font-serif text-[1.8cqh] px-[1.2cqh] py-[0.25cqh] ${INTERACTIVE_TRANSITION} duration-200 hover:bg-[rgba(245,251,255,0.9)] hover:text-[rgba(15,20,32,0.95)]`}
+              onClick={() => void handleCopyBugReport()}
+              disabled={isCopyingReport}
+              title="Copy diagnostics JSON for bug reports"
+            >
+              {isCopyingReport ? 'Copying...' : 'Copy Report'}
+            </button>
+            <button
+              type="button"
+              className={`cursor-pointer border border-[rgba(245,251,255,0.7)] bg-[rgba(8,12,20,0.18)] text-[rgba(245,251,255,0.95)] font-serif text-[1.8cqh] px-[1.2cqh] py-[0.25cqh] ${INTERACTIVE_TRANSITION} duration-200 hover:bg-[rgba(245,251,255,0.9)] hover:text-[rgba(15,20,32,0.95)]`}
+              onClick={() => void handleOpenGithubIssue()}
+              disabled={isOpeningIssue}
+              title="Open prefilled issue on GitHub"
+            >
+              {isOpeningIssue ? 'Opening...' : 'Report on GitHub'}
+            </button>
+            <button
+              type="button"
+              className={`cursor-pointer border border-[rgba(245,251,255,0.7)] bg-[rgba(8,12,20,0.18)] text-[rgba(245,251,255,0.95)] font-serif text-[1.8cqh] px-[1.2cqh] py-[0.25cqh] ${INTERACTIVE_TRANSITION} duration-200 hover:bg-[rgba(245,251,255,0.9)] hover:text-[rgba(15,20,32,0.95)]`}
+              onClick={() => window.open(DISCORD_HELP_URL, '_blank', 'noopener,noreferrer')}
+              title="Ask for help in Discord"
+            >
+              Ask on Discord
+            </button>
+          </div>
+          {reportActionStatus && (
+            <div className="font-serif text-[1.7cqh] text-[rgba(245,249,255,0.75)]">{reportActionStatus}</div>
+          )}
         </div>
       )}
       <div

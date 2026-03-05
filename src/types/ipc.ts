@@ -20,6 +20,19 @@ export type RuntimeDiagnosticsMeta = {
   is_packaged: boolean
 }
 
+export type SystemDiagnostics = {
+  platform: string
+  release: string
+  version: string
+  arch: string
+  uptime_seconds: number
+  total_memory_bytes: number
+  free_memory_bytes: number
+  cpu_model: string
+  cpu_cores: number
+  gpu_feature_status: Record<string, string>
+}
+
 export type ExportDiagnosticsResult = {
   canceled: boolean
   file_path: string | null
@@ -83,6 +96,7 @@ export type IpcCommandMap = {
   // Debug
   'write-spark-tuning': { args: [tuning: PortalSparksTuning]; return: void }
   'get-runtime-diagnostics-meta': { args: []; return: RuntimeDiagnosticsMeta }
+  'get-system-diagnostics': { args: []; return: SystemDiagnostics }
   'export-loading-diagnostics': { args: [reportText: string]; return: ExportDiagnosticsResult }
 
   // Updates

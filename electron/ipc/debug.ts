@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import * as path from 'node:path'
 import * as fs from 'node:fs'
 import { execSync } from 'node:child_process'
+import os from 'node:os'
 
 function resolveCommitHash(): string {
   const envCommit =
@@ -37,6 +38,22 @@ export function registerDebugIpc(): void {
       node_version: process.versions.node || 'unknown',
       locale: app.getLocale(),
       is_packaged: app.isPackaged
+    }
+  })
+
+  ipcMain.handle('get-system-diagnostics', () => {
+    const cpus = os.cpus()
+    return {
+      platform: os.platform(),
+      release: os.release(),
+      version: os.version(),
+      arch: os.arch(),
+      uptime_seconds: Math.round(os.uptime()),
+      total_memory_bytes: os.totalmem(),
+      free_memory_bytes: os.freemem(),
+      cpu_model: cpus[0]?.model || 'unknown',
+      cpu_cores: cpus.length,
+      gpu_feature_status: app.getGPUFeatureStatus()
     }
   })
 

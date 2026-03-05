@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { invoke } from '../bridge'
 import { useStreaming } from '../context/StreamingContext'
 import { useVortex } from '../context/VortexContext'
@@ -63,21 +63,7 @@ const TerminalDisplay = ({ onCancel }: TerminalDisplayProps) => {
     setExportStatus(null)
 
     try {
-      const meta = await invoke('get-runtime-diagnostics-meta')
-      const report = {
-        generated_at: new Date().toISOString(),
-        runtime: meta,
-        loading_state: {
-          connection_state: connectionState,
-          status_stage: statusStage,
-          status_text: statusText,
-          progress_percent: progressPercent,
-          engine_error: engineError,
-          websocket_error: error,
-          is_server_mode: isServerMode
-        },
-        logs: allLogsWithError
-      }
+      const report = await buildDiagnosticsPayload()
 
       const result = await invoke('export-loading-diagnostics', JSON.stringify(report, null, 2))
       if (result.canceled) {
@@ -92,6 +78,26 @@ const TerminalDisplay = ({ onCancel }: TerminalDisplayProps) => {
       setIsExportingDiagnostics(false)
     }
   }
+
+  const buildDiagnosticsPayload = useCallback(async () => {
+    const meta = await invoke('get-runtime-diagnostics-meta')
+    const system = await invoke('get-system-diagnostics')
+    return {
+      generated_at: new Date().toISOString(),
+      runtime: meta,
+      system,
+      loading_state: {
+        connection_state: connectionState,
+        status_stage: statusStage,
+        status_text: statusText,
+        progress_percent: progressPercent,
+        engine_error: engineError,
+        websocket_error: error,
+        is_server_mode: isServerMode
+      },
+      logs: allLogsWithError
+    }
+  }, [allLogsWithError, connectionState, engineError, error, isServerMode, progressPercent, statusStage, statusText])
 
   return (
     <>
@@ -135,20 +141,23 @@ const TerminalDisplay = ({ onCancel }: TerminalDisplayProps) => {
               variant="loading-inline"
               disableLiveIpc={true}
               externalLogs={logsWithError}
+              errorMessage={errorDetail}
               title={isServerMode ? 'SERVER OUTPUT' : undefined}
-              headerAction={
-                errorDetail ? (
-                  <button
-                    type="button"
-                    className="loading-inline-logs-close"
-                    onClick={() => void handleExportDiagnostics()}
-                    disabled={isExportingDiagnostics}
-                    title="Export loading logs and environment diagnostics"
-                  >
-                    {isExportingDiagnostics ? 'Exporting...' : 'Export Logs'}
-                  </button>
-                ) : null
-              }
+              reportContext={{
+                flow: 'loading',
+                connection_state: connectionState,
+                status_stage: statusStage,
+                status_text: statusText,
+                progress_percent: progressPercent,
+                engine_error: engineError,
+                websocket_error: error,
+                is_server_mode: isServerMode
+              }}
+              buildDiagnosticsPayload={buildDiagnosticsPayload}
+              showExportAction={!!errorDetail}
+              onExportAction={() => void handleExportDiagnostics()}
+              isExportingAction={isExportingDiagnostics}
+              exportActionLabel="Export Logs"
             />
           </div>
           <div className="flex items-center justify-end gap-[1.8cqh] mt-[1.35cqh] w-full">
