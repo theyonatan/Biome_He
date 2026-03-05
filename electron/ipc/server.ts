@@ -7,7 +7,6 @@ import path from 'node:path'
 import { getEngineDir, getUvDir, getHfHomeDir, getHfHubCacheDir } from '../lib/paths.js'
 import { getUvBinaryPath, getUvEnvVars } from '../lib/uv.js'
 import { getHiddenWindowOptions } from '../lib/platform.js'
-import { readSettingsSync } from './settings.js'
 import {
   getServerState,
   setServerProcess,
@@ -94,10 +93,8 @@ export function registerServerIpc(): void {
       BIOME_SERVER_LOG_PATH: path.join(engineDir, 'server.log')
     }
 
-    // HuggingFace token is optional. Only read from hidden app settings.
-    const currentSettings = readSettingsSync()
-    const settingsToken = currentSettings.huggingface_token?.trim() || ''
-    const hfToken = settingsToken
+    // Pass through HuggingFace token from environment
+    const hfToken = process.env.HF_TOKEN || process.env.HUGGING_FACE_HUB_TOKEN || ''
 
     if (hfToken) {
       console.log(`[ENGINE] HuggingFace token configured (${Math.min(hfToken.length, 4)}... chars)`)
