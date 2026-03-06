@@ -2,7 +2,7 @@ import { useEffect, useState, type CSSProperties } from 'react'
 import { PARALLAX_ENABLED } from '../constants'
 
 type BackgroundSlideshowProps = {
-  images: string[]
+  videos: string[]
   currentIndex: number
   nextIndex: number
   blurPx: number
@@ -12,7 +12,7 @@ type BackgroundSlideshowProps = {
 }
 
 const BackgroundSlideshow = ({
-  images,
+  videos,
   currentIndex,
   nextIndex,
   blurPx,
@@ -44,30 +44,29 @@ const BackgroundSlideshow = ({
     ['--bg-parallax-y' as string]: `${offset.y}px`
   }
 
-  const currentImage = images[currentIndex]
-  const nextImage = images[nextIndex]
+  const currentVideo = videos[currentIndex]
+  const nextVideo = videos[nextIndex]
 
   return (
     <div className="absolute inset-0 overflow-hidden -z-10 bg-darkest" style={backgroundStyle} aria-hidden="true">
-      {currentImage && (
-        <div
-          key={`current-${currentIndex}`}
-          className="app-background-slide active"
-          style={{ backgroundImage: `url("${currentImage}")` }}
-        />
+      {currentVideo && (
+        <div key={`current-${currentIndex}`} className="app-background-slide active">
+          <video src={currentVideo} autoPlay loop muted playsInline />
+        </div>
       )}
-      {isTransitioning && nextImage && (
+      {nextVideo && (
         <div
           key={`transition-${transitionKey}`}
-          className="app-background-transition-slide"
-          style={{ backgroundImage: `url("${nextImage}")` }}
+          className={isTransitioning ? 'app-background-transition-slide' : 'app-background-slide'}
           onAnimationEnd={(event) => {
             if (event.target !== event.currentTarget) return
             if (event.animationName === 'portalBgReveal') {
               onTransitionComplete()
             }
           }}
-        />
+        >
+          <video src={nextVideo} autoPlay loop muted playsInline />
+        </div>
       )}
       <div className="app-background-scrim" />
     </div>

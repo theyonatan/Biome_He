@@ -70,10 +70,9 @@ const PortalPreview = ({
           }}
         >
           {image && (
-            <div
-              className="portal-preview-image absolute rounded-[inherit] origin-center opacity-100"
-              style={{ backgroundImage: `url("${image}")` }}
-            />
+            <div className="portal-preview-image absolute rounded-[inherit] origin-center opacity-100">
+              <video src={image} autoPlay loop muted playsInline className="w-full h-full object-cover" />
+            </div>
           )}
           {hoverContent && (
             <div

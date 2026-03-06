@@ -49,7 +49,7 @@ const AppShell = () => {
   const { isStreaming, isPaused, connectionState, warning, connectionLost, statusStage, prepareReturnToMainMenu } =
     useStreaming()
   const {
-    images,
+    videos,
     currentIndex,
     nextIndex,
     isTransitioning,
@@ -70,15 +70,15 @@ const AppShell = () => {
       portalState === portalStates.STREAMING
   )
 
-  const nextScenePreview = images[nextIndex] ?? null
+  const nextScenePreview = videos[nextIndex] ?? null
   const isLaunchTransition = isEnteringLoading
   const isStreamingUi = portalState === portalStates.STREAMING && isStreaming
   const isLoadingUi = !isLaunchTransition && portalState === portalStates.LOADING
   const isMainUi = !isLaunchTransition && !isLoadingUi && !isStreamingUi
   const useMainBackground = !isStreamingUi
   const backgroundBlurPx = isMainUi ? (isSettingsOpen ? 14 : 2) : 0
-  const portalGlowRgb = useSceneGlowColor(images, currentIndex)
-  const nextSceneGlowRgb = useSceneGlowColor(images, nextIndex)
+  const portalGlowRgb = useSceneGlowColor(videos, currentIndex)
+  const nextSceneGlowRgb = useSceneGlowColor(videos, nextIndex)
   const showMenuHome = isMainUi && !isConnected && !isSettingsOpen
   const showMenuSettings = isMainUi && !isConnected && isSettingsOpen
   const activeMenuView: MenuViewKey | null = useMemo(
@@ -174,7 +174,7 @@ const AppShell = () => {
       >
         {useMainBackground && (
           <BackgroundSlideshow
-            images={images}
+            videos={videos}
             currentIndex={currentIndex}
             nextIndex={nextIndex}
             blurPx={backgroundBlurPx}
