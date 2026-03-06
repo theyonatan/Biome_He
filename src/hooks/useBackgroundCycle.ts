@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { invoke } from '../bridge'
 
 const CYCLE_INTERVAL_MS = 5000
@@ -9,6 +9,7 @@ const TRANSITION_FAILSAFE_MS = 1400
 
 type BackgroundCycleState = {
   videos: string[]
+  getVideoElement: (index: number) => HTMLVideoElement | null
   currentIndex: number
   nextIndex: number
   isTransitioning: boolean
@@ -23,12 +24,21 @@ type BackgroundCycleState = {
 
 export const useBackgroundCycle = (pauseTransitions = false): BackgroundCycleState => {
   const [videos, setVideos] = useState<string[]>([])
+  const videoElementsRef = useRef<Map<string, HTMLVideoElement>>(new Map())
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [isPortalShrinking, setIsPortalShrinking] = useState(false)
   const [transitionKey, setTransitionKey] = useState(0)
   const [portalVisible, setPortalVisible] = useState(true)
   const [isPortalEntering, setIsPortalEntering] = useState(false)
+
+  const getVideoElement = useCallback(
+    (index: number): HTMLVideoElement | null => {
+      const url = videos[index]
+      return url ? (videoElementsRef.current.get(url) ?? null) : null
+    },
+    [videos]
+  )
 
   const completePortalShrink = useCallback(() => {
     if (!isPortalShrinking || isTransitioning) return
@@ -59,6 +69,24 @@ export const useBackgroundCycle = (pauseTransitions = false): BackgroundCycleSta
         if (filenames.length === 0 || cancelled) return
 
         const urls = filenames.map((filename) => `biome-bg://serve/${filename}`)
+        const elements = new Map<string, HTMLVideoElement>()
+
+        for (const url of urls) {
+          const el = document.createElement('video')
+          el.src = url
+          el.autoplay = true
+          el.loop = true
+          el.muted = true
+          el.playsInline = true
+          el.preload = 'auto'
+          el.style.width = '100%'
+          el.style.height = '100%'
+          el.style.objectFit = 'cover'
+          el.load()
+          elements.set(url, el)
+        }
+
+        videoElementsRef.current = elements
 
         if (!cancelled) {
           setVideos(urls)
@@ -75,6 +103,11 @@ export const useBackgroundCycle = (pauseTransitions = false): BackgroundCycleSta
 
     return () => {
       cancelled = true
+      for (const el of videoElementsRef.current.values()) {
+        el.pause()
+        el.src = ''
+      }
+      videoElementsRef.current.clear()
     }
   }, [])
 
@@ -141,6 +174,7 @@ export const useBackgroundCycle = (pauseTransitions = false): BackgroundCycleSta
 
   return {
     videos,
+    getVideoElement,
     currentIndex,
     nextIndex,
     isTransitioning,

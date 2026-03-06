@@ -2,18 +2,17 @@ import { useEffect, useState } from 'react'
 
 const DEFAULT_GLOW_RGB: [number, number, number] = [140, 206, 244]
 
-const useSceneGlowColor = (videos: string[], currentIndex: number): [number, number, number] => {
+const useSceneGlowColor = (
+  getVideoElement: (index: number) => HTMLVideoElement | null,
+  index: number
+): [number, number, number] => {
   const [glowRgb, setGlowRgb] = useState<[number, number, number]>(DEFAULT_GLOW_RGB)
 
   useEffect(() => {
-    const src = videos[currentIndex]
-    if (!src) return
+    const video = getVideoElement(index)
+    if (!video) return
 
     let cancelled = false
-    const video = document.createElement('video')
-    video.crossOrigin = 'anonymous'
-    video.muted = true
-    video.preload = 'auto'
 
     const sampleColor = () => {
       if (cancelled) return
@@ -65,15 +64,20 @@ const useSceneGlowColor = (videos: string[], currentIndex: number): [number, num
       setGlowRgb([glowR, glowG, glowB])
     }
 
-    video.addEventListener('loadeddata', sampleColor, { once: true })
-    video.src = src
+    if (video.readyState >= 2) {
+      sampleColor()
+    } else {
+      video.addEventListener('loadeddata', sampleColor, { once: true })
+      return () => {
+        cancelled = true
+        video.removeEventListener('loadeddata', sampleColor)
+      }
+    }
 
     return () => {
       cancelled = true
-      video.removeEventListener('loadeddata', sampleColor)
-      video.src = ''
     }
-  }, [videos, currentIndex])
+  }, [getVideoElement, index])
 
   return glowRgb
 }
