@@ -347,7 +347,7 @@
     height: 100cqh;
     left: calc(50% - var(--portal-center-x));
     top: calc(50% - var(--portal-center-y));
-    transform: rotate(calc(var(--portal-tilt) * -1));
+    transform: rotate(calc(var(--portal-tilt) * -1)) scale(0.46);
     transition: opacity 280ms ease;
   }
 
