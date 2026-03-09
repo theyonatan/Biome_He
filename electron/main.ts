@@ -15,6 +15,15 @@ protocol.registerSchemesAsPrivileged([
   }
 ])
 
+// Register biome-bg as a privileged scheme so <video> elements can stream from it.
+// Must be called before app.whenReady().
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'biome-bg',
+    privileges: { standard: true, supportFetchAPI: true, stream: true, bypassCSP: true }
+  }
+])
+
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined
 declare const MAIN_WINDOW_VITE_NAME: string
 
