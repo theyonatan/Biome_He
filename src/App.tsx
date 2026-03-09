@@ -33,7 +33,7 @@ import PortalSparksConfigurator from './components/PortalSparksConfigurator'
 
 const LAUNCH_PRE_SHRINK_MS = 420
 
-const VORTEX_HOVER_VOLUME = 0.15
+const VORTEX_HOVER_VOLUME = 0.4
 
 const AppShell = () => {
   const [isPortalHovered, setIsPortalHovered] = useState(false)
@@ -144,6 +144,7 @@ const AppShell = () => {
       setIsEnteringLoading(false)
       setIsLaunchShrinking(false)
       setIsReturningToMenu(false)
+      setIsPortalHovered(false)
     }
   }, [isLoadingUi, portalState, portalStates.MAIN_MENU])
 
@@ -166,14 +167,14 @@ const AppShell = () => {
       !isEnteringLoading &&
       !isLaunchShrinking
     ) {
-      play('portal_swoosh')
+      play('portal_swoosh_long')
       setIsLaunchShrinking(true)
     }
   }
 
   const handleCancelLoading = () => {
     if (isReturningToMenu || portalState !== portalStates.LOADING) return
-    play('portal_swoosh')
+    play('portal_swoosh_long')
     setIsReturningToMenu(true)
     setIsPortalHovered(false)
     void prepareReturnToMainMenu()

@@ -6,6 +6,7 @@ export type SoundId =
   | 'ui_toggle_off'
   | 'error'
   | 'portal_swoosh'
+  | 'portal_swoosh_long'
   | 'vortex_loop'
   | 'vortex_error'
   | 'music_menu'

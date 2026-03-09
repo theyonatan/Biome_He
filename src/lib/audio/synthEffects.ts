@@ -28,27 +28,35 @@ export const synthError: SynthOneShot = (ctx, dest) => {
   }
 }
 
-/** Gentle wind passing by when the portal transitions. */
-export const synthPortalSwoosh: SynthOneShot = (ctx, dest) => {
-  const t = ctx.currentTime
+/** Gentle wind passing by — `scale` stretches timing (1 = default ~1.3s). */
+const makeSwoosh =
+  (scale: number): SynthOneShot =>
+  (ctx, dest) => {
+    const t = ctx.currentTime
+    const s = scale
 
-  // Soft filtered noise — gentle breeze
-  const noise = ctx.createBufferSource()
-  const noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 1.5, ctx.sampleRate)
-  const noiseData = noiseBuf.getChannelData(0)
-  for (let i = 0; i < noiseData.length; i++) noiseData[i] = Math.random() * 2 - 1
-  noise.buffer = noiseBuf
-  const bandpass = ctx.createBiquadFilter()
-  bandpass.type = 'bandpass'
-  bandpass.frequency.setValueAtTime(400, t)
-  bandpass.frequency.exponentialRampToValueAtTime(1200, t + 0.4)
-  bandpass.frequency.exponentialRampToValueAtTime(500, t + 1.2)
-  bandpass.Q.setValueAtTime(0.4, t)
-  const noiseGain = ctx.createGain()
-  noiseGain.gain.setValueAtTime(0, t)
-  noiseGain.gain.linearRampToValueAtTime(0.15, t + 0.2)
-  noiseGain.gain.linearRampToValueAtTime(0.1, t + 0.6)
-  noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 1.3)
-  noise.connect(bandpass).connect(noiseGain).connect(dest)
-  noise.start()
-}
+    const noise = ctx.createBufferSource()
+    const noiseBuf = ctx.createBuffer(1, ctx.sampleRate * (1.5 * s), ctx.sampleRate)
+    const noiseData = noiseBuf.getChannelData(0)
+    for (let i = 0; i < noiseData.length; i++) noiseData[i] = Math.random() * 2 - 1
+    noise.buffer = noiseBuf
+    const bandpass = ctx.createBiquadFilter()
+    bandpass.type = 'bandpass'
+    bandpass.frequency.setValueAtTime(400, t)
+    bandpass.frequency.exponentialRampToValueAtTime(1200, t + 0.4 * s)
+    bandpass.frequency.exponentialRampToValueAtTime(500, t + 1.2 * s)
+    bandpass.Q.setValueAtTime(0.4, t)
+    const noiseGain = ctx.createGain()
+    noiseGain.gain.setValueAtTime(0, t)
+    noiseGain.gain.linearRampToValueAtTime(0.15, t + 0.2 * s)
+    noiseGain.gain.linearRampToValueAtTime(0.1, t + 0.6 * s)
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 1.3 * s)
+    noise.connect(bandpass).connect(noiseGain).connect(dest)
+    noise.start()
+  }
+
+/** Short swoosh for background cycle transitions. */
+export const synthPortalSwoosh = makeSwoosh(1)
+
+/** Longer swoosh for portal entry/exit. */
+export const synthPortalSwooshLong = makeSwoosh(1.5)

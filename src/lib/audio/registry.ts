@@ -1,6 +1,6 @@
 import type { SoundId, SoundCategory, SynthOneShot, SynthLoop } from './types'
 import { synthUIHover, synthUIClick, synthUIBack, synthToggleOn, synthToggleOff } from './synthUI'
-import { synthError, synthPortalSwoosh } from './synthEffects'
+import { synthError, synthPortalSwoosh, synthPortalSwooshLong } from './synthEffects'
 import { synthVortexLoop, synthVortexError } from './synthVortex'
 import { synthPauseMusic, synthGameplayMusic } from './synthMusic'
 
@@ -12,6 +12,7 @@ export const SOUND_CATEGORIES: Record<SoundId, SoundCategory> = {
   ui_toggle_off: 'sfx',
   error: 'sfx',
   portal_swoosh: 'sfx',
+  portal_swoosh_long: 'sfx',
   vortex_loop: 'sfx',
   vortex_error: 'sfx',
   music_menu: 'music',
@@ -37,7 +38,8 @@ export const SYNTH_ONE_SHOTS: Partial<Record<SoundId, SynthOneShot>> = {
   ui_toggle_on: synthToggleOn,
   ui_toggle_off: synthToggleOff,
   error: synthError,
-  portal_swoosh: synthPortalSwoosh
+  portal_swoosh: synthPortalSwoosh,
+  portal_swoosh_long: synthPortalSwooshLong
 }
 
 export const SYNTH_LOOPS: Partial<Record<SoundId, SynthLoop>> = {
