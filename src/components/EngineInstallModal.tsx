@@ -52,7 +52,11 @@ const EngineInstallModal = ({ onClose }: EngineInstallModalProps) => {
   }
 
   return (
-    <div className="absolute inset-0 z-[12] pointer-events-none flex items-center justify-center bg-[var(--color-overlay-scrim)] backdrop-blur-sm">
+    <div
+      className="absolute inset-0 z-[12] flex items-center justify-center bg-[var(--color-overlay-scrim)] backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+    >
       <div className="w-[135.11cqh] max-w-[92vw] pointer-events-auto">
         <ServerLogDisplay
           variant="loading-inline"
