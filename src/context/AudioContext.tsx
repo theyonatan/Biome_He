@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, type ReactNode } from 'react'
-import { AudioEngine, type SoundId } from '../lib/audioEngine'
+import { AudioEngine, type SoundId } from '../lib/audio'
 import { useSettings } from '../hooks/useSettings'
 
 type AudioContextValue = {
