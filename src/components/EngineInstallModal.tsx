@@ -1,5 +1,5 @@
-import { useCallback, useState } from 'react'
-import { invoke } from '../bridge'
+import { useCallback, useEffect, useState } from 'react'
+import { invoke, listen } from '../bridge'
 import { useStreaming } from '../context/StreamingContext'
 import ServerLogDisplay from './ServerLogDisplay'
 
@@ -8,10 +8,30 @@ type EngineInstallModalProps = {
 }
 
 const EngineInstallModal = ({ onClose }: EngineInstallModalProps) => {
-  const { engineSetupInProgress, setupProgress, engineSetupError } = useStreaming()
+  const { engineSetupInProgress, setupProgress, engineSetupError, abortEngineSetup } = useStreaming()
   const [installLogs, setInstallLogs] = useState<string[]>([])
   const [isExportingInstallDiagnostics, setIsExportingInstallDiagnostics] = useState(false)
+  const [isAbortingInstall, setIsAbortingInstall] = useState(false)
   const [installExportStatus, setInstallExportStatus] = useState<string | null>(null)
+
+  useEffect(() => {
+    setInstallLogs([])
+    const unlisten = listen('engine-install-log', (payload) => {
+      setInstallLogs((prev) => {
+        const next = [...prev, payload.line]
+        if (next.length > 360) next.shift()
+        return next
+      })
+    })
+    return unlisten
+  }, [])
+
+  useEffect(() => {
+    if (engineSetupInProgress) {
+      setInstallLogs([])
+      setInstallExportStatus(null)
+    }
+  }, [engineSetupInProgress])
 
   const buildDiagnosticsPayload = useCallback(async () => {
     const meta = await invoke('get-runtime-diagnostics-meta')
@@ -51,6 +71,22 @@ const EngineInstallModal = ({ onClose }: EngineInstallModalProps) => {
     }
   }
 
+  const handleAbortInstall = async () => {
+    if (isAbortingInstall) return
+
+    setIsAbortingInstall(true)
+    setInstallExportStatus(null)
+    try {
+      const message = await abortEngineSetup()
+      setInstallExportStatus(message || 'Abort requested')
+    } catch (abortErr) {
+      const message = abortErr instanceof Error ? abortErr.message : 'Failed to abort install'
+      setInstallExportStatus(message)
+    } finally {
+      setIsAbortingInstall(false)
+    }
+  }
+
   return (
     <div
       className="absolute inset-0 z-[12] flex items-center justify-center bg-[var(--color-overlay-scrim)] backdrop-blur-sm"
@@ -61,6 +97,7 @@ const EngineInstallModal = ({ onClose }: EngineInstallModalProps) => {
         <ServerLogDisplay
           variant="loading-inline"
           title="WORLD ENGINE INSTALL"
+          externalLogs={installLogs}
           showProgress={engineSetupInProgress}
           progressMessage={
             engineSetupInProgress
@@ -82,9 +119,20 @@ const EngineInstallModal = ({ onClose }: EngineInstallModalProps) => {
           isExportingAction={isExportingInstallDiagnostics}
           exportActionLabel="Export Logs"
           showDismiss={false}
-          onLogsChange={setInstallLogs}
           headerAction={
-            !engineSetupInProgress ? (
+            engineSetupInProgress ? (
+              <div className="flex items-center gap-[0.8cqh]">
+                <button
+                  type="button"
+                  className="loading-inline-logs-close"
+                  onClick={() => void handleAbortInstall()}
+                  disabled={isAbortingInstall}
+                  aria-label="Abort engine install"
+                >
+                  {isAbortingInstall ? 'Aborting...' : 'Abort'}
+                </button>
+              </div>
+            ) : (
               <div className="flex items-center gap-[0.8cqh]">
                 <button
                   type="button"
@@ -95,7 +143,7 @@ const EngineInstallModal = ({ onClose }: EngineInstallModalProps) => {
                   Close
                 </button>
               </div>
-            ) : null
+            )
           }
         />
         {installExportStatus && (

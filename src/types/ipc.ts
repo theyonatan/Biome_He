@@ -66,6 +66,7 @@ export type IpcCommandMap = {
   'install-uv': { args: []; return: string }
   'setup-server-components': { args: []; return: string }
   'sync-engine-dependencies': { args: []; return: string }
+  'abort-sync-engine-dependencies': { args: []; return: string }
   'unpack-server-files': { args: [force: boolean]; return: string }
 
   // Server
@@ -109,5 +110,6 @@ export type IpcCommandMap = {
 export type IpcEventMap = {
   'server-ready': boolean
   'server-stage': { id: string; label: string; percent: number }
+  'engine-install-log': { line: string; is_stderr: boolean }
   'window-resized': { width: number; height: number }
 }
