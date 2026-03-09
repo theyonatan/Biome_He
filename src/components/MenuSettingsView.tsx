@@ -86,6 +86,9 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
   const [showLocalInstallLog, setShowLocalInstallLog] = useState(false)
 
   const [menuKeybindings, setMenuKeybindings] = useState<Keybindings>(() => ({ ...settings.keybindings }))
+  const [menuMasterVolume, setMenuMasterVolume] = useState(() => Math.round(settings.audio.master_volume * 100))
+  const [menuSfxVolume, setMenuSfxVolume] = useState(() => Math.round(settings.audio.sfx_volume * 100))
+  const [menuMusicVolume, setMenuMusicVolume] = useState(() => Math.round(settings.audio.music_volume * 100))
 
   const configServerUrl = settings.server_url
   const [menuServerUrl, setMenuServerUrl] = useState(configServerUrl)
@@ -144,13 +147,17 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
     setMenuMouseSensitivity(streamingToMenu(settings.mouse_sensitivity ?? mouseSensitivity))
     setMenuServerUrl(configServerUrl)
     setMenuKeybindings({ ...settings.keybindings })
+    setMenuMasterVolume(Math.round(settings.audio.master_volume * 100))
+    setMenuSfxVolume(Math.round(settings.audio.sfx_volume * 100))
+    setMenuMusicVolume(Math.round(settings.audio.music_volume * 100))
   }, [
     configEngineMode,
     configWorldModel,
     settings.mouse_sensitivity,
     mouseSensitivity,
     configServerUrl,
-    settings.keybindings
+    settings.keybindings,
+    settings.audio
   ])
 
   const handleServerUrlBlur = useCallback(() => {
@@ -196,7 +203,12 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
       engine_mode: engineModeValue,
       engine_model: menuWorldModel,
       mouse_sensitivity: streamingValue,
-      keybindings: menuKeybindings
+      keybindings: menuKeybindings,
+      audio: {
+        master_volume: menuMasterVolume / 100,
+        sfx_volume: menuSfxVolume / 100,
+        music_volume: menuMusicVolume / 100
+      }
     })
     setMouseSensitivity(streamingValue)
   }, [
@@ -207,6 +219,9 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
     menuServerUrl,
     menuWorldModel,
     menuKeybindings,
+    menuMasterVolume,
+    menuSfxVolume,
+    menuMusicVolume,
     saveSettings,
     setMouseSensitivity
   ])
@@ -312,13 +327,44 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
             title="Mouse Sensitivity"
             description="how much should the camera move when you move your mouse?"
           >
-            <SettingsSlider
-              min={10}
-              max={100}
-              value={menuMouseSensitivity}
-              onChange={handleMouseSensitivityChange}
-              label={`${menuMouseSensitivity}%`}
-            />
+            <div className="flex flex-col gap-[1.5cqh]">
+              <SettingsSlider
+                min={10}
+                max={100}
+                value={menuMouseSensitivity}
+                onChange={handleMouseSensitivityChange}
+                suffix={`${menuMouseSensitivity}%`}
+              />
+            </div>
+          </SettingsSection>
+
+          <SettingsSection title="Volume" description="how loud should things be?">
+            <div className="flex flex-col gap-[1.5cqh]">
+              <SettingsSlider
+                min={0}
+                max={100}
+                value={menuMasterVolume}
+                onChange={setMenuMasterVolume}
+                label="master"
+                suffix={`${menuMasterVolume}%`}
+              />
+              <SettingsSlider
+                min={0}
+                max={100}
+                value={menuSfxVolume}
+                onChange={setMenuSfxVolume}
+                label="sound effects"
+                suffix={`${menuSfxVolume}%`}
+              />
+              <SettingsSlider
+                min={0}
+                max={100}
+                value={menuMusicVolume}
+                onChange={setMenuMusicVolume}
+                label="music"
+                suffix={`${menuMusicVolume}%`}
+              />
+            </div>
           </SettingsSection>
 
           <SettingsSection title="Keybindings" description="what keys do you want to use?">

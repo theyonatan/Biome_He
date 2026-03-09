@@ -5,6 +5,9 @@ import { SettingsProvider } from './hooks/useSettings'
 import { PortalProvider, usePortal } from './context/PortalContext'
 import { StreamingProvider, useStreaming } from './context/StreamingContext'
 import { VortexProvider } from './context/VortexContext'
+import { AudioProvider } from './context/AudioContext'
+import { useAudio } from './context/AudioContext'
+import AudioController from './components/AudioController'
 import { useAppStartup } from './hooks/useAppStartup'
 import { invoke } from './bridge'
 import type { AppUpdateInfo } from './types/ipc'
@@ -30,8 +33,11 @@ import PortalSparksConfigurator from './components/PortalSparksConfigurator'
 
 const LAUNCH_PRE_SHRINK_MS = 420
 
+const VORTEX_HOVER_VOLUME = 0.15
+
 const AppShell = () => {
   const [isPortalHovered, setIsPortalHovered] = useState(false)
+  const { play, startLoop, stopLoop, setLoopVolume, isLoopActive } = useAudio()
   const [isLaunchShrinking, setIsLaunchShrinking] = useState(false)
   const [isEnteringLoading, setIsEnteringLoading] = useState(false)
   const [isReturningToMenu, setIsReturningToMenu] = useState(false)
@@ -126,6 +132,13 @@ const AppShell = () => {
     }
   }, [portalVisible])
 
+  // Play swoosh on background cycle transitions
+  useEffect(() => {
+    if (isPortalShrinking && !isLaunchShrinking) {
+      play('portal_swoosh')
+    }
+  }, [isPortalShrinking, isLaunchShrinking, play])
+
   useEffect(() => {
     if (!isLoadingUi && portalState === portalStates.MAIN_MENU) {
       setIsEnteringLoading(false)
@@ -153,12 +166,14 @@ const AppShell = () => {
       !isEnteringLoading &&
       !isLaunchShrinking
     ) {
+      play('portal_swoosh')
       setIsLaunchShrinking(true)
     }
   }
 
   const handleCancelLoading = () => {
     if (isReturningToMenu || portalState !== portalStates.LOADING) return
+    play('portal_swoosh')
     setIsReturningToMenu(true)
     setIsPortalHovered(false)
     void prepareReturnToMainMenu()
@@ -187,9 +202,22 @@ const AppShell = () => {
           <div
             className={`absolute top-1/2 z-8 w-[42.67cqh] cursor-pointer transition-[transform,left] duration-[180ms] ease-out ${!isConnected && isSettingsOpen ? 'left-[var(--portal-settings-right)] pointer-events-none' : 'left-[49%] pointer-events-auto'}`}
             style={{ transform: `translate(-50%, -50%) scale(${isPortalHovered ? 1.05 : 1})` }}
-            onMouseEnter={() => setIsPortalHovered(true)}
-            onMouseLeave={() => setIsPortalHovered(false)}
-            onClick={handleLaunch}
+            onMouseEnter={() => {
+              setIsPortalHovered(true)
+              if (!isLoopActive('vortex_loop')) {
+                startLoop('vortex_loop', VORTEX_HOVER_VOLUME)
+              } else {
+                setLoopVolume('vortex_loop', VORTEX_HOVER_VOLUME, 0.15)
+              }
+            }}
+            onMouseLeave={() => {
+              setIsPortalHovered(false)
+              stopLoop('vortex_loop')
+            }}
+            onClick={() => {
+              setLoopVolume('vortex_loop', 1, 0.3)
+              handleLaunch()
+            }}
             role="button"
             tabIndex={0}
             onKeyDown={(event) => {
@@ -335,13 +363,16 @@ const App = () => {
 
   return (
     <SettingsProvider>
-      <PortalProvider>
-        <StreamingProvider>
-          <VortexProvider>
-            <AppShell />
-          </VortexProvider>
-        </StreamingProvider>
-      </PortalProvider>
+      <AudioProvider>
+        <PortalProvider>
+          <StreamingProvider>
+            <VortexProvider>
+              <AudioController />
+              <AppShell />
+            </VortexProvider>
+          </StreamingProvider>
+        </PortalProvider>
+      </AudioProvider>
     </SettingsProvider>
   )
 }
