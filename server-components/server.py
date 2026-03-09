@@ -97,11 +97,11 @@ class TeeStream:
 
 # Log file receives both logger output and direct stdout/stderr writes.
 SERVER_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
-_hosted_log_fp = open(SERVER_LOG_FILE, "a", encoding="utf-8", buffering=1)
+_hosted_log_fp = open(SERVER_LOG_FILE, "w", encoding="utf-8", buffering=1)
 sys.stdout = TeeStream(sys.stdout, _hosted_log_fp)
 sys.stderr = TeeStream(sys.stderr, _hosted_log_fp)
 
-_file_log_handler = logging.FileHandler(SERVER_LOG_FILE, mode="a", encoding="utf-8")
+_file_log_handler = logging.FileHandler(SERVER_LOG_FILE, mode="w", encoding="utf-8")
 _file_log_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S"))
 logging.getLogger().addHandler(_file_log_handler)
 
