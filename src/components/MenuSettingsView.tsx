@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { invoke } from '../bridge'
-import { HEADING_BASE, SETTINGS_LABEL_BASE, SETTINGS_MUTED_TEXT } from '../styles'
+import { HEADING_BASE, SETTINGS_LABEL_BASE, SETTINGS_MUTED_TEXT, CONFIRM_BUTTON_BASE } from '../styles'
 import { useSettings } from '../hooks/useSettings'
 import { ENGINE_MODES, type Keybindings } from '../types/settings'
 import { useStreaming } from '../context/StreamingContext'
@@ -12,9 +12,11 @@ import SettingsTextInput from './ui/SettingsTextInput'
 import SettingsSlider from './ui/SettingsSlider'
 import SettingsKeybind, { fixedControlDisplay } from './ui/SettingsKeybind'
 import { FIXED_CONTROLS, getKeybindConflict } from '../hooks/useGameInput'
+import Modal from './ui/Modal'
 import ConfirmModal from './ui/ConfirmModal'
 import WorldEngineSection from './WorldEngineSection'
 import EngineInstallModal from './EngineInstallModal'
+import attributionText from '../../assets/audio/ATTRIBUTION.md?raw'
 
 type MenuModelOption = {
   id: string
@@ -84,6 +86,7 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
   const [showFixModal, setShowFixModal] = useState(false)
   const [showModeSwitchModal, setShowModeSwitchModal] = useState(false)
   const [showLocalInstallLog, setShowLocalInstallLog] = useState(false)
+  const [showCredits, setShowCredits] = useState(false)
 
   const [menuKeybindings, setMenuKeybindings] = useState<Keybindings>(() => ({ ...settings.keybindings }))
   const [menuMasterVolume, setMenuMasterVolume] = useState(() => Math.round(settings.audio.master_volume * 100))
@@ -381,6 +384,10 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
               <KeybindRow key={ctrl.label} label={ctrl.label} fixedLabel={fixedControlDisplay(ctrl)} />
             ))}
           </SettingsSection>
+
+          <MenuButton variant="ghost" className="w-full" onClick={() => setShowCredits(true)}>
+            Credits
+          </MenuButton>
         </div>
       </section>
 
@@ -417,6 +424,23 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
       )}
 
       {showLocalInstallLog && <EngineInstallModal onClose={() => setShowLocalInstallLog(false)} />}
+
+      {showCredits && (
+        <Modal title="Credits" onBackdropClick={() => setShowCredits(false)}>
+          <pre className="m-0 mt-[0.8cqh] font-mono text-[1.8cqh] text-text-modal-muted whitespace-pre-wrap border border-border-subtle bg-white/5 p-[1.2cqh] rounded-[0.4cqh]">
+            {attributionText.trim()}
+          </pre>
+          <div className="flex justify-end mt-[1.4cqh]">
+            <button
+              type="button"
+              className={`${CONFIRM_BUTTON_BASE} bg-[var(--color-surface-btn-hover)] text-[var(--color-text-inverse)]`}
+              onClick={() => setShowCredits(false)}
+            >
+              Close
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }

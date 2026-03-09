@@ -1,39 +1,6 @@
 import type { SynthLoop } from './types'
 import { loopTeardown } from './synthUtils'
 
-/** Ambient menu music — warm Cmaj7 pad with gentle breathing. */
-export const synthMenuMusic: SynthLoop = (ctx, dest) => {
-  const nodes: AudioNode[] = []
-  const gains: GainNode[] = []
-  const t = ctx.currentTime
-
-  const freqs = [130.81, 196.0, 246.94, 329.63]
-  for (const freq of freqs) {
-    const osc = ctx.createOscillator()
-    const g = ctx.createGain()
-    osc.type = 'sine'
-    osc.frequency.setValueAtTime(freq, t)
-    g.gain.setValueAtTime(0.12, t)
-    osc.connect(g).connect(dest)
-    osc.start()
-    nodes.push(osc, g)
-    gains.push(g)
-  }
-
-  const lfo = ctx.createOscillator()
-  const lfoGain = ctx.createGain()
-  lfo.type = 'sine'
-  lfo.frequency.setValueAtTime(0.08, t)
-  lfoGain.gain.setValueAtTime(0.04, t)
-  lfo.start()
-  for (const g of gains) {
-    lfo.connect(lfoGain).connect(g.gain)
-  }
-  nodes.push(lfo, lfoGain)
-
-  return loopTeardown(gains, nodes, 1.0)
-}
-
 /** Pause menu music — darker Am7 pad, slower breathing. */
 export const synthPauseMusic: SynthLoop = (ctx, dest) => {
   const nodes: AudioNode[] = []

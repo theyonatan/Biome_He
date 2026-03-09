@@ -17,6 +17,7 @@ export class AudioEngine {
   private musicGain: GainNode | null = null
   private assetBuffers = new Map<string, AudioBuffer>()
   private activeLoops = new Map<SoundId, { stop: () => void; gain: GainNode }>()
+  private pendingLoops = new Map<SoundId, { volume: number }>()
   private _masterVolume = 1.0
   private _sfxVolume = 0.5
   private _musicVolume = 0.3
@@ -61,11 +62,20 @@ export class AudioEngine {
   /** Preload an asset file into a decoded AudioBuffer. */
   async preloadAsset(id: string, url: string): Promise<void> {
     try {
+      console.log(`[AudioEngine] Preloading asset "${id}" from ${url}`)
       const ctx = this.ensureContext()
       const resp = await fetch(url)
+      if (!resp.ok) {
+        console.warn(`[AudioEngine] Fetch failed for "${id}": ${resp.status} ${resp.statusText}`)
+        return
+      }
       const arrayBuf = await resp.arrayBuffer()
+      console.log(`[AudioEngine] Fetched "${id}": ${arrayBuf.byteLength} bytes, decoding...`)
       const audioBuf = await ctx.decodeAudioData(arrayBuf)
       this.assetBuffers.set(id, audioBuf)
+      console.log(
+        `[AudioEngine] Asset "${id}" loaded: ${audioBuf.duration.toFixed(1)}s, ${audioBuf.numberOfChannels}ch`
+      )
     } catch (err) {
       console.warn(`[AudioEngine] Failed to preload asset "${id}":`, err)
     }
@@ -113,6 +123,9 @@ export class AudioEngine {
 
     // Try asset buffer first
     const buffer = this.assetBuffers.get(id)
+    console.log(
+      `[AudioEngine] startLoop("${id}"): asset buffer ${buffer ? `found (${buffer.duration.toFixed(1)}s)` : 'not found'}, synth ${SYNTH_LOOPS[id] ? 'available' : 'unavailable'}`
+    )
     if (buffer) {
       const source = ctx.createBufferSource()
       source.buffer = buffer
@@ -139,6 +152,13 @@ export class AudioEngine {
     }
 
     loopGain.disconnect()
+
+    // If there's a registered asset that hasn't loaded yet, remember this request
+    if (SOUND_ASSETS[id]) {
+      this.pendingLoops.set(id, { volume })
+      console.log(`[AudioEngine] Loop "${id}" deferred — asset not yet loaded`)
+    }
+
     return false
   }
 
@@ -162,6 +182,7 @@ export class AudioEngine {
 
   /** Stop a looping sound immediately. */
   stopLoop(id: SoundId) {
+    this.pendingLoops.delete(id)
     const loop = this.activeLoops.get(id)
     if (loop) {
       loop.stop()
@@ -177,6 +198,7 @@ export class AudioEngine {
 
   /** Fade out a looping sound over `seconds`, then clean up. */
   fadeOutLoop(id: SoundId, seconds: number) {
+    this.pendingLoops.delete(id)
     const loop = this.activeLoops.get(id)
     if (!loop || !this.ctx) return
     // Ramp gain to zero
@@ -196,6 +218,7 @@ export class AudioEngine {
 
   /** Stop all active loops. */
   stopAllLoops() {
+    this.pendingLoops.clear()
     for (const [id] of this.activeLoops) {
       this.stopLoop(id)
     }
@@ -205,5 +228,17 @@ export class AudioEngine {
   async preloadAll(): Promise<void> {
     const entries = Object.entries(SOUND_ASSETS) as [SoundId, string][]
     await Promise.all(entries.map(([id, url]) => this.preloadAsset(id, url)))
+    this.startPendingLoops()
+  }
+
+  /** Start any loops that were deferred because their asset wasn't loaded yet. */
+  private startPendingLoops() {
+    for (const [id, { volume }] of this.pendingLoops) {
+      if (this.assetBuffers.has(id)) {
+        console.log(`[AudioEngine] Starting deferred loop "${id}"`)
+        this.pendingLoops.delete(id)
+        this.startLoop(id, volume, 0.5)
+      }
+    }
   }
 }
