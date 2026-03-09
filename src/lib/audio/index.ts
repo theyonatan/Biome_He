@@ -1,2 +1,2 @@
 export { AudioEngine } from './AudioEngine'
-export type { SoundId, SoundCategory } from './types'
+export type { SoundId, SoundCategory, VolumeSettings } from './types'

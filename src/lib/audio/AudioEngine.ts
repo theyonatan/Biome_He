@@ -7,7 +7,7 @@
  * asset fails to load, the synthesizer is used as a fallback.
  */
 
-import type { SoundId } from './types'
+import type { SoundId, VolumeSettings } from './types'
 import { SOUND_CATEGORIES, SOUND_ASSETS, SYNTH_ONE_SHOTS, SYNTH_LOOPS } from './registry'
 
 export class AudioEngine {
@@ -48,10 +48,14 @@ export class AudioEngine {
     if (this.musicGain) this.musicGain.gain.value = this._musicVolume
   }
 
-  setVolumes(master: number, sfx: number, music: number) {
-    this._masterVolume = master
-    this._sfxVolume = sfx
-    this._musicVolume = music
+  get volumes(): VolumeSettings {
+    return { master: this._masterVolume, sfx: this._sfxVolume, music: this._musicVolume }
+  }
+
+  setVolumes(update: Partial<VolumeSettings>) {
+    if (update.master !== undefined) this._masterVolume = update.master
+    if (update.sfx !== undefined) this._sfxVolume = update.sfx
+    if (update.music !== undefined) this._musicVolume = update.music
     this.applyVolumes()
   }
 

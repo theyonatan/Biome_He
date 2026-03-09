@@ -4,6 +4,7 @@ import { HEADING_BASE, SETTINGS_LABEL_BASE, SETTINGS_MUTED_TEXT } from '../style
 import { useSettings } from '../hooks/useSettings'
 import { ENGINE_MODES, type Keybindings } from '../types/settings'
 import { useStreaming } from '../context/StreamingContext'
+import { useVolumeControls } from '../hooks/useVolumeControls'
 import MenuButton from './ui/MenuButton'
 import SettingsSection from './ui/SettingsSection'
 import SettingsToggle from './ui/SettingsToggle'
@@ -65,6 +66,7 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
     mouseSensitivity,
     setMouseSensitivity
   } = useStreaming()
+  const volume = useVolumeControls()
 
   // Convert streaming scale (0.1-3.0) to menu scale (10-100)
   const streamingToMenu = (v: number) => Math.round(10 + ((v - 0.1) * 90) / 2.9)
@@ -90,9 +92,6 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
   const [showCredits, setShowCredits] = useState(false)
 
   const [menuKeybindings, setMenuKeybindings] = useState<Keybindings>(() => ({ ...settings.keybindings }))
-  const [menuMasterVolume, setMenuMasterVolume] = useState(() => Math.round(settings.audio.master_volume * 100))
-  const [menuSfxVolume, setMenuSfxVolume] = useState(() => Math.round(settings.audio.sfx_volume * 100))
-  const [menuMusicVolume, setMenuMusicVolume] = useState(() => Math.round(settings.audio.music_volume * 100))
 
   const configServerUrl = settings.server_url
   const [menuServerUrl, setMenuServerUrl] = useState(configServerUrl)
@@ -151,17 +150,13 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
     setMenuMouseSensitivity(streamingToMenu(settings.mouse_sensitivity ?? mouseSensitivity))
     setMenuServerUrl(configServerUrl)
     setMenuKeybindings({ ...settings.keybindings })
-    setMenuMasterVolume(Math.round(settings.audio.master_volume * 100))
-    setMenuSfxVolume(Math.round(settings.audio.sfx_volume * 100))
-    setMenuMusicVolume(Math.round(settings.audio.music_volume * 100))
   }, [
     configEngineMode,
     configWorldModel,
     settings.mouse_sensitivity,
     mouseSensitivity,
     configServerUrl,
-    settings.keybindings,
-    settings.audio
+    settings.keybindings
   ])
 
   const handleServerUrlBlur = useCallback(() => {
@@ -208,11 +203,7 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
       engine_model: menuWorldModel,
       mouse_sensitivity: streamingValue,
       keybindings: menuKeybindings,
-      audio: {
-        master_volume: menuMasterVolume / 100,
-        sfx_volume: menuSfxVolume / 100,
-        music_volume: menuMusicVolume / 100
-      }
+      audio: volume.getAudioSettings()
     })
     setMouseSensitivity(streamingValue)
   }, [
@@ -223,9 +214,7 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
     menuServerUrl,
     menuWorldModel,
     menuKeybindings,
-    menuMasterVolume,
-    menuSfxVolume,
-    menuMusicVolume,
+    volume.getAudioSettings,
     saveSettings,
     setMouseSensitivity
   ])
@@ -347,26 +336,26 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
               <SettingsSlider
                 min={0}
                 max={100}
-                value={menuMasterVolume}
-                onChange={setMenuMasterVolume}
+                value={volume.master}
+                onChange={volume.setMaster}
                 label="master"
-                suffix={`${menuMasterVolume}%`}
+                suffix={`${volume.master}%`}
               />
               <SettingsSlider
                 min={0}
                 max={100}
-                value={menuSfxVolume}
-                onChange={setMenuSfxVolume}
+                value={volume.sfx}
+                onChange={volume.setSfx}
                 label="sound effects"
-                suffix={`${menuSfxVolume}%`}
+                suffix={`${volume.sfx}%`}
               />
               <SettingsSlider
                 min={0}
                 max={100}
-                value={menuMusicVolume}
-                onChange={setMenuMusicVolume}
+                value={volume.music}
+                onChange={volume.setMusic}
                 label="music"
-                suffix={`${menuMusicVolume}%`}
+                suffix={`${volume.music}%`}
               />
             </div>
           </SettingsSection>

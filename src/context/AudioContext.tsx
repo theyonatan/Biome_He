@@ -1,5 +1,5 @@
-import { createContext, useCallback, useContext, useEffect, useRef, type ReactNode } from 'react'
-import { AudioEngine, type SoundId } from '../lib/audio'
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { AudioEngine, type SoundId, type VolumeSettings } from '../lib/audio'
 import { useSettings } from '../hooks/useSettings'
 
 type AudioContextValue = {
@@ -11,6 +11,8 @@ type AudioContextValue = {
   stopAllLoops: () => void
   setLoopVolume: (id: SoundId, volume: number, rampSeconds?: number) => void
   isLoopActive: (id: SoundId) => boolean
+  volumes: VolumeSettings
+  setVolumes: (update: Partial<VolumeSettings>) => void
 }
 
 const Ctx = createContext<AudioContextValue | null>(null)
@@ -23,10 +25,14 @@ export const AudioProvider = ({ children }: { children: ReactNode }) => {
     engineRef.current = new AudioEngine()
   }
 
-  // Sync volume settings
+  const [volumes, setVolumesState] = useState<VolumeSettings>(() => engineRef.current!.volumes)
+
+  // Sync volume settings from persisted settings
   useEffect(() => {
     const audio = settings.audio
-    engineRef.current?.setVolumes(audio.master_volume, audio.sfx_volume, audio.music_volume)
+    const update = { master: audio.master_volume, sfx: audio.sfx_volume, music: audio.music_volume }
+    engineRef.current?.setVolumes(update)
+    setVolumesState(update)
   }, [settings.audio])
 
   // Preload assets on mount
@@ -66,9 +72,25 @@ export const AudioProvider = ({ children }: { children: ReactNode }) => {
     return engineRef.current?.isLoopActive(id) ?? false
   }, [])
 
+  const setVolumes = useCallback((update: Partial<VolumeSettings>) => {
+    engineRef.current?.setVolumes(update)
+    setVolumesState((prev) => ({ ...prev, ...update }))
+  }, [])
+
   return (
     <Ctx.Provider
-      value={{ play, startLoop, stopLoop, fadeOutLoop, crossfadeLoop, stopAllLoops, setLoopVolume, isLoopActive }}
+      value={{
+        play,
+        startLoop,
+        stopLoop,
+        fadeOutLoop,
+        crossfadeLoop,
+        stopAllLoops,
+        setLoopVolume,
+        isLoopActive,
+        volumes,
+        setVolumes
+      }}
     >
       {children}
     </Ctx.Provider>

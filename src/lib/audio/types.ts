@@ -15,6 +15,9 @@ export type SoundId =
 
 export type SoundCategory = 'sfx' | 'music'
 
+/** Volume levels for each audio category, all in 0–1 range. */
+export type VolumeSettings = { master: number; sfx: number; music: number }
+
 /** A function that synthesizes a one-shot sound into a destination node. */
 export type SynthOneShot = (ctx: AudioContext, dest: AudioNode) => void
 
