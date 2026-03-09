@@ -521,13 +521,4 @@
   .loading-inline-logs.dragging {
     transition: none;
   }
-  .loading-inline-logs-close {
-    border: 1px solid rgba(255, 255, 255, 0.7);
-    background: rgba(0, 0, 0, 0.45);
-    color: rgba(255, 255, 255, 0.95);
-    font-family: var(--font-serif);
-    font-size: 2.22cqh;
-    padding: 0.35cqh 1.24cqh;
-    cursor: pointer;
-  }
 }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { invoke, listen } from '../bridge'
 import { useStreaming } from '../context/StreamingContext'
+import { LOG_ACTION_BUTTON } from '../styles'
 import ServerLogDisplay from './ServerLogDisplay'
 
 type EngineInstallModalProps = {
@@ -96,15 +97,11 @@ const EngineInstallModal = ({ onClose }: EngineInstallModalProps) => {
       <div className="w-[135.11cqh] max-w-[92vw] pointer-events-auto">
         <ServerLogDisplay
           variant="loading-inline"
-          title="WORLD ENGINE INSTALL"
+          title="Installation"
           externalLogs={installLogs}
           showProgress={engineSetupInProgress}
           progressMessage={
-            engineSetupInProgress
-              ? setupProgress || 'Installing World Engine...'
-              : engineSetupError
-                ? 'World Engine installation failed.'
-                : 'World Engine installation complete.'
+            engineSetupInProgress ? setupProgress || 'Installing...' : engineSetupError ? 'Failed.' : 'Complete.'
           }
           errorMessage={engineSetupError}
           reportContext={{
@@ -124,7 +121,7 @@ const EngineInstallModal = ({ onClose }: EngineInstallModalProps) => {
               <div className="flex items-center gap-[0.8cqh]">
                 <button
                   type="button"
-                  className="loading-inline-logs-close"
+                  className={LOG_ACTION_BUTTON}
                   onClick={() => void handleAbortInstall()}
                   disabled={isAbortingInstall}
                   aria-label="Abort engine install"
@@ -134,12 +131,7 @@ const EngineInstallModal = ({ onClose }: EngineInstallModalProps) => {
               </div>
             ) : (
               <div className="flex items-center gap-[0.8cqh]">
-                <button
-                  type="button"
-                  className="loading-inline-logs-close"
-                  onClick={onClose}
-                  aria-label="Close install logs"
-                >
+                <button type="button" className={LOG_ACTION_BUTTON} onClick={onClose} aria-label="Close install logs">
                   Close
                 </button>
               </div>
@@ -147,7 +139,7 @@ const EngineInstallModal = ({ onClose }: EngineInstallModalProps) => {
           }
         />
         {installExportStatus && (
-          <div className="mt-[0.45cqh] text-right font-serif text-[2cqh] leading-[1.1] text-[rgba(245,249,255,0.78)]">
+          <div className="mt-[0.45cqh] text-right font-serif text-[2cqh] leading-[1.1] text-text-muted">
             {installExportStatus}
           </div>
         )}

@@ -350,8 +350,8 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
 
       {showFixModal && (
         <ConfirmModal
-          title="Fix World Engine?"
-          description="This will run repair/setup and open the installation log screen."
+          title="Reinstall?"
+          description="This may fix issues with the simulation by reinstalling the engine."
           onCancel={() => setShowFixModal(false)}
           onConfirm={handleConfirmFixEngine}
         />

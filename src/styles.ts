@@ -20,3 +20,7 @@ export const INTERACTIVE_TRANSITION = 'transition-[color,background-color,border
 
 /** Shared base for confirm modal buttons */
 export const CONFIRM_BUTTON_BASE = 'cursor-pointer font-serif p-[0.5cqh_1.78cqh] text-[2.49cqh]'
+
+/** Compact action button for log/diagnostic panels */
+export const LOG_ACTION_BUTTON =
+  'cursor-pointer border border-border-medium bg-surface-btn-ghost text-text-primary font-serif text-[1.8cqh] px-[1.2cqh] py-[0.25cqh] transition-[color,background-color,border-color,outline-width] ease-in-out duration-200 hover:bg-surface-btn-hover hover:text-text-inverse'
