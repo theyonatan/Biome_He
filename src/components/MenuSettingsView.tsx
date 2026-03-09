@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { invoke } from '../bridge'
-import { HEADING_BASE, SETTINGS_LABEL_BASE, SETTINGS_MUTED_TEXT, CONFIRM_BUTTON_BASE } from '../styles'
+import { HEADING_BASE, SETTINGS_LABEL_BASE, SETTINGS_MUTED_TEXT } from '../styles'
 import { useSettings } from '../hooks/useSettings'
 import { ENGINE_MODES, type Keybindings } from '../types/settings'
 import { useStreaming } from '../context/StreamingContext'
@@ -14,6 +14,7 @@ import SettingsKeybind, { fixedControlDisplay } from './ui/SettingsKeybind'
 import { FIXED_CONTROLS, getKeybindConflict } from '../hooks/useGameInput'
 import Modal from './ui/Modal'
 import ConfirmModal from './ui/ConfirmModal'
+import Button from './ui/Button'
 import WorldEngineSection from './WorldEngineSection'
 import EngineInstallModal from './EngineInstallModal'
 import attributionText from '../../assets/audio/ATTRIBUTION.md?raw'
@@ -431,13 +432,14 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
             {attributionText.trim()}
           </pre>
           <div className="flex justify-end mt-[1.4cqh]">
-            <button
-              type="button"
-              className={`${CONFIRM_BUTTON_BASE} bg-[var(--color-surface-btn-hover)] text-[var(--color-text-inverse)]`}
+            <Button
+              variant="primary"
+              className="p-[0.5cqh_1.78cqh] text-[2.49cqh]"
               onClick={() => setShowCredits(false)}
+              silent
             >
               Close
-            </button>
+            </Button>
           </div>
         </Modal>
       )}

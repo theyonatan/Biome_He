@@ -1,5 +1,5 @@
-import { CONFIRM_BUTTON_BASE } from '../../styles'
 import Modal from './Modal'
+import Button from './Button'
 
 type ConfirmModalProps = {
   title: string
@@ -9,6 +9,8 @@ type ConfirmModalProps = {
   confirmLabel?: string
   cancelLabel?: string
 }
+
+const MODAL_BUTTON = 'p-[0.5cqh_1.78cqh] text-[2.49cqh]'
 
 const ConfirmModal = ({
   title,
@@ -21,20 +23,12 @@ const ConfirmModal = ({
   <Modal title={title}>
     <p className="m-0 font-serif text-[var(--color-text-modal-muted)] text-[2.4cqh]">{description}</p>
     <div className="flex justify-end mt-[1.4cqh] gap-[1.42cqh]">
-      <button
-        type="button"
-        className={`${CONFIRM_BUTTON_BASE} border border-[var(--color-border-medium)] bg-[var(--color-surface-btn-ghost)] text-[var(--color-text-primary)]`}
-        onClick={onCancel}
-      >
+      <Button variant="ghost" className={MODAL_BUTTON} onClick={onCancel} silent>
         {cancelLabel}
-      </button>
-      <button
-        type="button"
-        className={`${CONFIRM_BUTTON_BASE} bg-[var(--color-surface-btn-hover)] text-[var(--color-text-inverse)]`}
-        onClick={onConfirm}
-      >
+      </Button>
+      <Button variant="primary" className={MODAL_BUTTON} onClick={onConfirm} silent>
         {confirmLabel}
-      </button>
+      </Button>
     </div>
   </Modal>
 )
