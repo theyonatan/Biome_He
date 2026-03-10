@@ -18,6 +18,9 @@ export function getUvEnvVars(): Record<string, string> {
     UV_PYTHON_BIN_DIR: path.join(uvDir, 'python_bin'),
     UV_TOOL_DIR: path.join(uvDir, 'tool'),
     UV_TOOL_BIN_DIR: path.join(uvDir, 'tool_bin'),
-    UV_HTTP_TIMEOUT: String(30 * 60)
+    UV_HTTP_TIMEOUT: String(30 * 60),
+    UV_LINK_MODE: 'copy',
+    UV_NO_EDITABLE: '1',
+    UV_MANAGED_PYTHON: '1'
   }
 }

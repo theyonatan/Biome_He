@@ -3,10 +3,11 @@ import SettingsButton from './ui/SettingsButton'
 
 type WorldEngineSectionProps = {
   engineReady: boolean | null
-  onReinstallClick: () => void
+  onFixInPlaceClick: () => void
+  onTotalReinstallClick: () => void
 }
 
-const WorldEngineSection = ({ engineReady, onReinstallClick }: WorldEngineSectionProps) => {
+const WorldEngineSection = ({ engineReady, onFixInPlaceClick, onTotalReinstallClick }: WorldEngineSectionProps) => {
   return (
     <SettingsSection
       title="World Engine"
@@ -29,9 +30,12 @@ const WorldEngineSection = ({ engineReady, onReinstallClick }: WorldEngineSectio
         </span>
       }
     >
-      <div className="flex justify-start">
-        <SettingsButton variant="secondary" onClick={onReinstallClick}>
-          Reinstall
+      <div className="flex justify-start gap-[1.2cqh]">
+        <SettingsButton variant="secondary" onClick={onFixInPlaceClick}>
+          Fix In Place
+        </SettingsButton>
+        <SettingsButton variant="danger" onClick={onTotalReinstallClick}>
+          Total Reinstall
         </SettingsButton>
       </div>
     </SettingsSection>

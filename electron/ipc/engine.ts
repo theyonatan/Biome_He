@@ -5,13 +5,13 @@ import { execFile } from 'node:child_process'
 import { getEngineDir, getUvDir, getResourcePath, SERVER_COMPONENT_FILES } from '../lib/paths.js'
 import { getUvBinaryPath, getUvEnvVars } from '../lib/uv.js'
 import { getHiddenWindowOptions, getUvArchiveName, getVenvPythonPath } from '../lib/platform.js'
-import { getServerState } from '../lib/serverState.js'
+import { getServerState, stopServerSync } from '../lib/serverState.js'
 import { runUvSyncWithMirroredLogs } from '../lib/uvSync.js'
 import { copyServerComponentFiles } from '../lib/serverFiles.js'
 import { emitToAllWindows } from '../lib/ipcUtils.js'
 
-const UV_VERSION = '0.9.26'
-let syncDependenciesAbortController: AbortController | null = null
+const UV_VERSION = '0.10.9'
+let engineInstallAbortController: AbortController | null = null
 
 function execFileAsync(file: string, args: string[], options?: Parameters<typeof execFile>[2]): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -53,6 +53,90 @@ function unpackServerFilesInner(force: boolean): string {
     return 'Files already exist, skipped unpacking'
   }
   return `Unpacked: ${unpacked.join(', ')}`
+}
+
+/** Create .uv subdirectories, then run uv sync with mirrored logs. */
+async function syncEngineDependencies(signal?: AbortSignal): Promise<void> {
+  const engineDir = getEngineDir()
+  const uvDir = getUvDir()
+  const uvBinary = getUvBinaryPath()
+  const uvEnv = getUvEnvVars()
+
+  if (!fs.existsSync(engineDir)) {
+    throw new Error('Engine repository not found. Please clone it first.')
+  }
+  if (!fs.existsSync(uvBinary)) {
+    throw new Error('uv is not installed. Please install it first.')
+  }
+
+  // Create .uv directories
+  for (const subdir of ['cache', 'python_install', 'python_bin', 'tool', 'tool_bin']) {
+    fs.mkdirSync(path.join(uvDir, subdir), { recursive: true })
+  }
+
+  logEngineToConsoleAndUi('[ENGINE] Running uv sync for engine dependencies...')
+  await runUvSyncWithMirroredLogs(
+    uvBinary,
+    engineDir,
+    { ...process.env, ...uvEnv },
+    {
+      logPrefix: '[ENGINE]',
+      signal,
+      onLine: (line, isStderr) => {
+        emitToAllWindows('engine-install-log', { line, is_stderr: isStderr })
+      }
+    }
+  )
+  logEngineToConsoleAndUi('[ENGINE] uv sync finished for engine dependencies')
+}
+
+/** Full engine setup: install UV if needed, copy server components, sync dependencies. */
+async function reinstallEngine(signal?: AbortSignal): Promise<void> {
+  emitToAllWindows('engine-install-log', { line: '[ENGINE] Checking uv installation...', is_stderr: false })
+  const uvBinary = getUvBinaryPath()
+
+  let uvInstalled = false
+  if (fs.existsSync(uvBinary)) {
+    try {
+      await execFileAsync(uvBinary, ['--version'], { ...getHiddenWindowOptions() })
+      uvInstalled = true
+    } catch {
+      uvInstalled = false
+    }
+  }
+
+  if (!uvInstalled) {
+    emitToAllWindows('engine-install-log', { line: '[ENGINE] Installing uv...', is_stderr: false })
+    await installUv()
+  }
+
+  emitToAllWindows('engine-install-log', { line: '[ENGINE] Setting up server components...', is_stderr: false })
+  copyServerComponentFiles(getEngineDir())
+
+  emitToAllWindows('engine-install-log', {
+    line: '[ENGINE] Syncing dependencies (this may take a while)...',
+    is_stderr: false
+  })
+  await syncEngineDependencies(signal)
+
+  emitToAllWindows('engine-install-log', { line: '[ENGINE] Setup complete.', is_stderr: false })
+}
+
+/** Nuke engine and UV directories. */
+function nukeEngineDirectories(): void {
+  stopServerSync()
+
+  const engineDir = getEngineDir()
+  const uvDir = getUvDir()
+
+  if (fs.existsSync(engineDir)) {
+    fs.rmSync(engineDir, { recursive: true, force: true })
+    emitToAllWindows('engine-install-log', { line: `[ENGINE] Removed ${engineDir}`, is_stderr: false })
+  }
+  if (fs.existsSync(uvDir)) {
+    fs.rmSync(uvDir, { recursive: true, force: true })
+    emitToAllWindows('engine-install-log', { line: `[ENGINE] Removed ${uvDir}`, is_stderr: false })
+  }
 }
 
 async function installUv(): Promise<string> {
@@ -198,78 +282,47 @@ export function registerEngineIpc(): void {
     return result
   })
 
-  ipcMain.handle('install-uv', async () => {
-    return installUv()
-  })
-
-  ipcMain.handle('setup-server-components', () => {
-    copyServerComponentFiles(getEngineDir())
-    return 'Server components installed'
-  })
-
-  ipcMain.handle('sync-engine-dependencies', async () => {
-    if (syncDependenciesAbortController) {
-      throw new Error('Engine dependency sync is already running')
-    }
-
-    const engineDir = getEngineDir()
-    const uvDir = getUvDir()
-    const uvBinary = getUvBinaryPath()
-    const uvEnv = getUvEnvVars()
-    syncDependenciesAbortController = new AbortController()
-
-    if (!fs.existsSync(engineDir)) {
-      syncDependenciesAbortController = null
-      throw new Error('Engine repository not found. Please clone it first.')
-    }
-
-    // Create .uv directories
-    for (const subdir of ['cache', 'python_install', 'python_bin', 'tool', 'tool_bin']) {
-      fs.mkdirSync(path.join(uvDir, subdir), { recursive: true })
-    }
-
-    if (!fs.existsSync(uvBinary)) {
-      syncDependenciesAbortController = null
-      throw new Error('uv is not installed. Please install it first.')
-    }
-
-    try {
-      logEngineToConsoleAndUi('[ENGINE] Running uv sync for engine dependencies...')
-      await runUvSyncWithMirroredLogs(
-        uvBinary,
-        engineDir,
-        {
-          ...process.env,
-          ...uvEnv,
-          UV_LINK_MODE: 'copy',
-          UV_NO_EDITABLE: '1',
-          UV_MANAGED_PYTHON: '1'
-        },
-        {
-          logPrefix: '[ENGINE]',
-          signal: syncDependenciesAbortController.signal,
-          onLine: (line, isStderr) => {
-            emitToAllWindows('engine-install-log', { line, is_stderr: isStderr })
-          }
-        }
-      )
-      logEngineToConsoleAndUi('[ENGINE] uv sync finished for engine dependencies')
-    } finally {
-      syncDependenciesAbortController = null
-    }
-
-    return 'Dependencies synced successfully'
-  })
-
-  ipcMain.handle('abort-sync-engine-dependencies', () => {
-    if (!syncDependenciesAbortController) {
-      return 'No dependency sync is currently running'
-    }
-    syncDependenciesAbortController.abort()
-    return 'Dependency sync abort requested'
-  })
-
   ipcMain.handle('unpack-server-files', (_event, force: boolean) => {
     return unpackServerFilesInner(force)
+  })
+
+  ipcMain.handle('reinstall-engine', async () => {
+    if (engineInstallAbortController) {
+      throw new Error('Engine install is already running')
+    }
+
+    engineInstallAbortController = new AbortController()
+    try {
+      await reinstallEngine(engineInstallAbortController.signal)
+    } finally {
+      engineInstallAbortController = null
+    }
+
+    return 'Engine reinstalled successfully'
+  })
+
+  ipcMain.handle('nuke-and-reinstall-engine', async () => {
+    if (engineInstallAbortController) {
+      throw new Error('Engine install is already running')
+    }
+
+    nukeEngineDirectories()
+
+    engineInstallAbortController = new AbortController()
+    try {
+      await reinstallEngine(engineInstallAbortController.signal)
+    } finally {
+      engineInstallAbortController = null
+    }
+
+    return 'Engine nuked and reinstalled successfully'
+  })
+
+  ipcMain.handle('abort-engine-install', () => {
+    if (!engineInstallAbortController) {
+      return 'No engine install is currently running'
+    }
+    engineInstallAbortController.abort()
+    return 'Engine install abort requested'
   })
 }

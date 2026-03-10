@@ -61,6 +61,7 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
     engineStatus,
     checkEngineStatus,
     setupEngine,
+    nukeAndReinstallEngine,
     engineSetupInProgress,
     isStreaming,
     mouseSensitivity,
@@ -87,6 +88,7 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
   const [menuModelsLoading, setMenuModelsLoading] = useState(false)
   const [menuModelsError, setMenuModelsError] = useState<string | null>(null)
   const [showFixModal, setShowFixModal] = useState(false)
+  const [showNukeModal, setShowNukeModal] = useState(false)
   const [showModeSwitchModal, setShowModeSwitchModal] = useState(false)
   const [showLocalInstallLog, setShowLocalInstallLog] = useState(false)
   const [showCredits, setShowCredits] = useState(false)
@@ -262,6 +264,17 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
     }
   }
 
+  const handleConfirmNukeEngine = async () => {
+    setShowNukeModal(false)
+    setShowLocalInstallLog(true)
+    try {
+      await nukeAndReinstallEngine()
+      await checkEngineStatus()
+    } catch {
+      // Error is surfaced by engineSetupError and server logs.
+    }
+  }
+
   return (
     <div className="absolute inset-0 z-[9] pointer-events-auto">
       <section className="absolute top-[var(--edge-top-xl)] left-[var(--edge-left)] w-[90%] z-[3] flex flex-col">
@@ -296,7 +309,11 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
           )}
 
           {menuEngineMode === 'standalone' && (
-            <WorldEngineSection engineReady={engineReady} onReinstallClick={() => setShowFixModal(true)} />
+            <WorldEngineSection
+              engineReady={engineReady}
+              onFixInPlaceClick={() => setShowFixModal(true)}
+              onTotalReinstallClick={() => setShowNukeModal(true)}
+            />
           )}
 
           <SettingsSection title="World Model" description="which Overworld model will simulate your world?">
@@ -393,10 +410,21 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
 
       {showFixModal && (
         <ConfirmModal
-          title="Reinstall?"
-          description="This may fix issues with the simulation by reinstalling the engine."
+          title="Fix In Place?"
+          description="This will re-sync engine dependencies without deleting anything. Usually enough to fix issues after an update."
           onCancel={() => setShowFixModal(false)}
-          onConfirm={handleConfirmFixEngine}
+          onConfirm={() => void handleConfirmFixEngine()}
+          confirmLabel="Fix"
+        />
+      )}
+
+      {showNukeModal && (
+        <ConfirmModal
+          title="Total Reinstall?"
+          description="This will completely delete the engine directory and reinstall everything from scratch, including re-downloading Python, all dependencies, and the UV package manager. This can take a while, but may fix stubborn issues that Fix In Place cannot."
+          onCancel={() => setShowNukeModal(false)}
+          onConfirm={() => void handleConfirmNukeEngine()}
+          confirmLabel="Reinstall Everything"
         />
       )}
 

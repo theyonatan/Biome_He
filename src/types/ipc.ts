@@ -63,11 +63,10 @@ export type IpcCommandMap = {
 
   // Engine
   'check-engine-status': { args: [source?: string]; return: EngineStatus }
-  'install-uv': { args: []; return: string }
-  'setup-server-components': { args: []; return: string }
-  'sync-engine-dependencies': { args: []; return: string }
-  'abort-sync-engine-dependencies': { args: []; return: string }
+  'abort-engine-install': { args: []; return: string }
   'unpack-server-files': { args: [force: boolean]; return: string }
+  'reinstall-engine': { args: []; return: string }
+  'nuke-and-reinstall-engine': { args: []; return: string }
 
   // Server
   'start-engine-server': { args: [port: number]; return: string }
