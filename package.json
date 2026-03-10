@@ -17,6 +17,7 @@
     "framer-motion": "^12.35.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "strip-ansi": "^7.2.0",
     "tailwindcss": "^4.2.1",
     "tree-kill": "^1.2.2",
     "zod": "^4.3.6"

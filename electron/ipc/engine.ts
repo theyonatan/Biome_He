@@ -25,10 +25,6 @@ function execFileAsync(file: string, args: string[], options?: Parameters<typeof
   })
 }
 
-function logEngineToConsoleAndUi(message: string): void {
-  console.log(message)
-}
-
 /** Unpack bundled server files to the engine directory */
 function unpackServerFilesInner(force: boolean): string {
   const engineDir = getEngineDir()
@@ -74,7 +70,7 @@ async function syncEngineDependencies(signal?: AbortSignal): Promise<void> {
     fs.mkdirSync(path.join(uvDir, subdir), { recursive: true })
   }
 
-  logEngineToConsoleAndUi('[ENGINE] Running uv sync for engine dependencies...')
+  console.log('[ENGINE] Running uv sync for engine dependencies...')
   await runUvSyncWithMirroredLogs(
     uvBinary,
     engineDir,
@@ -83,16 +79,16 @@ async function syncEngineDependencies(signal?: AbortSignal): Promise<void> {
       logPrefix: '[ENGINE]',
       signal,
       onLine: (line, isStderr) => {
-        emitToAllWindows('engine-install-log', { line, is_stderr: isStderr })
+        emitToAllWindows('engine-log', { line, is_stderr: isStderr })
       }
     }
   )
-  logEngineToConsoleAndUi('[ENGINE] uv sync finished for engine dependencies')
+  console.log('[ENGINE] uv sync finished for engine dependencies')
 }
 
 /** Full engine setup: install UV if needed, copy server components, sync dependencies. */
 async function reinstallEngine(signal?: AbortSignal): Promise<void> {
-  emitToAllWindows('engine-install-log', { line: '[ENGINE] Checking uv installation...', is_stderr: false })
+  emitToAllWindows('engine-log', { line: '[ENGINE] Checking uv installation...', is_stderr: false })
   const uvBinary = getUvBinaryPath()
 
   let uvInstalled = false
@@ -106,20 +102,20 @@ async function reinstallEngine(signal?: AbortSignal): Promise<void> {
   }
 
   if (!uvInstalled) {
-    emitToAllWindows('engine-install-log', { line: '[ENGINE] Installing uv...', is_stderr: false })
+    emitToAllWindows('engine-log', { line: '[ENGINE] Installing uv...', is_stderr: false })
     await installUv()
   }
 
-  emitToAllWindows('engine-install-log', { line: '[ENGINE] Setting up server components...', is_stderr: false })
+  emitToAllWindows('engine-log', { line: '[ENGINE] Setting up server components...', is_stderr: false })
   copyServerComponentFiles(getEngineDir())
 
-  emitToAllWindows('engine-install-log', {
+  emitToAllWindows('engine-log', {
     line: '[ENGINE] Syncing dependencies (this may take a while)...',
     is_stderr: false
   })
   await syncEngineDependencies(signal)
 
-  emitToAllWindows('engine-install-log', { line: '[ENGINE] Setup complete.', is_stderr: false })
+  emitToAllWindows('engine-log', { line: '[ENGINE] Setup complete.', is_stderr: false })
 }
 
 /** Nuke engine and UV directories. */
@@ -131,11 +127,11 @@ function nukeEngineDirectories(): void {
 
   if (fs.existsSync(engineDir)) {
     fs.rmSync(engineDir, { recursive: true, force: true })
-    emitToAllWindows('engine-install-log', { line: `[ENGINE] Removed ${engineDir}`, is_stderr: false })
+    emitToAllWindows('engine-log', { line: `[ENGINE] Removed ${engineDir}`, is_stderr: false })
   }
   if (fs.existsSync(uvDir)) {
     fs.rmSync(uvDir, { recursive: true, force: true })
-    emitToAllWindows('engine-install-log', { line: `[ENGINE] Removed ${uvDir}`, is_stderr: false })
+    emitToAllWindows('engine-log', { line: `[ENGINE] Removed ${uvDir}`, is_stderr: false })
   }
 }
 
@@ -212,7 +208,7 @@ async function installUv(): Promise<string> {
 export function registerEngineIpc(): void {
   ipcMain.handle('check-engine-status', async (_event, source?: string) => {
     const caller = source ?? 'unknown'
-    logEngineToConsoleAndUi(`[ENGINE] check-engine-status: start (caller=${caller})`)
+    console.log(`[ENGINE] check-engine-status: start (caller=${caller})`)
     const engineDir = getEngineDir()
     const uvBinary = getUvBinaryPath()
     const uvDir = getUvDir()
@@ -222,15 +218,15 @@ export function registerEngineIpc(): void {
     let uvInstalled = false
     if (fs.existsSync(uvBinary)) {
       try {
-        logEngineToConsoleAndUi('[ENGINE] check-engine-status: validating uv binary...')
+        console.log('[ENGINE] check-engine-status: validating uv binary...')
         await execFileAsync(uvBinary, ['--version'], {
           ...getHiddenWindowOptions()
         })
         uvInstalled = true
-        logEngineToConsoleAndUi('[ENGINE] check-engine-status: uv binary ok')
+        console.log('[ENGINE] check-engine-status: uv binary ok')
       } catch {
         uvInstalled = false
-        logEngineToConsoleAndUi('[ENGINE] check-engine-status: uv binary validation failed')
+        console.log('[ENGINE] check-engine-status: uv binary validation failed')
       }
     }
 
@@ -246,19 +242,17 @@ export function registerEngineIpc(): void {
       const pythonPath = getVenvPythonPath(engineDir)
       if (fs.existsSync(pythonPath)) {
         try {
-          logEngineToConsoleAndUi(
-            '[ENGINE] check-engine-status: validating synced dependencies via uv run python --version...'
-          )
+          console.log('[ENGINE] check-engine-status: validating synced dependencies via uv run python --version...')
           await execFileAsync(uvBinary, ['run', 'python', '--version'], {
             cwd: engineDir,
             env: { ...process.env, ...uvEnv, UV_FROZEN: '1' },
             ...getHiddenWindowOptions()
           })
           dependenciesSynced = true
-          logEngineToConsoleAndUi('[ENGINE] check-engine-status: dependency validation ok')
+          console.log('[ENGINE] check-engine-status: dependency validation ok')
         } catch {
           dependenciesSynced = false
-          logEngineToConsoleAndUi('[ENGINE] check-engine-status: dependency validation failed')
+          console.log('[ENGINE] check-engine-status: dependency validation failed')
         }
       }
     }
@@ -278,7 +272,7 @@ export function registerEngineIpc(): void {
       server_port: serverPort,
       server_log_path: serverLogPath
     }
-    logEngineToConsoleAndUi(`[ENGINE] check-engine-status: result ${JSON.stringify(result)}`)
+    console.log(`[ENGINE] check-engine-status: result ${JSON.stringify(result)}`)
     return result
   })
 

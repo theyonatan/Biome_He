@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { invoke, listen } from '../bridge'
+import { invoke } from '../bridge'
 import { resolveStage } from '../stages'
 import { useStreaming } from '../context/StreamingContext'
 import { useVortex } from '../context/VortexContext'
 import { useSettings } from '../hooks/useSettings'
+import { useEngineLogs } from '../hooks/useEngineLogs'
 import Button from './ui/Button'
 import ServerLogDisplay from './ServerLogDisplay'
 import SocialCtaRow from './SocialCtaRow'
@@ -19,33 +20,12 @@ const TerminalDisplay = ({ onCancel }: TerminalDisplayProps) => {
   const { connectionState, statusStage, engineError, error, cancelConnection, wsLogs } = useStreaming()
   const { setErrorMode } = useVortex()
   const { isServerMode } = useSettings()
+  const { logs: engineLogs } = useEngineLogs(!isServerMode)
+  const activeLogs = isServerMode ? wsLogs : engineLogs
   const [showLogsPanel, setShowLogsPanel] = useState(false)
   const [isExportingDiagnostics, setIsExportingDiagnostics] = useState(false)
   const [exportStatus, setExportStatus] = useState<string | null>(null)
-  const [displayedLogs, setDisplayedLogs] = useState<string[]>([])
-  const [standaloneLogs, setStandaloneLogs] = useState<string[]>([])
   const logsPanelHeight = 260
-
-  // In standalone mode, accumulate logs from IPC events (engine install + server process)
-  useEffect(() => {
-    if (isServerMode) return
-
-    const MAX_LINES = 500
-    const appendLine = (line: string) => {
-      setStandaloneLogs((prev) => {
-        const next = [...prev, line]
-        return next.length > MAX_LINES ? next.slice(-MAX_LINES) : next
-      })
-    }
-
-    const unlistenInstall = listen('engine-install-log', (payload) => appendLine(payload.line))
-    const unlistenServer = listen('server-log', (payload) => appendLine(payload.line))
-
-    return () => {
-      unlistenInstall()
-      unlistenServer()
-    }
-  }, [isServerMode])
 
   const errorDetail = engineError || error
 
@@ -95,10 +75,9 @@ const TerminalDisplay = ({ onCancel }: TerminalDisplayProps) => {
 
   const buildDiagnosticsPayload = useCallback(async () => {
     const activeError = errorDetail
-    const logs = activeError ? [...displayedLogs, `[ERROR] ${activeError}`] : displayedLogs
+    const logs = activeError ? [...activeLogs, `[ERROR] ${activeError}`] : activeLogs
     const meta = await invoke('get-runtime-diagnostics-meta')
     const system = await invoke('get-system-diagnostics')
-    const serverProcessLogTail = isServerMode ? null : await invoke('read-server-log-tail', 260)
     return {
       generated_at: new Date().toISOString(),
       runtime: meta,
@@ -113,12 +92,11 @@ const TerminalDisplay = ({ onCancel }: TerminalDisplayProps) => {
         websocket_error: error,
         is_server_mode: isServerMode
       },
-      logs,
-      server_process_log_tail: serverProcessLogTail
+      logs
     }
   }, [
+    activeLogs,
     connectionState,
-    displayedLogs,
     engineError,
     error,
     errorDetail,
@@ -168,30 +146,15 @@ const TerminalDisplay = ({ onCancel }: TerminalDisplayProps) => {
           >
             <ServerLogDisplay
               errorMessage={errorDetail}
-              externalLogs={isServerMode ? wsLogs : standaloneLogs}
-              onLogsChange={setDisplayedLogs}
-              reportContext={{
-                flow: 'loading',
-                connection_state: connectionState,
-                status_stage: statusStage,
-                status_text: statusText,
-                progress_percent: progressPercent,
-                engine_error: engineError,
-                websocket_error: error,
-                is_server_mode: isServerMode
-              }}
+              logs={activeLogs}
               buildDiagnosticsPayload={buildDiagnosticsPayload}
               showExportAction={!!errorDetail}
               onExportAction={() => void handleExportDiagnostics()}
               isExportingAction={isExportingDiagnostics}
               exportActionLabel="Export Logs"
+              actionStatus={exportStatus}
             />
           </div>
-          {exportStatus && (
-            <div className="w-full text-right font-serif text-[2cqh] leading-[1.1] text-[rgba(245,249,255,0.78)] mt-[0.45cqh]">
-              {exportStatus}
-            </div>
-          )}
         </div>
       </div>
       <SocialCtaRow rowClassName="z-55" />

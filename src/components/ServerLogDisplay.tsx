@@ -1,23 +1,12 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { invoke } from '../bridge'
 import Button from './ui/Button'
 
 const MAX_ERROR_MESSAGE_CHARS = 220
-const MAX_REPORT_LOG_LINES = 220
 const MAX_GITHUB_BODY_CHARS = 1200
 const MAX_GITHUB_LOG_LINES = 10
 const MAX_GITHUB_LOG_CHARS = 450
 const DISCORD_HELP_URL = 'https://discord.gg/overworld'
 const GITHUB_NEW_ISSUE_URL = 'https://github.com/Overworldai/Biome/issues/new'
-
-type ReportContext = Record<string, unknown>
-
-function sanitizeText(text: string): string {
-  return text
-    .replace(/[A-Za-z]:\\Users\\[^\\\r\n]+/g, 'C:\\Users\\<redacted>')
-    .replace(/\/Users\/[^/\r\n]+/g, '/Users/<redacted>')
-    .replace(/\/home\/[^/\r\n]+/g, '/home/<redacted>')
-}
 
 function copyToClipboard(text: string): Promise<void> {
   if (navigator.clipboard?.writeText) {
@@ -51,71 +40,32 @@ const ServerLogDisplay = ({
   showProgress = false,
   progressMessage = null,
   headerAction = null,
-  externalLogs = null,
-  pollLogFileTail = false,
-  logTailLines = 300,
-  logTailIntervalMs = 700,
+  logs = [],
   title = null,
-  onLogsChange,
-  reportContext,
   buildDiagnosticsPayload,
   showExportAction = false,
   onExportAction,
   isExportingAction = false,
-  exportActionLabel = 'Export Logs'
+  exportActionLabel = 'Export Logs',
+  actionStatus = null
 }: {
   errorMessage?: string | null
   showProgress?: boolean
   progressMessage?: string | null
   headerAction?: ReactNode
-  externalLogs?: string[] | null
-  pollLogFileTail?: boolean
-  logTailLines?: number
-  logTailIntervalMs?: number
+  logs?: string[]
   title?: string | null
-  onLogsChange?: (logs: string[]) => void
-  reportContext?: ReportContext
-  buildDiagnosticsPayload?: () => Promise<Record<string, unknown>>
+  buildDiagnosticsPayload: () => Promise<Record<string, unknown>>
   showExportAction?: boolean
   onExportAction?: () => void
   isExportingAction?: boolean
   exportActionLabel?: string
+  actionStatus?: string | null
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null)
-  const [logs, setLogs] = useState<string[]>([])
   const [reportActionStatus, setReportActionStatus] = useState<string | null>(null)
   const [isCopyingReport, setIsCopyingReport] = useState(false)
   const [isOpeningIssue, setIsOpeningIssue] = useState(false)
-
-  useEffect(() => {
-    if (externalLogs !== null) return
-
-    if (!pollLogFileTail) {
-      setLogs([])
-      return
-    }
-
-    let mounted = true
-    const poll = async () => {
-      try {
-        const lines = await invoke('read-server-log-tail', logTailLines)
-        if (!mounted) return
-        setLogs(lines.map((line) => String(line ?? '')))
-      } catch {
-        // Ignore poll failures; next interval may recover.
-      }
-    }
-
-    void poll()
-    const intervalId = window.setInterval(() => {
-      void poll()
-    }, logTailIntervalMs)
-
-    return () => {
-      mounted = false
-      window.clearInterval(intervalId)
-    }
-  }, [externalLogs, pollLogFileTail, logTailLines, logTailIntervalMs])
 
   const autoScrollRef = useRef(true)
 
@@ -129,46 +79,17 @@ const ServerLogDisplay = ({
     return () => el.removeEventListener('scroll', onScroll)
   }, [])
 
-  const visibleLogs = externalLogs ?? logs
   const displayErrorMessage =
     errorMessage && errorMessage.length > MAX_ERROR_MESSAGE_CHARS
       ? `${errorMessage.slice(0, MAX_ERROR_MESSAGE_CHARS).trimEnd()}...`
       : errorMessage
 
   useEffect(() => {
-    onLogsChange?.(visibleLogs)
-  }, [visibleLogs, onLogsChange])
-
-  useEffect(() => {
     const el = containerRef.current
     if (el && autoScrollRef.current) {
       el.scrollTop = el.scrollHeight
     }
-  }, [visibleLogs])
-
-  const buildDiagnosticsFallbackPayload = async (): Promise<Record<string, unknown>> => {
-    const runtimeMeta = await invoke('get-runtime-diagnostics-meta')
-    const system = await invoke('get-system-diagnostics')
-    const trimmedLogs = visibleLogs.slice(-MAX_REPORT_LOG_LINES).map((line) => sanitizeText(String(line ?? '')))
-    const safeError = errorMessage ? sanitizeText(errorMessage) : null
-    const safeProgress = progressMessage ? sanitizeText(progressMessage) : null
-
-    const report = {
-      generated_at: new Date().toISOString(),
-      runtime: runtimeMeta,
-      system,
-      context: reportContext ?? {},
-      ui_state: {
-        title,
-        show_progress: showProgress,
-        progress_message: safeProgress
-      },
-      error_message: safeError,
-      logs: trimmedLogs
-    }
-
-    return report
-  }
+  }, [logs])
 
   const handleCopyBugReport = async () => {
     if (isCopyingReport) return
@@ -176,9 +97,7 @@ const ServerLogDisplay = ({
     setReportActionStatus(null)
 
     try {
-      const payload = buildDiagnosticsPayload
-        ? await buildDiagnosticsPayload()
-        : await buildDiagnosticsFallbackPayload()
+      const payload = await buildDiagnosticsPayload()
       const reportText = JSON.stringify(payload, null, 2)
       await copyToClipboard(reportText)
       setReportActionStatus('Diagnostics copied')
@@ -196,9 +115,7 @@ const ServerLogDisplay = ({
     setReportActionStatus(null)
 
     try {
-      const payload = buildDiagnosticsPayload
-        ? await buildDiagnosticsPayload()
-        : await buildDiagnosticsFallbackPayload()
+      const payload = await buildDiagnosticsPayload()
       const reportText = JSON.stringify(payload, null, 2)
       let copiedDiagnostics = false
       try {
@@ -213,7 +130,7 @@ const ServerLogDisplay = ({
       const runtime = payload.runtime as Record<string, unknown> | undefined
       const appVersion = String(runtime?.app_version ?? 'unknown')
       const platform = String(runtime?.platform ?? 'unknown')
-      const recentLogsRaw = visibleLogs.slice(-MAX_GITHUB_LOG_LINES).join('\n')
+      const recentLogsRaw = logs.slice(-MAX_GITHUB_LOG_LINES).join('\n')
       const recentLogsTrimmed =
         recentLogsRaw.length > MAX_GITHUB_LOG_CHARS
           ? `${recentLogsRaw.slice(0, MAX_GITHUB_LOG_CHARS)}\n... (truncated)`
@@ -279,10 +196,10 @@ const ServerLogDisplay = ({
         className="server-log-content flex-1 px-[1.78cqh] py-[0.8cqh] overflow-y-auto font-mono text-[1.78cqh] leading-relaxed [scrollbar-color:rgba(255,255,255,0.34)_transparent]"
         ref={containerRef}
       >
-        {visibleLogs.length === 0 ? (
+        {logs.length === 0 ? (
           <div className="italic text-text-muted">Waiting for server output...</div>
         ) : (
-          visibleLogs.map((line, index) => (
+          logs.map((line, index) => (
             <div key={index} className="whitespace-pre-wrap break-all text-text-modal-muted">
               {line}
             </div>

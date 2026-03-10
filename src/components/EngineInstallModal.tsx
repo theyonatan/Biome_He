@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import { invoke, listen } from '../bridge'
+import { invoke } from '../bridge'
 import { useStreaming } from '../context/StreamingContext'
+import { useEngineLogs } from '../hooks/useEngineLogs'
 import Button from './ui/Button'
 import ServerLogDisplay from './ServerLogDisplay'
 
@@ -10,29 +11,17 @@ type EngineInstallModalProps = {
 
 const EngineInstallModal = ({ onClose }: EngineInstallModalProps) => {
   const { engineSetupInProgress, setupProgress, engineSetupError, abortEngineSetup } = useStreaming()
-  const [installLogs, setInstallLogs] = useState<string[]>([])
+  const { logs: installLogs, clear: clearInstallLogs } = useEngineLogs(true)
   const [isExportingInstallDiagnostics, setIsExportingInstallDiagnostics] = useState(false)
   const [isAbortingInstall, setIsAbortingInstall] = useState(false)
   const [installExportStatus, setInstallExportStatus] = useState<string | null>(null)
 
   useEffect(() => {
-    setInstallLogs([])
-    const unlisten = listen('engine-install-log', (payload) => {
-      setInstallLogs((prev) => {
-        const next = [...prev, payload.line]
-        if (next.length > 360) next.shift()
-        return next
-      })
-    })
-    return unlisten
-  }, [])
-
-  useEffect(() => {
     if (engineSetupInProgress) {
-      setInstallLogs([])
+      clearInstallLogs()
       setInstallExportStatus(null)
     }
-  }, [engineSetupInProgress])
+  }, [engineSetupInProgress, clearInstallLogs])
 
   const buildDiagnosticsPayload = useCallback(async () => {
     const meta = await invoke('get-runtime-diagnostics-meta')
@@ -97,23 +86,18 @@ const EngineInstallModal = ({ onClose }: EngineInstallModalProps) => {
       <div className="w-[135.11cqh] max-w-[92vw] pointer-events-auto">
         <ServerLogDisplay
           title="Installation"
-          externalLogs={installLogs}
+          logs={installLogs}
           showProgress={engineSetupInProgress}
           progressMessage={
             engineSetupInProgress ? setupProgress || 'Installing...' : engineSetupError ? 'Failed.' : 'Complete.'
           }
           errorMessage={engineSetupError}
-          reportContext={{
-            flow: 'engine-install',
-            engine_setup_in_progress: engineSetupInProgress,
-            setup_progress: setupProgress,
-            engine_setup_error: engineSetupError
-          }}
           buildDiagnosticsPayload={buildDiagnosticsPayload}
           showExportAction={!engineSetupInProgress && !!engineSetupError}
           onExportAction={() => void handleExportInstallDiagnostics()}
           isExportingAction={isExportingInstallDiagnostics}
           exportActionLabel="Export Logs"
+          actionStatus={installExportStatus}
           headerAction={
             engineSetupInProgress ? (
               <div className="flex items-center gap-[0.8cqh]">
@@ -141,11 +125,6 @@ const EngineInstallModal = ({ onClose }: EngineInstallModalProps) => {
             )
           }
         />
-        {installExportStatus && (
-          <div className="mt-[0.45cqh] text-right font-serif text-[2cqh] leading-[1.1] text-text-muted">
-            {installExportStatus}
-          </div>
-        )}
       </div>
     </div>
   )

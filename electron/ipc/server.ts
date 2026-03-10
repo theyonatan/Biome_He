@@ -21,16 +21,6 @@ function isLocalhost(hostname: string): boolean {
   return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1'
 }
 
-function readLogTail(logFilePath: string, maxLines: number): string[] {
-  if (!fs.existsSync(logFilePath)) return []
-  const content = fs.readFileSync(logFilePath, 'utf-8')
-  return content
-    .split(/\r?\n/)
-    .map((line) => line.trimEnd())
-    .filter((line) => line.length > 0)
-    .slice(-Math.max(1, maxLines))
-}
-
 export function registerServerIpc(): void {
   ipcMain.handle('start-engine-server', async (_event, port: number) => {
     const engineDir = getEngineDir()
@@ -107,7 +97,7 @@ export function registerServerIpc(): void {
       rl.on('line', (line) => {
         console.log(`[SERVER] ${line}`)
         fs.appendFileSync(logFilePath, line + '\n', 'utf-8')
-        emitToAllWindows('server-log', { line, is_stderr: false })
+        emitToAllWindows('engine-log', { line, is_stderr: false })
       })
     }
 
@@ -117,7 +107,7 @@ export function registerServerIpc(): void {
       rl.on('line', (line) => {
         console.log(`[SERVER] ${line}`)
         fs.appendFileSync(logFilePath, line + '\n', 'utf-8')
-        emitToAllWindows('server-log', { line, is_stderr: true })
+        emitToAllWindows('engine-log', { line, is_stderr: true })
       })
     }
 
@@ -160,14 +150,6 @@ export function registerServerIpc(): void {
       return 'Server already stopped'
     }
     return result
-  })
-
-  ipcMain.handle('read-server-log-tail', (_event, maxLines?: number) => {
-    const engineDir = getEngineDir()
-    const logFilePath = path.join(engineDir, 'server.log')
-    const parsedMaxLines = Number(maxLines)
-    const safeMaxLines = Number.isFinite(parsedMaxLines) ? parsedMaxLines : 200
-    return readLogTail(logFilePath, safeMaxLines)
   })
 
   ipcMain.handle('is-server-running', () => {

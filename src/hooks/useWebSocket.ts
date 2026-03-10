@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import stripAnsi from 'strip-ansi'
 import { createLogger } from '../utils/logger'
 import { WsRpcClient } from '../lib/wsRpc'
 import type { StageId } from '../stages'
@@ -165,7 +166,7 @@ export const useWebSocket = (): WebSocketHook => {
             break
           }
           case 'log': {
-            const line = String(msg.line ?? '')
+            const line = stripAnsi(String(msg.line ?? ''))
             allLogsRef.current = [...allLogsRef.current, line]
             setLogs((prev) => {
               const next = [...prev, line]
