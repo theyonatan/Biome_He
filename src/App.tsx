@@ -35,7 +35,7 @@ const LAUNCH_PRE_SHRINK_MS = 420
 
 const AppShell = () => {
   const [isPortalHovered, setIsPortalHovered] = useState(false)
-  const { play, startLoop, stopLoop } = useAudio()
+  const { play, startLoop, stopLoop, fadeOutLoop } = useAudio()
   const [isLaunchShrinking, setIsLaunchShrinking] = useState(false)
   const [isEnteringLoading, setIsEnteringLoading] = useState(false)
   const [isReturningToMenu, setIsReturningToMenu] = useState(false)
@@ -166,8 +166,8 @@ const AppShell = () => {
       !isLaunchShrinking
     ) {
       play('portal_swoosh_long')
-      stopLoop('portal_hum')
-      startLoop('vortex_loop')
+      fadeOutLoop('portal_hum', 0.15)
+      startLoop('vortex_loop', 1, 0.5)
       setIsLaunchShrinking(true)
     }
   }
@@ -205,14 +205,14 @@ const AppShell = () => {
             style={{ transform: `translate(-50%, -50%) scale(${isPortalHovered ? 1.05 : 1})` }}
             onMouseEnter={() => {
               setIsPortalHovered(true)
-              startLoop('portal_hum')
+              startLoop('portal_hum', 1, 0.3)
             }}
             onMouseLeave={() => {
               setIsPortalHovered(false)
-              stopLoop('portal_hum')
+              fadeOutLoop('portal_hum', 0.3)
             }}
             onClick={() => {
-              stopLoop('portal_hum')
+              fadeOutLoop('portal_hum', 0.15)
               handleLaunch()
             }}
             role="button"

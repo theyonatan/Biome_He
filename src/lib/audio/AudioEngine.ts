@@ -35,17 +35,35 @@ export class AudioEngine {
       this.applyVolumes()
     }
     if (this.ctx.state === 'suspended' && !this.resumePromise) {
+      // Mute before resuming, then ramp up to avoid a burst of buffered audio
+      if (this.masterGain) {
+        this.masterGain.gain.value = 0
+      }
       this.resumePromise = this.ctx.resume().then(() => {
         this.resumePromise = null
+        this.applyVolumes(0.15)
       })
     }
     return this.ctx
   }
 
-  private applyVolumes() {
-    if (this.masterGain) this.masterGain.gain.value = this._masterVolume
-    if (this.sfxGain) this.sfxGain.gain.value = this._sfxVolume
-    if (this.musicGain) this.musicGain.gain.value = this._musicVolume
+  private applyVolumes(rampSeconds = 0.05) {
+    const t = this.ctx?.currentTime ?? 0
+    if (this.masterGain) {
+      this.masterGain.gain.cancelScheduledValues(t)
+      this.masterGain.gain.setValueAtTime(this.masterGain.gain.value, t)
+      this.masterGain.gain.linearRampToValueAtTime(this._masterVolume, t + rampSeconds)
+    }
+    if (this.sfxGain) {
+      this.sfxGain.gain.cancelScheduledValues(t)
+      this.sfxGain.gain.setValueAtTime(this.sfxGain.gain.value, t)
+      this.sfxGain.gain.linearRampToValueAtTime(this._sfxVolume, t + rampSeconds)
+    }
+    if (this.musicGain) {
+      this.musicGain.gain.cancelScheduledValues(t)
+      this.musicGain.gain.setValueAtTime(this.musicGain.gain.value, t)
+      this.musicGain.gain.linearRampToValueAtTime(this._musicVolume, t + rampSeconds)
+    }
   }
 
   get volumes(): VolumeSettings {

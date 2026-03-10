@@ -32,9 +32,11 @@ export const SOUND_ASSETS: Partial<Record<SoundId, string>> = {
   vortex_loop: new URL('../../../assets/audio/vortex_loop.wav', import.meta.url).href
 }
 
-/** Per-sound volume overrides for asset-based loops (0–1). */
+/** Per-sound volume overrides for loops (0–1). */
 export const SOUND_LOOP_VOLUMES: Partial<Record<SoundId, number>> = {
-  vortex_loop: 0.3
+  portal_hum: 0.6,
+  vortex_loop: 0.3,
+  music_menu: 0.8
 }
 
 export const SYNTH_ONE_SHOTS: Partial<Record<SoundId, SynthOneShot>> = {
