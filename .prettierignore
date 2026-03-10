@@ -1,3 +1,4 @@
 server-components
 out
 .vite
+build/installer.nsh

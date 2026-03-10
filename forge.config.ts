@@ -27,6 +27,7 @@ const config: ForgeConfig = {
           oneClick: false,
           allowToChangeInstallationDirectory: true,
           license: 'licensing/EULA.txt',
+          include: 'build/installer.nsh',
           installerIcon: 'app-icon.ico',
           uninstallerIcon: 'app-icon.ico'
         }
