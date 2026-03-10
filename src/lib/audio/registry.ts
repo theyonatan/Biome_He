@@ -28,7 +28,13 @@ export const SOUND_CATEGORIES: Record<SoundId, SoundCategory> = {
  *   ui_click: new URL('../../../assets/audio/click.wav', import.meta.url).href
  */
 export const SOUND_ASSETS: Partial<Record<SoundId, string>> = {
-  music_menu: new URL('../../../assets/audio/music_menu.mp3', import.meta.url).href
+  music_menu: new URL('../../../assets/audio/music_menu.mp3', import.meta.url).href,
+  vortex_loop: new URL('../../../assets/audio/vortex_loop.wav', import.meta.url).href
+}
+
+/** Per-sound volume overrides for asset-based loops (0–1). */
+export const SOUND_LOOP_VOLUMES: Partial<Record<SoundId, number>> = {
+  vortex_loop: 0.3
 }
 
 export const SYNTH_ONE_SHOTS: Partial<Record<SoundId, SynthOneShot>> = {

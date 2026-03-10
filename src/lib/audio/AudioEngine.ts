@@ -8,7 +8,7 @@
  */
 
 import type { SoundId, VolumeSettings } from './types'
-import { SOUND_CATEGORIES, SOUND_ASSETS, SYNTH_ONE_SHOTS, SYNTH_LOOPS } from './registry'
+import { SOUND_CATEGORIES, SOUND_ASSETS, SOUND_LOOP_VOLUMES, SYNTH_ONE_SHOTS, SYNTH_LOOPS } from './registry'
 
 export class AudioEngine {
   private ctx: AudioContext | null = null
@@ -109,14 +109,15 @@ export class AudioEngine {
     const ctx = this.ensureContext()
     const cat = SOUND_CATEGORIES[id]
     const dest = this.getDestForCategory(cat)
+    const effectiveVolume = volume * (SOUND_LOOP_VOLUMES[id] ?? 1)
 
     // Per-loop gain node for individual volume control
     const loopGain = ctx.createGain()
     if (fadeInSeconds > 0) {
       loopGain.gain.setValueAtTime(0, ctx.currentTime)
-      loopGain.gain.linearRampToValueAtTime(volume, ctx.currentTime + fadeInSeconds)
+      loopGain.gain.linearRampToValueAtTime(effectiveVolume, ctx.currentTime + fadeInSeconds)
     } else {
-      loopGain.gain.setValueAtTime(volume, ctx.currentTime)
+      loopGain.gain.setValueAtTime(effectiveVolume, ctx.currentTime)
     }
     loopGain.connect(dest)
 

@@ -2,87 +2,82 @@ import type { SynthLoop } from './types'
 import { loopTeardown } from './synthUtils'
 
 /**
- * Builds a vortex tunnel sound. The core character is rushing air with
- * resonant sweeps that create a sense of forward motion. Tonal elements
- * sit underneath as a subtle drone.
- *  - 'normal': smooth rushing wind with warm resonance
- *  - 'error':  harsher, more turbulent — same tunnel, gone wrong
+ * Builds a vortex loop — a quiet, low-frequency rumble designed for
+ * long listening sessions (30+ minutes during downloads/compiles).
+ *  - 'normal': gentle low rumble, barely-there presence
+ *  - 'error':  same character but darker and slightly more prominent
  */
+/** Master volume multiplier for the vortex loop — tweak this to dial in overall level. */
+const VORTEX_VOLUME = 1.0
+
 function buildVortexLoop(ctx: AudioContext, dest: AudioNode, variant: 'normal' | 'error'): () => void {
   const nodes: AudioNode[] = []
   const gains: GainNode[] = []
   const t = ctx.currentTime
   const isError = variant === 'error'
+  const v = VORTEX_VOLUME
 
-  // --- Layer 1: Rushing air (primary) ---
-  const wind = ctx.createBufferSource()
-  const windBuf = ctx.createBuffer(2, ctx.sampleRate * 4, ctx.sampleRate)
+  // --- Layer 1: Noise rumble through a steep lowpass ---
+  const rumble = ctx.createBufferSource()
+  const rumbleBuf = ctx.createBuffer(2, ctx.sampleRate * 4, ctx.sampleRate)
   for (let ch = 0; ch < 2; ch++) {
-    const data = windBuf.getChannelData(ch)
+    const data = rumbleBuf.getChannelData(ch)
     for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1
   }
-  wind.buffer = windBuf
-  wind.loop = true
+  rumble.buffer = rumbleBuf
+  rumble.loop = true
 
-  const windBP = ctx.createBiquadFilter()
-  windBP.type = 'bandpass'
-  windBP.frequency.setValueAtTime(isError ? 600 : 680, t)
-  windBP.Q.setValueAtTime(0.8, t)
+  const rumbleLP = ctx.createBiquadFilter()
+  rumbleLP.type = 'lowpass'
+  rumbleLP.frequency.setValueAtTime(isError ? 140 : 160, t)
+  rumbleLP.Q.setValueAtTime(2.5, t) // resonant peak adds body
 
-  const windGain = ctx.createGain()
-  windGain.gain.setValueAtTime(0.14, t)
-  wind.connect(windBP).connect(windGain).connect(dest)
-  wind.start()
-  nodes.push(wind, windBP, windGain)
-  gains.push(windGain)
+  const rumbleGain = ctx.createGain()
+  rumbleGain.gain.setValueAtTime(0.35 * v, t)
+  rumble.connect(rumbleLP).connect(rumbleGain).connect(dest)
+  rumble.start()
+  nodes.push(rumble, rumbleLP, rumbleGain)
+  gains.push(rumbleGain)
 
-  // --- Layer 2: High whistle / tunnel resonance ---
-  const whistle = ctx.createBufferSource()
-  const whistleBuf = ctx.createBuffer(1, ctx.sampleRate * 4, ctx.sampleRate)
-  const whistleData = whistleBuf.getChannelData(0)
-  for (let i = 0; i < whistleData.length; i++) whistleData[i] = Math.random() * 2 - 1
-  whistle.buffer = whistleBuf
-  whistle.loop = true
+  // --- Layer 2: Sub-bass weight ---
+  const sub = ctx.createOscillator()
+  const subGain = ctx.createGain()
+  sub.type = 'triangle'
+  sub.frequency.setValueAtTime(isError ? 35 : 42, t)
+  subGain.gain.setValueAtTime(0.12 * v, t)
+  sub.connect(subGain).connect(dest)
+  sub.start()
+  nodes.push(sub, subGain)
+  gains.push(subGain)
 
-  const whistleBP = ctx.createBiquadFilter()
-  whistleBP.type = 'bandpass'
-  whistleBP.frequency.setValueAtTime(isError ? 1500 : 1800, t)
-  whistleBP.Q.setValueAtTime(2, t)
+  // --- Layer 3: Slow filter cutoff drift for organic movement ---
+  const driftLfo = ctx.createOscillator()
+  const driftDepth = ctx.createGain()
+  driftLfo.type = 'sine'
+  driftLfo.frequency.setValueAtTime(0.035, t)
+  driftDepth.gain.setValueAtTime(40, t) // ±40 Hz cutoff drift
+  driftLfo.connect(driftDepth).connect(rumbleLP.frequency)
+  driftLfo.start()
+  nodes.push(driftLfo, driftDepth)
 
-  // Offset sweep so the two bands don't move in sync
-  const whistleLfo = ctx.createOscillator()
-  const whistleDepth = ctx.createGain()
-  whistleLfo.type = 'sine'
-  whistleLfo.frequency.setValueAtTime(isError ? 0.073 : 0.06, t)
-  whistleDepth.gain.setValueAtTime(isError ? 700 : 600, t)
-  whistleLfo.connect(whistleDepth).connect(whistleBP.frequency)
-  whistleLfo.start()
-
-  const whistleGain = ctx.createGain()
-  whistleGain.gain.setValueAtTime(isError ? 0.05 : 0.04, t)
-  whistle.connect(whistleBP).connect(whistleGain).connect(dest)
-  whistle.start()
-  nodes.push(whistle, whistleBP, whistleLfo, whistleDepth, whistleGain)
-  gains.push(whistleGain)
-
-  // --- Layer 3: Subtle tonal undertone ---
-  const drone = ctx.createOscillator()
-  const droneGain = ctx.createGain()
-  drone.type = 'sine'
-  drone.frequency.setValueAtTime(isError ? 50 : 60, t)
-  droneGain.gain.setValueAtTime(isError ? 0.07 : 0.04, t)
-  drone.connect(droneGain).connect(dest)
-  drone.start()
-  nodes.push(drone, droneGain)
-  gains.push(droneGain)
+  // --- Layer 4: Very slow amplitude breathing ---
+  const breathLfo = ctx.createOscillator()
+  const breathDepth = ctx.createGain()
+  breathLfo.type = 'sine'
+  breathLfo.frequency.setValueAtTime(0.025, t)
+  breathDepth.gain.setValueAtTime(0.04 * v, t)
+  breathLfo.connect(breathDepth).connect(rumbleGain.gain)
+  breathLfo.connect(breathDepth).connect(subGain.gain)
+  breathLfo.start()
+  nodes.push(breathLfo, breathDepth)
 
   return loopTeardown(gains, nodes, 0.5)
 }
 
-/** Rushing-through-a-tunnel vortex loop. */
+/** Quiet low rumble for the loading vortex. */
 export const synthVortexLoop: SynthLoop = (ctx, dest) => buildVortexLoop(ctx, dest, 'normal')
 
-/** Harsher, turbulent variant of the vortex for error states. */
+/** Slightly darker/louder variant for error states. */
 export const synthVortexError: SynthLoop = (ctx, dest) => buildVortexLoop(ctx, dest, 'error')
 
 /** Warm energy hum for portal hover — like standing near something powerful. */
