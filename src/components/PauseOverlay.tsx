@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useStreaming } from '../context/StreamingContext'
 import MenuSettingsView from './MenuSettingsView'
@@ -8,21 +8,13 @@ import { PAUSE_VIEW, PAUSE_OVERLAY_CRT, type PauseViewKey } from '../constants'
 import { viewFadeVariants } from '../transitions'
 import { useSeedManager } from '../hooks/useSeedManager'
 import { usePinnedScenes } from '../hooks/usePinnedScenes'
+import { usePointerLockFeedback } from '../hooks/usePointerLockFeedback'
 
 const PauseOverlay = ({ isActive }: { isActive: boolean }) => {
-  const {
-    canUnpause,
-    unlockDelayMs,
-    pauseElapsedMs,
-    pointerLockBlockedSeq,
-    requestPointerLock,
-    reset,
-    sendPromptWithSeed,
-    wsRequest
-  } = useStreaming()
+  const { requestPointerLock, reset, sendPromptWithSeed, wsRequest } = useStreaming()
   const [view, setView] = useState<PauseViewKey>(PAUSE_VIEW.MAIN)
-  const [showUnlockHint, setShowUnlockHint] = useState(false)
-  const lastPointerLockBlockedSeqRef = useRef(0)
+  const { showUnlockHint, showPauseLockoutTimer, pauseLockoutSecondsText, selectCooldown } =
+    usePointerLockFeedback(isActive)
 
   const { pinnedSceneIds, togglePinnedScene, removePinnedScene } = usePinnedScenes()
 
@@ -44,7 +36,6 @@ const PauseOverlay = ({ isActive }: { isActive: boolean }) => {
   useEffect(() => {
     if (!isActive) {
       setView(PAUSE_VIEW.MAIN)
-      setShowUnlockHint(false)
       return
     }
 
@@ -63,30 +54,7 @@ const PauseOverlay = ({ isActive }: { isActive: boolean }) => {
     return () => window.removeEventListener('keyup', handleKeyUp)
   }, [isActive, view, requestPointerLock])
 
-  useEffect(() => {
-    if (!showUnlockHint) return
-    const timer = window.setTimeout(() => setShowUnlockHint(false), 1200)
-    return () => window.clearTimeout(timer)
-  }, [showUnlockHint])
-
-  useEffect(() => {
-    if (canUnpause) {
-      setShowUnlockHint(false)
-    }
-  }, [canUnpause])
-
-  useEffect(() => {
-    if (!isActive) return
-    if (pointerLockBlockedSeq <= 0) return
-    if (pointerLockBlockedSeq === lastPointerLockBlockedSeqRef.current) return
-    lastPointerLockBlockedSeqRef.current = pointerLockBlockedSeq
-    setShowUnlockHint(true)
-  }, [isActive, pointerLockBlockedSeq])
-
   const pinnedScenes = useMemo(() => seeds.filter((s) => pinnedSceneIds.includes(s.filename)), [seeds, pinnedSceneIds])
-  const pauseLockoutRemainingMs = Math.max(0, unlockDelayMs - pauseElapsedMs)
-  const showPauseLockoutTimer = isActive && !canUnpause && pauseLockoutRemainingMs > 0 && showUnlockHint
-  const pauseLockoutSecondsText = (pauseLockoutRemainingMs / 1000).toFixed(1)
 
   const handleSceneSelect = (filename: string) => {
     sendPromptWithSeed(filename)
@@ -138,7 +106,7 @@ const PauseOverlay = ({ isActive }: { isActive: boolean }) => {
             <PauseMainView
               pinnedScenes={pinnedScenes}
               thumbnails={thumbnails}
-              selectCooldown={!canUnpause}
+              selectCooldown={selectCooldown}
               onSceneSelect={handleSceneSelect}
               onTogglePin={togglePinnedScene}
               onRemoveScene={removeScene}
@@ -163,7 +131,7 @@ const PauseOverlay = ({ isActive }: { isActive: boolean }) => {
               seeds={seeds}
               thumbnails={thumbnails}
               pinnedSceneIds={pinnedSceneIds}
-              selectCooldown={!canUnpause}
+              selectCooldown={selectCooldown}
               uploadingImage={uploadingImage}
               uploadError={uploadError}
               onSceneSelect={handleSceneSelect}

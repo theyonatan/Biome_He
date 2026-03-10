@@ -105,7 +105,7 @@ const SceneCard = ({
       onMouseEnter={() => !isUnsafe && playHover()}
       onClick={() => {
         if (isUnsafe) return
-        play(selectCooldown ? 'error' : 'portal_swoosh')
+        if (!selectCooldown) play('portal_swoosh')
         onSelect(seed.filename)
       }}
     >

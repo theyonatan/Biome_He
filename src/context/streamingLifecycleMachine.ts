@@ -18,7 +18,6 @@ export type StreamingLifecycleEffects = {
   runLoadingConnection: boolean
   transitionToStreaming: boolean
   teardownForInactivePortalState: boolean
-  requestPointerLockOnStreamStart: boolean
   resumeOnPointerLock: boolean
   pauseOnPointerUnlock: boolean
   suppressedIntentionalWarmError: boolean
@@ -36,7 +35,6 @@ const emptyEffects = (): StreamingLifecycleEffects => ({
   runLoadingConnection: false,
   transitionToStreaming: false,
   teardownForInactivePortalState: false,
-  requestPointerLockOnStreamStart: false,
   resumeOnPointerLock: false,
   pauseOnPointerUnlock: false,
   suppressedIntentionalWarmError: false,
@@ -51,7 +49,6 @@ export type StreamingLifecycleState = {
   intentionalReconnectInProgress: boolean
   loadingTransitionRequestedForIntentionalReconnect: boolean
   streamingTransitionRequested: boolean
-  streamPointerLockRequested: boolean
   loadingConnectionRequestSeq: number
   lastPortalState: PortalState | null
   lastTeardownPortalState: PortalState | null
@@ -66,7 +63,6 @@ export const initialStreamingLifecycleState: StreamingLifecycleState = {
   intentionalReconnectInProgress: false,
   loadingTransitionRequestedForIntentionalReconnect: false,
   streamingTransitionRequested: false,
-  streamPointerLockRequested: false,
   loadingConnectionRequestSeq: 0,
   lastPortalState: null,
   lastTeardownPortalState: null,
@@ -155,10 +151,6 @@ export const streamingLifecycleReducer = (
   if (!inLoadingState) {
     next.streamingTransitionRequested = false
   }
-  if (!inStreamingState) {
-    next.streamPointerLockRequested = false
-  }
-
   if (inSessionPortalState) {
     next.lastTeardownPortalState = null
   } else if (next.lastTeardownPortalState !== portalState) {
@@ -174,10 +166,6 @@ export const streamingLifecycleReducer = (
   }
 
   const streamingReady = inStreamingState && socketReady
-  if (streamingReady && !next.streamPointerLockRequested) {
-    next.effects.requestPointerLockOnStreamStart = true
-    next.streamPointerLockRequested = true
-  }
 
   if (streamingReady && isPointerLocked && (settingsOpen || isPaused)) {
     next.effects.resumeOnPointerLock = true

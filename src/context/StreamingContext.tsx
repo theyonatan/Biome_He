@@ -378,7 +378,6 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
       states,
       lastAppliedModelRef,
       exitPointerLock,
-      requestPointerLock,
       sendPause
     })
 
@@ -392,7 +391,6 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     disconnect,
     settings?.engine_model,
     exitPointerLock,
-    requestPointerLock,
     sendPause
   ])
 

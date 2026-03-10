@@ -11,7 +11,6 @@ export const LIFECYCLE_EFFECT_ORDER: Array<keyof StreamingLifecycleEffects> = [
   'transitionToLoadingAfterIntentionalDisconnect',
   'transitionToStreaming',
   'teardownForInactivePortalState',
-  'requestPointerLockOnStreamStart',
   'resumeOnPointerLock',
   'pauseOnPointerUnlock',
   'engineErrorDismissed',
@@ -43,7 +42,6 @@ type CreateHandlersArgs = {
   states: PortalStatesLike
   lastAppliedModelRef: { current: string | null }
   exitPointerLock: () => void
-  requestPointerLock: () => void
   sendPause: (paused: boolean) => void
 }
 
@@ -68,7 +66,6 @@ export const createStreamingLifecycleEffectHandlers = ({
   states,
   lastAppliedModelRef,
   exitPointerLock,
-  requestPointerLock,
   sendPause
 }: CreateHandlersArgs): LifecycleEffectHandlers => {
   return {
@@ -108,10 +105,6 @@ export const createStreamingLifecycleEffectHandlers = ({
       setSettingsOpen(false)
       setIsPaused(false)
       setPausedAt(null)
-    },
-    requestPointerLockOnStreamStart: () => {
-      log.info('Auto-requesting pointer lock on stream start')
-      requestPointerLock()
     },
     resumeOnPointerLock: () => {
       setSettingsOpen(false)
