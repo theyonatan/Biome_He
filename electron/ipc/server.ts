@@ -227,7 +227,6 @@ export function registerServerIpc(): void {
     try {
       const response = await fetch(healthUrl, {
         method: 'GET',
-        cache: 'no-store',
         signal: controller.signal
       })
       if (response.ok) {
