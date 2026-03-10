@@ -245,6 +245,11 @@ const ServerLogDisplay = ({
               >
                 {isCopyingReport ? 'Copying...' : 'Copy Report'}
               </Button>
+              {(reportActionStatus || actionStatus) && (
+                <span className="ml-[0.4cqh] font-serif text-[2.13cqh] text-text-muted whitespace-nowrap">
+                  {reportActionStatus || actionStatus}
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-[0.8cqh]">
               <Button
@@ -266,7 +271,6 @@ const ServerLogDisplay = ({
               </Button>
             </div>
           </div>
-          {reportActionStatus && <div className="font-serif text-[1.7cqh] text-text-muted">{reportActionStatus}</div>}
         </div>
       )}
     </div>
