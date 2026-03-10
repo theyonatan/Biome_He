@@ -7,7 +7,6 @@ type ButtonProps = {
   variant: ButtonVariant
   children: ReactNode
   className?: string
-  silent?: boolean
 } & Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'className'>
 
 const variantClasses: Record<ButtonVariant, string> = {
@@ -18,15 +17,15 @@ const variantClasses: Record<ButtonVariant, string> = {
     'border-border-light outline-border-light bg-surface-btn-ghost text-text-primary hover:bg-surface-btn-hover hover:text-text-inverse hover:-translate-y-px'
 }
 
-const Button = ({ variant, children, className = '', silent = false, ...rest }: ButtonProps) => {
+const Button = ({ variant, children, className = '', ...rest }: ButtonProps) => {
   const { playHover, playClick } = useUISound()
 
   return (
     <button
       type="button"
       className={`font-serif rounded-none cursor-pointer border outline-0 hover:outline-2 transition-[color,background-color,border-color,outline-color,transform,box-shadow] duration-150 ${variantClasses[variant]} ${className}`}
-      onMouseEnter={silent ? undefined : playHover}
-      onMouseDown={silent ? undefined : playClick}
+      onMouseEnter={playHover}
+      onMouseDown={playClick}
       {...rest}
     >
       {children}

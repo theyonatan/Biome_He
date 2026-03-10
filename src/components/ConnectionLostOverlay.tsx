@@ -37,7 +37,7 @@ const ConnectionLostOverlay = () => {
           The connection to World Engine was interrupted
         </p>
         <div className="flex justify-end mt-[1.2cqh] w-full">
-          <Button variant="primary" className="p-[0.5cqh_1.78cqh] text-[2.49cqh]" onClick={handleDismiss} silent>
+          <Button variant="primary" className="p-[0.5cqh_1.78cqh] text-[2.49cqh]" onClick={handleDismiss}>
             Reconnect
           </Button>
         </div>

@@ -425,7 +425,6 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
               variant="primary"
               className="p-[0.5cqh_1.78cqh] text-[2.49cqh]"
               onClick={() => setShowCredits(false)}
-              silent
             >
               Close
             </Button>

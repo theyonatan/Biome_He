@@ -125,7 +125,6 @@ const EngineInstallModal = ({ onClose }: EngineInstallModalProps) => {
                   onClick={() => void handleAbortInstall()}
                   disabled={isAbortingInstall}
                   aria-label="Abort engine install"
-                  silent
                 >
                   {isAbortingInstall ? 'Aborting...' : 'Abort'}
                 </Button>
@@ -137,7 +136,6 @@ const EngineInstallModal = ({ onClose }: EngineInstallModalProps) => {
                   className="text-[1.8cqh] px-[1.2cqh] py-[0.25cqh]"
                   onClick={onClose}
                   aria-label="Close install logs"
-                  silent
                 >
                   Close
                 </Button>

@@ -344,7 +344,6 @@ const ServerLogDisplay = ({
                 onClick={onExportAction}
                 disabled={isExportingAction}
                 title="Export diagnostics JSON"
-                silent
               >
                 {isExportingAction ? 'Exporting...' : exportActionLabel}
               </Button>
@@ -355,7 +354,6 @@ const ServerLogDisplay = ({
               onClick={() => void handleCopyBugReport()}
               disabled={isCopyingReport}
               title="Copy diagnostics JSON for bug reports"
-              silent
             >
               {isCopyingReport ? 'Copying...' : 'Copy Report'}
             </Button>
@@ -365,7 +363,6 @@ const ServerLogDisplay = ({
               onClick={() => void handleOpenGithubIssue()}
               disabled={isOpeningIssue}
               title="Open prefilled issue on GitHub"
-              silent
             >
               {isOpeningIssue ? 'Opening...' : 'Report on GitHub'}
             </Button>
@@ -374,7 +371,6 @@ const ServerLogDisplay = ({
               className="text-[1.8cqh] px-[1.2cqh] py-[0.25cqh]"
               onClick={() => window.open(DISCORD_HELP_URL, '_blank', 'noopener,noreferrer')}
               title="Ask for help in Discord"
-              silent
             >
               Ask on Discord
             </Button>
@@ -421,7 +417,6 @@ const ServerLogDisplay = ({
           variant="danger"
           className="mx-[2.13cqh] my-[1cqh] px-[2.67cqh] py-[0.6cqh] text-[1.78cqh] tracking-wider"
           onClick={onDismiss}
-          silent
         >
           DISMISS
         </Button>
