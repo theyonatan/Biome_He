@@ -1,6 +1,5 @@
 @import 'tailwindcss';
 @import './animations.css';
-@import './video-mask.css';
 
 @property --vortex-warp-x {
   syntax: '<number>';

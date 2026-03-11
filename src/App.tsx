@@ -22,7 +22,6 @@ import ViewLabel from './components/ui/ViewLabel'
 import MenuButton from './components/ui/MenuButton'
 import PauseOverlay from './components/PauseOverlay'
 import ConnectionLostOverlay from './components/ConnectionLostOverlay'
-import ShutdownOverlay from './components/ShutdownOverlay'
 import WindowControls from './components/WindowControls'
 import ConfirmModal from './components/ui/ConfirmModal'
 import useBackgroundCycle from './hooks/useBackgroundCycle'
@@ -331,7 +330,6 @@ const AppShell = () => {
             )}
           </div>
         )}
-        <ShutdownOverlay />
       </div>
       {PORTAL_SPARKS_DEBUG && <PortalSparksConfigurator />}
       {availableUpdate && (

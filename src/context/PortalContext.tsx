@@ -8,8 +8,7 @@ const VISUAL_PHASES = {
   LAUNCH_SHRINKING: 'launch_shrinking',
   LAUNCH_EXPANDING: 'launch_expanding',
   LOADING_IDLE: 'loading_idle',
-  STREAMING_ACTIVE: 'streaming_active',
-  SHUTTING_DOWN: 'shutting_down'
+  STREAMING_ACTIVE: 'streaming_active'
 } as const
 
 type VisualPhase = (typeof VISUAL_PHASES)[keyof typeof VISUAL_PHASES]
@@ -22,7 +21,6 @@ type PortalContextValue = {
   isExpanded: boolean
   isConnected: boolean
   showFlash: boolean
-  isShuttingDown: boolean
   isSettingsOpen: boolean
   toggleSettings: () => void
   runLaunchTransition: () => Promise<boolean>
@@ -30,7 +28,6 @@ type PortalContextValue = {
   shutdown: () => Promise<void>
   onStateChange: (callback: (newState: PortalState, previousState: PortalState) => void) => () => void
   registerMaskRef: (element: HTMLDivElement | null) => void
-  registerShutdownRef: (element: HTMLDivElement | null) => void
   is: (state: PortalState) => boolean
 }
 
@@ -55,11 +52,9 @@ export const usePortal = () => {
 export const PortalProvider = ({ children }: { children: ReactNode }) => {
   const [state, setState] = useState<PortalState>(PORTAL_STATES.MAIN_MENU)
   const [visualPhase, setVisualPhase] = useState<VisualPhase>(VISUAL_PHASES.MENU_IDLE)
-  const [isShuttingDown, setIsShuttingDown] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const listenersRef = useRef<Array<(newState: PortalState, previousState: PortalState) => void>>([])
   const maskElementRef = useRef<HTMLDivElement | null>(null)
-  const shutdownElementRef = useRef<HTMLDivElement | null>(null)
   const transitionRunRef = useRef(0)
   const timersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set())
 
@@ -68,10 +63,6 @@ export const PortalProvider = ({ children }: { children: ReactNode }) => {
   const registerMaskRef = useCallback((element: HTMLDivElement | null) => {
     maskElementRef.current = element
   }, [])
-  const registerShutdownRef = useCallback((element: HTMLDivElement | null) => {
-    shutdownElementRef.current = element
-  }, [])
-
   const setMaskProperty = useCallback((property: string, value: string) => {
     if (maskElementRef.current) {
       maskElementRef.current.style.setProperty(property, value)
@@ -85,10 +76,7 @@ export const PortalProvider = ({ children }: { children: ReactNode }) => {
     setMaskProperty('--mask-duration', '0s')
   }, [setMaskProperty])
 
-  const isAnimating =
-    visualPhase === VISUAL_PHASES.LAUNCH_SHRINKING ||
-    visualPhase === VISUAL_PHASES.LAUNCH_EXPANDING ||
-    visualPhase === VISUAL_PHASES.SHUTTING_DOWN
+  const isAnimating = visualPhase === VISUAL_PHASES.LAUNCH_SHRINKING || visualPhase === VISUAL_PHASES.LAUNCH_EXPANDING
   const isShrinking = visualPhase === VISUAL_PHASES.LAUNCH_SHRINKING
   const isExpanded = visualPhase === VISUAL_PHASES.LAUNCH_EXPANDING
   const isConnected = state === PORTAL_STATES.STREAMING
@@ -144,35 +132,6 @@ export const PortalProvider = ({ children }: { children: ReactNode }) => {
     })
   }, [])
 
-  const waitForShutdownAnimation = useCallback((runId: number, fallbackMs = 1200) => {
-    return new Promise<void>((resolve) => {
-      const element = shutdownElementRef.current
-      if (!element) {
-        setTimeout(resolve, fallbackMs)
-        return
-      }
-
-      let settled = false
-      const finish = () => {
-        if (settled) return
-        settled = true
-        element.removeEventListener('animationend', onAnimationEnd)
-        clearTimeout(watchdog)
-        resolve()
-      }
-
-      const onAnimationEnd = (event: AnimationEvent) => {
-        if (transitionRunRef.current !== runId) return finish()
-        if (event.target !== element) return
-        if (event.animationName && event.animationName !== 'tvBlackout') return
-        finish()
-      }
-
-      element.addEventListener('animationend', onAnimationEnd)
-      const watchdog = setTimeout(finish, fallbackMs)
-    })
-  }, [])
-
   const shrinkThenExpand = useCallback(
     async (options: ShrinkExpandOptions = {}) => {
       const runId = transitionRunRef.current
@@ -221,22 +180,14 @@ export const PortalProvider = ({ children }: { children: ReactNode }) => {
   const shutdown = useCallback(async () => {
     transitionRunRef.current += 1
     clearAllTimers()
-    const runId = transitionRunRef.current
     const previousState = state
-    log.info('Shutdown initiated - TV turn-off effect')
+    log.info('Shutdown initiated')
 
-    setIsShuttingDown(true)
-    setVisualPhase(VISUAL_PHASES.SHUTTING_DOWN)
-
-    await waitForShutdownAnimation(runId)
-    if (transitionRunRef.current !== runId) return
-
-    setIsShuttingDown(false)
     setVisualPhase(VISUAL_PHASES.MENU_IDLE)
     resetMaskToPortalIdle()
     setState(PORTAL_STATES.MAIN_MENU)
     notifyListeners(PORTAL_STATES.MAIN_MENU, previousState)
-  }, [state, notifyListeners, clearAllTimers, resetMaskToPortalIdle, waitForShutdownAnimation])
+  }, [state, notifyListeners, clearAllTimers, resetMaskToPortalIdle])
 
   const transitionTo = useCallback(
     async (newState: PortalState) => {
@@ -278,7 +229,6 @@ export const PortalProvider = ({ children }: { children: ReactNode }) => {
     isExpanded,
     isConnected,
     showFlash,
-    isShuttingDown,
     isSettingsOpen,
     toggleSettings,
     runLaunchTransition,
@@ -286,7 +236,6 @@ export const PortalProvider = ({ children }: { children: ReactNode }) => {
     shutdown,
     onStateChange,
     registerMaskRef,
-    registerShutdownRef,
     is: (s: PortalState) => state === s
   }
 

@@ -4,7 +4,7 @@ import { useStreaming } from '../context/StreamingContext'
 import MenuSettingsView from './MenuSettingsView'
 import PauseMainView from './PauseMainView'
 import PauseScenesView from './PauseScenesView'
-import { PAUSE_VIEW, PAUSE_OVERLAY_CRT, type PauseViewKey } from '../constants'
+import { PAUSE_VIEW, type PauseViewKey } from '../constants'
 import { viewFadeVariants } from '../transitions'
 import { useSeedManager } from '../hooks/useSeedManager'
 import { usePinnedScenes } from '../hooks/usePinnedScenes'
@@ -75,12 +75,9 @@ const PauseOverlay = ({ isActive }: { isActive: boolean }) => {
 
   return (
     <div
-      className={`absolute inset-0 z-45 transition-opacity duration-[240ms] ease-in-out bg-black/[0.34] ${PAUSE_OVERLAY_CRT ? 'backdrop-blur-[7px]' : 'backdrop-blur-[14px]'} ${isActive ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+      className={`absolute inset-0 z-45 transition-opacity duration-[240ms] ease-in-out bg-black/[0.34] backdrop-blur-[14px] ${isActive ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
       id="pause-overlay"
     >
-      {PAUSE_OVERLAY_CRT && (
-        <div className="absolute inset-0 pointer-events-none [background:repeating-linear-gradient(0deg,transparent_0px,transparent_2px,rgba(255,255,255,0.04)_2px,rgba(255,255,255,0.04)_4px)]" />
-      )}
       <div className="overlay-darken absolute inset-0 pointer-events-none" />
       <AnimatePresence mode="wait">
         {view === PAUSE_VIEW.SETTINGS ? (
