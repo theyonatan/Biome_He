@@ -11,6 +11,7 @@ import SettingsToggle from './ui/SettingsToggle'
 import SettingsSelect from './ui/SettingsSelect'
 import SettingsTextInput from './ui/SettingsTextInput'
 import SettingsSlider from './ui/SettingsSlider'
+import SettingsCheckbox from './ui/SettingsCheckbox'
 import SettingsKeybind, { fixedControlDisplay } from './ui/SettingsKeybind'
 import { FIXED_CONTROLS, getKeybindConflict } from '../hooks/useGameInput'
 import Modal from './ui/Modal'
@@ -94,7 +95,8 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
   const [showCredits, setShowCredits] = useState(false)
 
   const [menuKeybindings, setMenuKeybindings] = useState<Keybindings>(() => ({ ...settings.keybindings }))
-  const [menuDebugMetrics, setMenuDebugMetrics] = useState(() => settings.debug_metrics ?? false)
+  const [menuPerformanceStats, setMenuPerformanceStats] = useState(() => settings.debug_overlays.performance_stats)
+  const [menuInputOverlay, setMenuInputOverlay] = useState(() => settings.debug_overlays.input)
 
   const configServerUrl = settings.server_url
   const [menuServerUrl, setMenuServerUrl] = useState(configServerUrl)
@@ -153,7 +155,8 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
     setMenuMouseSensitivity(streamingToMenu(settings.mouse_sensitivity ?? mouseSensitivity))
     setMenuServerUrl(configServerUrl)
     setMenuKeybindings({ ...settings.keybindings })
-    setMenuDebugMetrics(settings.debug_metrics ?? false)
+    setMenuPerformanceStats(settings.debug_overlays.performance_stats)
+    setMenuInputOverlay(settings.debug_overlays.input)
   }, [
     configEngineMode,
     configWorldModel,
@@ -161,7 +164,8 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
     mouseSensitivity,
     configServerUrl,
     settings.keybindings,
-    settings.debug_metrics
+    settings.debug_overlays.performance_stats,
+    settings.debug_overlays.input
   ])
 
   const handleServerUrlBlur = useCallback(() => {
@@ -209,7 +213,7 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
       mouse_sensitivity: streamingValue,
       keybindings: menuKeybindings,
       audio: volume.getAudioSettings(),
-      debug_metrics: menuDebugMetrics
+      debug_overlays: { performance_stats: menuPerformanceStats, input: menuInputOverlay }
     })
     setMouseSensitivity(streamingValue)
   }, [
@@ -220,7 +224,8 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
     menuServerUrl,
     menuWorldModel,
     menuKeybindings,
-    menuDebugMetrics,
+    menuPerformanceStats,
+    menuInputOverlay,
     volume.getAudioSettings,
     saveSettings,
     setMouseSensitivity
@@ -396,15 +401,15 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
             ))}
           </SettingsSection>
 
-          <SettingsSection title="Performance Metrics" description="want to see what's happening under the hood?">
-            <SettingsToggle
-              options={[
-                { value: 'on', label: 'On' },
-                { value: 'off', label: 'Off' }
-              ]}
-              value={menuDebugMetrics ? 'on' : 'off'}
-              onChange={(v) => setMenuDebugMetrics(v === 'on')}
-            />
+          <SettingsSection title="Debug Metrics" description="want to see what's happening under the hood?">
+            <div className="flex flex-col gap-[1cqh]">
+              <SettingsCheckbox
+                label="Performance Stats"
+                checked={menuPerformanceStats}
+                onChange={setMenuPerformanceStats}
+              />
+              <SettingsCheckbox label="Input Overlay" checked={menuInputOverlay} onChange={setMenuInputOverlay} />
+            </div>
           </SettingsSection>
         </div>
       </section>

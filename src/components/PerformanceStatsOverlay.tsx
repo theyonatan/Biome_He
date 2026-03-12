@@ -13,8 +13,8 @@ const COLOR_GOOD = '#64ff96'
 const COLOR_ERROR = '#ff7878'
 const COLOR_LABEL = 'rgba(255,255,255,0.5)'
 
-const OVERLAY_BG = 'bg-[rgba(0,0,0,0.72)]'
-const OVERLAY_BORDER = 'border border-[rgba(120,255,245,0.2)]'
+const OVERLAY_BG = 'bg-black/50'
+const OVERLAY_BORDER = 'border border-white/20'
 const OVERLAY_TEXT = 'font-mono text-[1.6cqh] leading-[2.2cqh]'
 
 const useRingBuffer = () => {
@@ -36,8 +36,8 @@ const colorForPercent = (pct: number) => {
 
 const formatValue = (v: number, unavailable = -1) => (v === unavailable ? 'N/A' : v.toString())
 
-const DebugMetricsOverlay = () => {
-  const { debugMetrics, isStreaming, serverMetrics, inputLatency } = useStreaming()
+const PerformanceStatsOverlay = () => {
+  const { performanceStatsOverlay, isStreaming, serverMetrics, inputLatency } = useStreaming()
   const [, setTick] = useState(0)
 
   const fpsBuf = useRingBuffer()
@@ -67,12 +67,12 @@ const DebugMetricsOverlay = () => {
 
   // Re-render at 2Hz to update sparklines
   useEffect(() => {
-    if (!debugMetrics || !isStreaming) return
+    if (!performanceStatsOverlay || !isStreaming) return
     const interval = setInterval(() => setTick((t) => t + 1), 500)
     return () => clearInterval(interval)
-  }, [debugMetrics, isStreaming])
+  }, [performanceStatsOverlay, isStreaming])
 
-  if (!debugMetrics || !isStreaming) return null
+  if (!performanceStatsOverlay || !isStreaming) return null
 
   const m = serverMetrics
 
@@ -161,4 +161,4 @@ const Row = ({ label, value, color, sparkValues, sparkColor, sparkMax, className
   </div>
 )
 
-export default DebugMetricsOverlay
+export default PerformanceStatsOverlay

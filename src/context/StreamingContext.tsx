@@ -560,7 +560,8 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     setShowStats,
     serverMetrics,
     inputLatency,
-    debugMetrics: settings.debug_metrics ?? false,
+    performanceStatsOverlay: settings.debug_overlays.performance_stats,
+    inputOverlay: settings.debug_overlays.input,
 
     endpointUrl,
     setEndpointUrl,

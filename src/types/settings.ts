@@ -49,7 +49,12 @@ export const settingsSchema = z.object({
       music_volume: z.number().min(0).max(1).default(DEFAULT_AUDIO.music_volume)
     })
     .default(DEFAULT_AUDIO),
-  debug_metrics: z.boolean().default(false)
+  debug_overlays: z
+    .object({
+      performance_stats: z.boolean().default(false),
+      input: z.boolean().default(false)
+    })
+    .default({ performance_stats: false, input: false })
 })
 
 export type Settings = z.infer<typeof settingsSchema>

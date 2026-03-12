@@ -33,7 +33,8 @@ export type StreamingContextValue = {
   stats: StreamingStats
   serverMetrics: ServerMetrics | null
   inputLatency: number | null
-  debugMetrics: boolean
+  performanceStatsOverlay: boolean
+  inputOverlay: boolean
 
   endpointUrl: string | null
   setEndpointUrl: (url: string | null) => void
