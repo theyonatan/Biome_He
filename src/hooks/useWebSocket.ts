@@ -9,6 +9,20 @@ const MAX_VISIBLE_LOG_LINES = 500
 
 type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error'
 
+export type ServerMetrics = {
+  isMultiframe: boolean
+  perceivedFps: number
+  latentFps: number
+  avgGenMs: number
+  vramUsedMb: number
+  vramTotalMb: number
+  vramPercent: number
+  gpuUtilPercent: number
+  gpuName: string | null
+  cpuName: string | null
+  model: string
+}
+
 type WebSocketHook = {
   connectionState: ConnectionState
   statusStage: StageId | null
@@ -18,6 +32,8 @@ type WebSocketHook = {
   hasRealFrame: boolean
   frameId: number
   genTime: number | null
+  serverMetrics: ServerMetrics | null
+  inputLatency: number | null
   logs: string[]
   allLogs: string[]
   connect: (endpointUrl: string) => void
@@ -48,11 +64,14 @@ export const useWebSocket = (): WebSocketHook => {
   const [statusStage, setStatusStage] = useState<StageId | null>(null)
   const [hasRealFrame, setHasRealFrame] = useState(false)
   const [logs, setLogs] = useState<string[]>([])
+  const [serverMetrics, setServerMetrics] = useState<ServerMetrics | null>(null)
+  const [inputLatency, setInputLatency] = useState<number | null>(null)
   const allLogsRef = useRef<string[]>([])
 
   const wsRef = useRef<WebSocket | null>(null)
   const isConnectingRef = useRef(false)
   const isReadyRef = useRef(false)
+  const lastControlTsRef = useRef<number>(0)
   const rpcRef = useRef(new WsRpcClient())
   const warningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -154,6 +173,9 @@ export const useWebSocket = (): WebSocketHook => {
             if (typeof msg.gen_ms === 'number') {
               setGenTime(Math.round(msg.gen_ms))
             }
+            if (typeof msg.client_ts === 'number' && msg.client_ts > 0) {
+              setInputLatency(Math.round(performance.now() - (msg.client_ts as number)))
+            }
             break
           }
           case 'stats': {
@@ -163,6 +185,22 @@ export const useWebSocket = (): WebSocketHook => {
             if (typeof msg.frame === 'number') {
               setFrameId(msg.frame)
             }
+            break
+          }
+          case 'metrics': {
+            setServerMetrics({
+              isMultiframe: !!msg.is_multiframe,
+              perceivedFps: (msg.perceived_fps as number) ?? 0,
+              latentFps: (msg.latent_fps as number) ?? 0,
+              avgGenMs: (msg.avg_gen_ms as number) ?? 0,
+              vramUsedMb: (msg.vram_used_mb as number) ?? -1,
+              vramTotalMb: (msg.vram_total_mb as number) ?? -1,
+              vramPercent: (msg.vram_percent as number) ?? -1,
+              gpuUtilPercent: (msg.gpu_util_percent as number) ?? -1,
+              gpuName: (msg.gpu_name as string | null) ?? null,
+              cpuName: (msg.cpu_name as string | null) ?? null,
+              model: (msg.model as string) ?? ''
+            })
             break
           }
           case 'log': {
@@ -215,6 +253,8 @@ export const useWebSocket = (): WebSocketHook => {
       setHasRealFrame(false)
       setFrameId(0)
       setGenTime(null)
+      setServerMetrics(null)
+      setInputLatency(null)
     }
   }, [])
 
@@ -234,13 +274,17 @@ export const useWebSocket = (): WebSocketHook => {
     setFrameId(0)
     setError(null)
     setGenTime(null)
+    setServerMetrics(null)
+    setInputLatency(null)
     setStatusStage(null)
     setHasRealFrame(false)
   }, [clearWarningTimer])
 
   const sendControl = useCallback((buttons: string[] = [], mouseDx = 0, mouseDy = 0) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: 'control', buttons, mouse_dx: mouseDx, mouse_dy: mouseDy }))
+      const ts = performance.now()
+      wsRef.current.send(JSON.stringify({ type: 'control', buttons, mouse_dx: mouseDx, mouse_dy: mouseDy, ts }))
+      lastControlTsRef.current = ts
       return true
     }
     return false
@@ -322,6 +366,8 @@ export const useWebSocket = (): WebSocketHook => {
     hasRealFrame,
     frameId,
     genTime,
+    serverMetrics,
+    inputLatency,
     logs,
     allLogs: allLogsRef.current,
     connect,

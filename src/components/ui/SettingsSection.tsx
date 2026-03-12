@@ -3,6 +3,7 @@ import { HEADING_BASE, SETTINGS_MUTED_TEXT } from '../../styles'
 
 type SettingsSectionProps = {
   title: string
+  /** Short description shown below the title. Should always be phrased as a question. */
   description?: ReactNode
   children?: ReactNode
 }

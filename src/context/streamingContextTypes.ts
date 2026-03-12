@@ -1,5 +1,6 @@
 import type { EngineStatus } from '../types/app'
 import type { StageId } from '../stages'
+import type { ServerMetrics } from '../hooks/useWebSocket'
 
 export type StreamingStats = {
   gentime: number
@@ -30,6 +31,9 @@ export type StreamingContextValue = {
   showStats: boolean
   setShowStats: (value: boolean) => void
   stats: StreamingStats
+  serverMetrics: ServerMetrics | null
+  inputLatency: number | null
+  debugMetrics: boolean
 
   endpointUrl: string | null
   setEndpointUrl: (url: string | null) => void

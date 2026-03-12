@@ -94,6 +94,7 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
   const [showCredits, setShowCredits] = useState(false)
 
   const [menuKeybindings, setMenuKeybindings] = useState<Keybindings>(() => ({ ...settings.keybindings }))
+  const [menuDebugMetrics, setMenuDebugMetrics] = useState(() => settings.debug_metrics ?? false)
 
   const configServerUrl = settings.server_url
   const [menuServerUrl, setMenuServerUrl] = useState(configServerUrl)
@@ -152,13 +153,15 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
     setMenuMouseSensitivity(streamingToMenu(settings.mouse_sensitivity ?? mouseSensitivity))
     setMenuServerUrl(configServerUrl)
     setMenuKeybindings({ ...settings.keybindings })
+    setMenuDebugMetrics(settings.debug_metrics ?? false)
   }, [
     configEngineMode,
     configWorldModel,
     settings.mouse_sensitivity,
     mouseSensitivity,
     configServerUrl,
-    settings.keybindings
+    settings.keybindings,
+    settings.debug_metrics
   ])
 
   const handleServerUrlBlur = useCallback(() => {
@@ -205,7 +208,8 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
       engine_model: menuWorldModel,
       mouse_sensitivity: streamingValue,
       keybindings: menuKeybindings,
-      audio: volume.getAudioSettings()
+      audio: volume.getAudioSettings(),
+      debug_metrics: menuDebugMetrics
     })
     setMouseSensitivity(streamingValue)
   }, [
@@ -216,6 +220,7 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
     menuServerUrl,
     menuWorldModel,
     menuKeybindings,
+    menuDebugMetrics,
     volume.getAudioSettings,
     saveSettings,
     setMouseSensitivity
@@ -389,6 +394,17 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
             {FIXED_CONTROLS.map((ctrl) => (
               <KeybindRow key={ctrl.label} label={ctrl.label} fixedLabel={fixedControlDisplay(ctrl)} />
             ))}
+          </SettingsSection>
+
+          <SettingsSection title="Performance Metrics" description="want to see what's happening under the hood?">
+            <SettingsToggle
+              options={[
+                { value: 'on', label: 'On' },
+                { value: 'off', label: 'Off' }
+              ]}
+              value={menuDebugMetrics ? 'on' : 'off'}
+              onChange={(v) => setMenuDebugMetrics(v === 'on')}
+            />
           </SettingsSection>
         </div>
       </section>

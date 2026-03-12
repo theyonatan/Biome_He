@@ -29,6 +29,7 @@ import useSceneGlowColor from './hooks/useSceneGlowColor'
 import { PORTAL_SPARKS_DEBUG, MENU_VIEW, type MenuViewKey } from './constants'
 import { viewFadeVariants } from './transitions'
 import PortalSparksConfigurator from './components/PortalSparksConfigurator'
+import DebugMetricsOverlay from './components/DebugMetricsOverlay'
 
 const LAUNCH_PRE_SHRINK_MS = 420
 
@@ -286,6 +287,7 @@ const AppShell = () => {
             }}
           >
             <VideoContainer />
+            <DebugMetricsOverlay />
             <div className="absolute z-[2] pointer-events-none" id="logo-container"></div>
             <PauseOverlay isActive={isPaused} />
             {warning && !connectionLost && (

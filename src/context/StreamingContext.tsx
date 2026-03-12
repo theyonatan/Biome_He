@@ -77,6 +77,8 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     hasRealFrame,
     frameId,
     genTime,
+    serverMetrics,
+    inputLatency,
     logs: wsLogs,
     allLogs: wsAllLogs,
     connect,
@@ -542,6 +544,9 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     },
     showStats,
     setShowStats,
+    serverMetrics,
+    inputLatency,
+    debugMetrics: settings.debug_metrics ?? false,
 
     endpointUrl,
     setEndpointUrl,

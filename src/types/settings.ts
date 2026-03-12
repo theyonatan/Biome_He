@@ -48,7 +48,8 @@ export const settingsSchema = z.object({
       sfx_volume: z.number().min(0).max(1).default(DEFAULT_AUDIO.sfx_volume),
       music_volume: z.number().min(0).max(1).default(DEFAULT_AUDIO.music_volume)
     })
-    .default(DEFAULT_AUDIO)
+    .default(DEFAULT_AUDIO),
+  debug_metrics: z.boolean().default(false)
 })
 
 export type Settings = z.infer<typeof settingsSchema>
