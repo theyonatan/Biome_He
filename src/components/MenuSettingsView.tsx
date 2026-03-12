@@ -299,8 +299,8 @@ const MenuSettingsView = ({ onBack }: MenuSettingsViewProps) => {
           >
             <SettingsToggle
               options={[
-                { value: 'server', label: 'Server' },
-                { value: 'standalone', label: 'Standalone' }
+                { value: 'standalone', label: 'Standalone' },
+                { value: 'server', label: 'Server' }
               ]}
               value={menuEngineMode}
               onChange={(v) => handleEngineModeChange(v as 'server' | 'standalone')}
