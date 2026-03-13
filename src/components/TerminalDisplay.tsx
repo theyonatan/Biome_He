@@ -17,7 +17,7 @@ type TerminalDisplayProps = {
 }
 
 const TerminalDisplay = ({ onCancel }: TerminalDisplayProps) => {
-  const { connectionState, statusStage, engineError, error, cancelConnection, wsLogs } = useStreaming()
+  const { connectionState, statusStage, isFreshInstall, engineError, error, cancelConnection, wsLogs } = useStreaming()
   const { setErrorMode } = useVortex()
   const { isServerMode } = useSettings()
   const { logs: engineLogs } = useEngineLogs(!isServerMode)
@@ -108,6 +108,19 @@ const TerminalDisplay = ({ onCancel }: TerminalDisplayProps) => {
 
   return (
     <>
+      {isFreshInstall && !errorDetail && (
+        <div className="absolute z-55 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-[2.4cqh] pointer-events-none bg-[rgba(4,8,16,0.45)] rounded-[1.8cqh] px-[5cqh] py-[3.6cqh]">
+          <div className="font-serif text-[5.2cqh] font-normal text-white [text-shadow:0_1px_6px_rgba(0,0,0,0.5)]">
+            First-time setup
+          </div>
+          <div className="font-serif text-[3.2cqh] font-normal text-text-modal-muted [text-shadow:0_1px_4px_rgba(0,0,0,0.4)] text-center leading-[1.4] max-w-[80cqh]">
+            This will take 10-30 minutes while components are
+            <br />
+            downloaded and optimized for your system.
+            <span className="block mt-[1.6cqh]">Feel free to grab a coffee in the meantime.</span>
+          </div>
+        </div>
+      )}
       <div className="terminal-display absolute z-55 flex flex-col items-center top-auto bottom-[calc(var(--edge-bottom)+7.2cqh)] left-1/2 -translate-x-1/2 gap-[1.6cqh] opacity-100 !animate-none w-[135.11cqh]">
         <div className="flex flex-col items-center gap-[0.55cqh] w-[135.11cqh]">
           <div className="w-full flex items-baseline justify-between">

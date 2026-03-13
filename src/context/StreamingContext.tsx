@@ -113,6 +113,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
   const [loadingConnectionJobSeq, setLoadingConnectionJobSeq] = useState(0)
   const [pointerLockBlockedSeq, setPointerLockBlockedSeq] = useState(0)
   const [preConnectionStage, setPreConnectionStage] = useState<StageId | null>(null)
+  const [isFreshInstall, setIsFreshInstall] = useState(false)
   const [lifecycleState, dispatchLifecycle] = useReducer(streamingLifecycleReducer, initialStreamingLifecycleState)
 
   const [scrollActive, setScrollActive] = useState({ up: false, down: false })
@@ -320,6 +321,9 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
       onStage: (stageId) => {
         if (!warmFlowCancelledRef.current) setPreConnectionStage(stageId)
       },
+      onFreshInstall: (isFresh) => {
+        if (!warmFlowCancelledRef.current) setIsFreshInstall(isFresh)
+      },
       isCancelled: () => warmFlowCancelledRef.current,
       log
     }).catch((err) => {
@@ -330,6 +334,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       warmFlowCancelledRef.current = true
       setPreConnectionStage(null)
+      setIsFreshInstall(false)
     }
   }, [loadingConnectionJobSeq])
 
@@ -579,6 +584,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     pauseElapsedMs,
     settingsOpen,
     statusStage: effectiveStatusStage,
+    isFreshInstall,
 
     // Stats
     genTime,

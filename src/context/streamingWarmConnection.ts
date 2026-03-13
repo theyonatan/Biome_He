@@ -21,6 +21,7 @@ type WarmConnectionOptions = {
   connect: (wsUrl: string) => void
   onServerError: (error: unknown) => void
   onStage: (stageId: StageId) => void
+  onFreshInstall: (isFresh: boolean) => void
   isCancelled: () => boolean
   log: { info: (...args: unknown[]) => void }
 }
@@ -143,6 +144,7 @@ export const runWarmConnectionFlow = async ({
   connect,
   onServerError,
   onStage,
+  onFreshInstall,
   isCancelled,
   log
 }: WarmConnectionOptions): Promise<void> => {
@@ -196,6 +198,7 @@ export const runWarmConnectionFlow = async ({
 
       const status = await checkEngineStatus()
       if (!status?.uv_installed || !status?.repo_cloned || !status?.dependencies_synced) {
+        onFreshInstall(true)
         onStage('setup.engine')
         log.info('Engine not fully set up, running auto-setup...')
         try {

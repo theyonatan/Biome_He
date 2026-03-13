@@ -24,6 +24,7 @@ export type StreamingContextValue = {
   pauseElapsedMs: number
   settingsOpen: boolean
   statusStage: StageId | null
+  isFreshInstall: boolean
 
   genTime: number | null
   frameId: number
