@@ -28,7 +28,7 @@ type WebSocketHook = {
   statusStage: StageId | null
   error: string | null
   warning: string | null
-  frame: string | null
+  frame: Blob | string | null
   hasRealFrame: boolean
   frameId: number
   genTime: number | null
@@ -44,7 +44,7 @@ type WebSocketHook = {
   sendPromptWithSeed: (promptOrFilename: string, seedUrl?: string) => void
   sendInitialSeed: (filename: string) => void
   sendModel: (model: string, seed?: string | null) => void
-  setPlaceholderFrame: (dataUrl: string | null) => void
+  setPlaceholderFrame: (frame: Blob | string | null) => void
   reset: () => void
   request: <T = unknown>(type: string, params?: Record<string, unknown>, timeoutMs?: number) => Promise<T>
   clearLogs: () => void
@@ -55,7 +55,7 @@ type WebSocketHook = {
 
 export const useWebSocket = (): WebSocketHook => {
   const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected')
-  const [frame, setFrame] = useState<string | null>(null)
+  const [frame, setFrame] = useState<Blob | string | null>(null)
   const [frameId, setFrameId] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [warning, setWarning] = useState<string | null>(null)
@@ -146,8 +146,39 @@ export const useWebSocket = (): WebSocketHook => {
       setConnectionState('connected')
     }
 
-    ws.onmessage = (event: MessageEvent<string>) => {
+    ws.binaryType = 'arraybuffer'
+
+    ws.onmessage = (event: MessageEvent<string | ArrayBuffer>) => {
       if (wsRef.current !== ws) return
+
+      // Binary messages: [4-byte LE header_len][JSON header][image bytes]
+      // If header contains req_id → RPC response; otherwise → frame
+      if (event.data instanceof ArrayBuffer) {
+        const view = new DataView(event.data)
+        const headerLen = view.getUint32(0, true)
+        const headerBytes = new Uint8Array(event.data, 4, headerLen)
+        const header = JSON.parse(new TextDecoder().decode(headerBytes)) as Record<string, unknown>
+        const imageBlob = new Blob([new Uint8Array(event.data, 4 + headerLen)], { type: 'image/jpeg' })
+
+        // Binary RPC response (e.g. seeds_image, seeds_thumbnail)
+        if (header.req_id != null) {
+          rpc.handleBinaryResponse(header, imageBlob)
+          return
+        }
+
+        // Binary frame
+        setFrame(imageBlob)
+        setHasRealFrame(true)
+        setFrameId((header.frame_id as number) ?? 0)
+        if (typeof header.gen_ms === 'number') {
+          setGenTime(Math.round(header.gen_ms))
+        }
+        if (typeof header.client_ts === 'number' && (header.client_ts as number) > 0) {
+          setInputLatency(Math.round(performance.now() - (header.client_ts as number)))
+        }
+        return
+      }
+
       try {
         const msg = JSON.parse(event.data) as Record<string, unknown>
 
@@ -163,18 +194,6 @@ export const useWebSocket = (): WebSocketHook => {
             if (stageId === 'session.ready') {
               setIsReady(true)
               isReadyRef.current = true
-            }
-            break
-          }
-          case 'frame': {
-            setFrame((msg.data as string) ?? null)
-            setHasRealFrame(true)
-            setFrameId((msg.frame_id as number) ?? 0)
-            if (typeof msg.gen_ms === 'number') {
-              setGenTime(Math.round(msg.gen_ms))
-            }
-            if (typeof msg.client_ts === 'number' && msg.client_ts > 0) {
-              setInputLatency(Math.round(performance.now() - (msg.client_ts as number)))
             }
             break
           }
@@ -333,8 +352,8 @@ export const useWebSocket = (): WebSocketHook => {
     }
   }, [])
 
-  const setPlaceholderFrame = useCallback((dataUrl: string | null) => {
-    setFrame(dataUrl)
+  const setPlaceholderFrame = useCallback((frame: Blob | string | null) => {
+    setFrame(frame)
   }, [])
 
   const reset = useCallback(() => {

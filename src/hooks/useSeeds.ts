@@ -16,9 +16,9 @@ type UseSeedsResult = {
   refreshSeeds: (
     wsRequest: <T = unknown>(type: string, params?: Record<string, unknown>) => Promise<T>
   ) => Promise<SeedRecord[]>
-  getDefaultSeedBase64: (
+  getDefaultSeedBlob: (
     wsRequest: <T = unknown>(type: string, params?: Record<string, unknown>) => Promise<T>
-  ) => Promise<string>
+  ) => Promise<Blob>
   openSeedsDir: () => Promise<void>
   getSeedsDirPath: () => Promise<string>
 }
@@ -89,7 +89,7 @@ export const useSeeds = (): UseSeedsResult => {
     []
   )
 
-  const getDefaultSeedBase64 = useCallback(
+  const getDefaultSeedBlob = useCallback(
     async (wsRequest: <T = unknown>(type: string, params?: Record<string, unknown>) => Promise<T>) => {
       try {
         let seedList = seeds
@@ -103,8 +103,8 @@ export const useSeeds = (): UseSeedsResult => {
           throw new Error('Required seed file "default.png" not found in seeds folder')
         }
 
-        const result = await wsRequest<{ image_base64: string }>('seeds_image', { filename: 'default.png' })
-        return result.image_base64
+        const result = await wsRequest<{ blob: Blob }>('seeds_image', { filename: 'default.png' })
+        return result.blob
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
         setError(msg)
@@ -143,7 +143,7 @@ export const useSeeds = (): UseSeedsResult => {
     error,
     initializeSeeds,
     refreshSeeds,
-    getDefaultSeedBase64,
+    getDefaultSeedBlob,
     openSeedsDir,
     getSeedsDirPath
   }

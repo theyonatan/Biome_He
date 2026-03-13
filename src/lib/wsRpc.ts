@@ -55,6 +55,32 @@ export class WsRpcClient {
   }
 
   /**
+   * Handle a binary RPC response. Returns true if the header contained a
+   * `req_id` that matched a pending request (i.e. it was consumed).
+   */
+  handleBinaryResponse(header: Record<string, unknown>, blob: Blob): boolean {
+    const reqId = header.req_id != null ? String(header.req_id) : null
+    if (!reqId) return false
+
+    const entry = this.pending.get(reqId)
+    if (!entry) {
+      log.warn('Received binary response for unknown req_id:', reqId)
+      return true
+    }
+
+    this.pending.delete(reqId)
+    clearTimeout(entry.timer)
+
+    if (header.success) {
+      entry.resolve({ blob })
+    } else {
+      entry.reject(new Error(String(header.error ?? 'Request failed')))
+    }
+
+    return true
+  }
+
+  /**
    * Send a request over WS and return a Promise that resolves with the
    * response `data` field, or rejects on error / timeout / disconnect.
    */

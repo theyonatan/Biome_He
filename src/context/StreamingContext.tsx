@@ -121,7 +121,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
   const prevEngineModeRef = useRef(engineMode)
   const frameCountRef = useRef(0)
   const lastFpsUpdateRef = useRef(performance.now())
-  const inputLoopRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const inputLoopRef = useRef<number | null>(null)
   const lastAppliedModelRef = useRef<string | null>(null)
   const warmBootstrapSentRef = useRef(false)
   const warmFlowCancelledRef = useRef(false)
@@ -202,10 +202,10 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     log.info('Loading connected - bootstrapping session with model+seed:', selectedModel)
     // Use the default seed image as the immediate placeholder frame so transition
     // to streaming never shows a blank frame while waiting for server output.
-    wsRequest<{ image_base64: string }>('seeds_image', { filename: 'default.png' })
+    wsRequest<{ blob: Blob }>('seeds_image', { filename: 'default.png' })
       .then((result) => {
-        if (!result?.image_base64) return
-        setPlaceholderFrame(`data:image/png;base64,${result.image_base64}`)
+        if (!result?.blob) return
+        setPlaceholderFrame(result.blob)
       })
       .catch(() => null)
     sendModel(selectedModel, 'default.png')
@@ -399,43 +399,73 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     sendPause
   ])
 
-  // Render frames to canvas
+  // Render frames to canvas using createImageBitmap for off-main-thread decoding.
+  // Decoded bitmaps are queued and drawn one-per-rAF so multiframe batches are
+  // paced to the display refresh rather than all flushing in a single tick.
+  const bitmapQueueRef = useRef<ImageBitmap[]>([])
+  const drawRafRef = useRef<number | null>(null)
+
+  // rAF draw loop: pulls one bitmap per frame from the queue
   useEffect(() => {
-    if (!frame || !canvasRef.current || !canvasReady) return
+    if (!canvasReady || !canvasRef.current) return
 
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    frameCountRef.current++
-    const now = performance.now()
-    if (now - lastFpsUpdateRef.current >= 1000) {
-      setFps(frameCountRef.current)
-      frameCountRef.current = 0
-      lastFpsUpdateRef.current = now
+    const drawTick = () => {
+      const bitmap = bitmapQueueRef.current.shift()
+      if (bitmap) {
+        frameCountRef.current++
+        const now = performance.now()
+        if (now - lastFpsUpdateRef.current >= 1000) {
+          setFps(frameCountRef.current)
+          frameCountRef.current = 0
+          lastFpsUpdateRef.current = now
+        }
+        ctx.clearRect(0, 0, canvas.width, canvas.height)
+        ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+        bitmap.close()
+      }
+      drawRafRef.current = requestAnimationFrame(drawTick)
     }
+    drawRafRef.current = requestAnimationFrame(drawTick)
 
-    const img = new Image()
-    img.onload = () => {
-      const targetW = canvas.width
-      const targetH = canvas.height
-      ctx.clearRect(0, 0, targetW, targetH)
-      ctx.drawImage(img, 0, 0, targetW, targetH)
+    return () => {
+      if (drawRafRef.current !== null) cancelAnimationFrame(drawRafRef.current)
+      for (const b of bitmapQueueRef.current) b.close()
+      bitmapQueueRef.current = []
     }
-    img.src = frame.startsWith('data:') ? frame : `data:image/jpeg;base64,${frame}`
+  }, [canvasReady])
+
+  // Decode incoming frames off-thread and push to the draw queue
+  useEffect(() => {
+    if (!frame || !canvasReady) return
+
+    const source =
+      frame instanceof Blob
+        ? Promise.resolve(frame)
+        : fetch(frame.startsWith('data:') ? frame : `data:image/jpeg;base64,${frame}`).then((r) => r.blob())
+
+    source
+      .then((blob) => createImageBitmap(blob))
+      .then((bitmap) => {
+        bitmapQueueRef.current.push(bitmap)
+      })
+      .catch(() => {})
   }, [frame, canvasReady])
 
-  // Input loop at 60hz
+  // Input loop synced to requestAnimationFrame for minimal jitter
   useEffect(() => {
     if (!inputEnabled) {
       if (inputLoopRef.current) {
-        clearInterval(inputLoopRef.current)
+        cancelAnimationFrame(inputLoopRef.current)
         inputLoopRef.current = null
       }
       return
     }
 
-    inputLoopRef.current = setInterval(() => {
+    const tick = () => {
       const { buttons, mouseDx, mouseDy } = getInputState()
       const scrollUp = buttons.includes('SCROLL_UP')
       const scrollDown = buttons.includes('SCROLL_DOWN')
@@ -445,11 +475,13 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
         scrollTimeoutRef.current = setTimeout(() => setScrollActive({ up: false, down: false }), 150)
       }
       sendControl(buttons, Math.round(mouseDx * mouseSensitivity), Math.round(mouseDy * mouseSensitivity))
-    }, 16)
+      inputLoopRef.current = requestAnimationFrame(tick)
+    }
+    inputLoopRef.current = requestAnimationFrame(tick)
 
     return () => {
       if (inputLoopRef.current) {
-        clearInterval(inputLoopRef.current)
+        cancelAnimationFrame(inputLoopRef.current)
         inputLoopRef.current = null
       }
       if (scrollTimeoutRef.current) {

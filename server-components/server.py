@@ -26,6 +26,7 @@ import os
 import pickle
 import shutil
 import signal
+import struct
 import threading
 import time
 import traceback
@@ -768,10 +769,19 @@ def _generate_thumbnail_jpeg_bytes(file_path: str, size: int = 300) -> bytes:
 # ============================================================================
 
 
-async def dispatch_request(msg: dict, websocket: WebSocket) -> dict:
+class BinaryResponse:
+    """Sentinel for RPC handlers that return raw binary data instead of JSON."""
+    __slots__ = ("image_bytes",)
+
+    def __init__(self, image_bytes: bytes):
+        self.image_bytes = image_bytes
+
+
+async def dispatch_request(msg: dict, websocket: WebSocket) -> dict | BinaryResponse:
     """Route a request-type WS message to the appropriate handler.
 
-    Returns a response dict (without type/req_id — caller wraps those).
+    Returns a response dict (without type/req_id — caller wraps those),
+    or a BinaryResponse for image data.
     """
     req_type = msg.get("type", "")
 
@@ -928,7 +938,7 @@ async def _fallback_seed_cache_entry(filename: str, log_prefix: str = "[SEEDS]")
         return False, f"Fallback safety check failed for '{filename}': {exc}"
 
 
-async def _handle_seeds_image(msg: dict) -> dict:
+async def _handle_seeds_image(msg: dict) -> dict | BinaryResponse:
     filename = msg.get("filename", "")
     if filename not in safe_seeds_cache:
         ok, error = await _fallback_seed_cache_entry(filename, log_prefix="[SEEDS_IMAGE]")
@@ -944,11 +954,10 @@ async def _handle_seeds_image(msg: dict) -> dict:
         return {"success": False, "error": "Seed file not found"}
 
     image_bytes = await asyncio.to_thread(Path(file_path).read_bytes)
-    image_base64 = base64.b64encode(image_bytes).decode("ascii")
-    return {"success": True, "data": {"image_base64": image_base64}}
+    return BinaryResponse(image_bytes)
 
 
-async def _handle_seeds_thumbnail(msg: dict) -> dict:
+async def _handle_seeds_thumbnail(msg: dict) -> dict | BinaryResponse:
     filename = msg.get("filename", "")
     if filename not in safe_seeds_cache:
         ok, error = await _fallback_seed_cache_entry(filename, log_prefix="[SEEDS_THUMBNAIL]")
@@ -962,8 +971,7 @@ async def _handle_seeds_thumbnail(msg: dict) -> dict:
 
     try:
         thumbnail_bytes = await asyncio.to_thread(_generate_thumbnail_jpeg_bytes, file_path)
-        thumbnail_base64 = base64.b64encode(thumbnail_bytes).decode("ascii")
-        return {"success": True, "data": {"thumbnail_base64": thumbnail_base64}}
+        return BinaryResponse(thumbnail_bytes)
     except Exception as e:
         logger.error(f"Failed to generate thumbnail for {filename}: {e}")
         return {"success": False, "error": "Thumbnail generation failed"}
@@ -1098,7 +1106,8 @@ async def websocket_endpoint(websocket: WebSocket):
     Protocol:
         Server -> Client:
             {"type": "status", "code": str, "stage": {...}}
-            {"type": "frame", "data": base64_jpeg, "frame_id": int, "client_ts": float, "gen_ms": float}
+            Binary frame: [4-byte LE header_len][JSON header][JPEG bytes]
+              Header: {"frame_id": int, "client_ts": float, "gen_ms": float}
             {"type": "error", "message": str}
             {"type": "response", "req_id": str, "success": bool, "data": ..., "error": ...}
             {"type": "log", "line": str, "level": str}
@@ -1336,9 +1345,16 @@ async def websocket_endpoint(websocket: WebSocket):
                 if "req_id" in msg:
                     result = await dispatch_request(msg, websocket)
                     req_id = msg["req_id"]
-                    if "success" not in result:
-                        result = {"success": True, "data": result}
-                    await send_json({"type": "response", "req_id": req_id, **result})
+                    if isinstance(result, BinaryResponse):
+                        header = json.dumps(
+                            {"req_id": req_id, "success": True},
+                            separators=(",", ":"),
+                        ).encode("utf-8")
+                        await websocket.send_bytes(struct.pack("<I", len(header)) + header + result.image_bytes)
+                    else:
+                        if "success" not in result:
+                            result = {"success": True, "data": result}
+                        await send_json({"type": "response", "req_id": req_id, **result})
                     continue
 
                 if msg_type == "set_model":
@@ -1389,15 +1405,11 @@ async def websocket_endpoint(websocket: WebSocket):
         jpeg = await asyncio.to_thread(
             world_engine.frame_to_jpeg, initial_display_frame
         )
-        await send_json(
-            {
-                "type": "frame",
-                "data": base64.b64encode(jpeg).decode("ascii"),
-                "frame_id": 0,
-                "client_ts": 0,
-                "gen_ms": 0,
-            }
-        )
+        header = json.dumps(
+            {"frame_id": 0, "client_ts": 0, "gen_ms": 0},
+            separators=(",", ":"),
+        ).encode("utf-8")
+        await websocket.send_bytes(struct.pack("<I", len(header)) + header + jpeg)
 
         world_engine.set_progress_callback(None)
         await send_stage(SESSION_READY)
@@ -1448,11 +1460,18 @@ async def websocket_endpoint(websocket: WebSocket):
                 "model": getattr(world_engine, 'model_uri', "") or "",
             }
 
-        def queue_send(payload: dict) -> None:
+        def queue_send(payload: dict | bytes) -> None:
             try:
                 frame_queue.put_nowait(payload)
             except Exception:
                 pass
+
+        def build_binary_frame(jpeg: bytes, frame_id: int, client_ts: float, gen_ms: float) -> bytes:
+            header = json.dumps(
+                {"frame_id": frame_id, "client_ts": client_ts, "gen_ms": gen_ms},
+                separators=(",", ":"),
+            ).encode("utf-8")
+            return struct.pack("<I", len(header)) + header + jpeg
 
         queue_send(_build_metrics_payload())
 
@@ -1467,9 +1486,16 @@ async def websocket_endpoint(websocket: WebSocket):
                     if "req_id" in msg:
                         result = await dispatch_request(msg, websocket)
                         req_id = msg["req_id"]
-                        if "success" not in result:
-                            result = {"success": True, "data": result}
-                        queue_send({"type": "response", "req_id": req_id, **result})
+                        if isinstance(result, BinaryResponse):
+                            header = json.dumps(
+                                {"req_id": req_id, "success": True},
+                                separators=(",", ":"),
+                            ).encode("utf-8")
+                            queue_send(struct.pack("<I", len(header)) + header + result.image_bytes)
+                        else:
+                            if "success" not in result:
+                                result = {"success": True, "data": result}
+                            queue_send({"type": "response", "req_id": req_id, **result})
                         continue
 
                     match msg_type:
@@ -1555,7 +1581,10 @@ async def websocket_endpoint(websocket: WebSocket):
                     except Empty:
                         await asyncio.sleep(0.001)
                         continue
-                    await websocket.send_text(json.dumps(payload))
+                    if isinstance(payload, bytes):
+                        await websocket.send_bytes(payload)
+                    else:
+                        await websocket.send_text(json.dumps(payload))
                 except Exception as e:
                     logger.error(f"[{client_host}] Sender error: {e}", exc_info=True)
                     running = False
@@ -1612,29 +1641,11 @@ async def websocket_endpoint(websocket: WebSocket):
                             session.frame_count += 1
                             frame = result[i]
                             jpeg = world_engine.frame_to_jpeg(frame)
-                            queue_send(
-                                {
-                                    "type": "frame",
-                                    "data": base64.b64encode(jpeg).decode("ascii"),
-                                    "frame_id": session.frame_count,
-                                    "client_ts": client_ts,
-                                    "gen_ms": per_frame_ms,
-                                    "latent_gen_ms": gen_time,
-                                }
-                            )
+                            queue_send(build_binary_frame(jpeg, session.frame_count, client_ts, per_frame_ms))
                     else:
                         session.frame_count += 1
                         jpeg = world_engine.frame_to_jpeg(result)
-                        queue_send(
-                            {
-                                "type": "frame",
-                                "data": base64.b64encode(jpeg).decode("ascii"),
-                                "frame_id": session.frame_count,
-                                "client_ts": client_ts,
-                                "gen_ms": gen_time,
-                                "latent_gen_ms": gen_time,
-                            }
-                        )
+                        queue_send(build_binary_frame(jpeg, session.frame_count, client_ts, gen_time))
 
                     now = time.perf_counter()
                     if _metrics_frame_timestamps and (now - _metrics_frame_timestamps[-1]) > 1.5:
