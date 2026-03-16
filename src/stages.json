@@ -5,7 +5,7 @@
   { "id": "setup.engine", "label": "Preparing engine...", "percent": 1 },
   { "id": "setup.server_components", "label": "Preparing engine files...", "percent": 1 },
   { "id": "setup.port_scan", "label": "Preparing to launch...", "percent": 2 },
-  { "id": "setup.sync_deps", "label": "Installing components (this may take a while)...", "percent": 2 },
+  { "id": "setup.sync_deps", "label": "Installing components...", "percent": 2 },
   { "id": "setup.verify", "label": "Verifying installation...", "percent": 2 },
   { "id": "setup.server_start", "label": "Launching engine...", "percent": 3 },
   { "id": "setup.health_poll", "label": "Waiting for engine to start...", "percent": 4 },
