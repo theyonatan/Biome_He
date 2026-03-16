@@ -25,7 +25,7 @@ const TerminalDisplay = ({ onCancel }: TerminalDisplayProps) => {
   const [showLogsPanel, setShowLogsPanel] = useState(false)
   const [isExportingDiagnostics, setIsExportingDiagnostics] = useState(false)
   const [exportStatus, setExportStatus] = useState<string | null>(null)
-  const logsPanelHeight = 260
+  const logsPanelHeight = '36cqh'
 
   const errorDetail = engineError || error
 
@@ -109,7 +109,12 @@ const TerminalDisplay = ({ onCancel }: TerminalDisplayProps) => {
   return (
     <>
       {isFreshInstall && !errorDetail && (
-        <div className="absolute z-55 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-[2.4cqh] pointer-events-none bg-[rgba(4,8,16,0.45)] rounded-[1.8cqh] px-[5cqh] py-[3.6cqh]">
+        <div
+          className="absolute z-55 left-1/2 top-1/2 flex flex-col items-center gap-[2.4cqh] pointer-events-none bg-[rgba(4,8,16,0.45)] rounded-[1.8cqh] px-[5cqh] py-[3.6cqh] transition-transform duration-300 ease-in-out"
+          style={{
+            transform: `translate(-50%, ${showLogsPanel ? 'calc(-50% - 22cqh)' : '-50%'})`
+          }}
+        >
           <div className="font-serif text-[5.2cqh] font-normal text-white [text-shadow:0_1px_6px_rgba(0,0,0,0.5)]">
             First-time setup
           </div>
@@ -150,9 +155,9 @@ const TerminalDisplay = ({ onCancel }: TerminalDisplayProps) => {
             className="loading-inline-logs"
             style={{
               marginTop: showLogsPanel ? '0.8cqh' : '0px',
-              height: showLogsPanel ? `${logsPanelHeight}px` : '0px',
+              height: showLogsPanel ? logsPanelHeight : '0cqh',
               opacity: showLogsPanel ? 1 : 0,
-              transform: showLogsPanel ? 'translateY(0)' : 'translateY(6px)',
+              transform: showLogsPanel ? 'translateY(0)' : 'translateY(0.83cqh)',
               pointerEvents: showLogsPanel ? 'auto' : 'none',
               overflow: 'hidden'
             }}
