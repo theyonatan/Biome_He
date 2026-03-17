@@ -15,3 +15,6 @@ export type MenuViewKey = (typeof MENU_VIEW)[keyof typeof MENU_VIEW]
 
 /** Show the portal sparks tuning configurator on the home page. */
 export const PORTAL_SPARKS_DEBUG = false
+
+/** Allow users to add their own scenes via drag-and-drop, paste, or file picker. */
+export const ALLOW_USER_SCENES = false

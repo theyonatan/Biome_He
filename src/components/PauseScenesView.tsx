@@ -4,6 +4,7 @@ import SceneCard from './SceneCard'
 import MenuButton from './ui/MenuButton'
 import SettingsButton from './ui/SettingsButton'
 import { HEADING_BASE } from '../styles'
+import { ALLOW_USER_SCENES } from '../constants'
 
 interface PauseScenesViewProps {
   seeds: SeedRecord[]
@@ -41,6 +42,8 @@ const PauseScenesView = ({
   const [isDragActive, setIsDragActive] = useState(false)
 
   useEffect(() => {
+    if (!ALLOW_USER_SCENES) return
+
     const handleKeyDown = (event: KeyboardEvent) => {
       const isPasteShortcut = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'v'
       if (!isPasteShortcut) return
@@ -119,12 +122,16 @@ const PauseScenesView = ({
   return (
     <div
       className="absolute inset-0 p-[3.8%_4%] z-[2]"
-      onDragEnter={handleDragEnter}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
+      {...(ALLOW_USER_SCENES
+        ? {
+            onDragEnter: handleDragEnter,
+            onDragOver: handleDragOver,
+            onDragLeave: handleDragLeave,
+            onDrop: handleDrop
+          }
+        : {})}
     >
-      {isDragActive && (
+      {ALLOW_USER_SCENES && isDragActive && (
         <div
           className="absolute inset-[2.4cqh] z-[20] border border-[rgba(245,249,255,0.86)] bg-[rgba(248,248,245,0.12)] pointer-events-none grid place-items-center"
           aria-hidden="true"
@@ -135,59 +142,63 @@ const PauseScenesView = ({
       <section className="absolute top-[var(--edge-top-xl)] left-[var(--edge-left)] w-[92%] z-[3] flex flex-col">
         <h2 className={`${HEADING_BASE} text-heading text-text-primary font-normal text-left`}>Scenes</h2>
         <p className="m-0 font-serif text-caption text-text-muted max-w-[103.12cqh] text-left">
-          All of your {seeds.length} {seeds.length === 1 ? 'scene' : 'scenes'}. Use the buttons to add more scenes, or
-          drag/paste them in.
+          All of your {seeds.length} {seeds.length === 1 ? 'scene' : 'scenes'}.
+          {ALLOW_USER_SCENES && ' Use the buttons to add more scenes, or drag/paste them in.'}
         </p>
         {uploadError && (
           <p className="m-0 mt-[0.6cqh] font-serif text-caption text-[var(--color-error-bright)]">{uploadError}</p>
         )}
-        <input ref={fileInputRef} type="file" accept="image/*" onChange={onImageUpload} style={{ display: 'none' }} />
+        {ALLOW_USER_SCENES && (
+          <input ref={fileInputRef} type="file" accept="image/*" onChange={onImageUpload} style={{ display: 'none' }} />
+        )}
         <div className="pause-scene-scroll overflow-y-auto pr-[0.8cqh] max-h-[62cqh] mt-[1.1cqh] relative z-[4]">
           <div className="grid grid-cols-[repeat(auto-fill,25.78cqh)] gap-[1.28cqh] w-full">
-            <div
-              className={`relative w-full aspect-video border border-[rgba(245,249,255,0.84)] bg-[rgba(248,248,245,0.14)] p-0 overflow-hidden grid grid-cols-2 ${uploadingImage ? 'opacity-60 pointer-events-none' : ''}`}
-            >
-              <span
-                className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-px bg-[rgba(245,249,255,0.4)] pointer-events-none z-[1]"
-                aria-hidden="true"
-              />
-              <SettingsButton
-                variant="secondary"
-                className="!rounded-none !border-0 !outline-0 hover:!outline-0 h-full w-full grid place-items-center !p-0 active:bg-[var(--color-surface-btn-hover)] active:text-[var(--color-text-inverse)] focus-visible:outline-2 focus-visible:outline-[var(--color-surface-btn-hover)]"
-                onClick={() => void onClipboardUpload()}
-                title="Paste image from clipboard"
+            {ALLOW_USER_SCENES && (
+              <div
+                className={`relative w-full aspect-video border border-[rgba(245,249,255,0.84)] bg-[rgba(248,248,245,0.14)] p-0 overflow-hidden grid grid-cols-2 ${uploadingImage ? 'opacity-60 pointer-events-none' : ''}`}
               >
-                <svg
-                  className="w-[2.67cqh] h-[2.67cqh]"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
+                <span
+                  className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-px bg-[rgba(245,249,255,0.4)] pointer-events-none z-[1]"
+                  aria-hidden="true"
+                />
+                <SettingsButton
+                  variant="secondary"
+                  className="!rounded-none !border-0 !outline-0 hover:!outline-0 h-full w-full grid place-items-center !p-0 active:bg-[var(--color-surface-btn-hover)] active:text-[var(--color-text-inverse)] focus-visible:outline-2 focus-visible:outline-[var(--color-surface-btn-hover)]"
+                  onClick={() => void onClipboardUpload()}
+                  title="Paste image from clipboard"
                 >
-                  <rect x="9" y="3" width="6" height="4" rx="1" />
-                  <path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h7" />
-                  <rect x="12" y="10" width="8" height="10" rx="1" />
-                </svg>
-              </SettingsButton>
-              <SettingsButton
-                variant="secondary"
-                className="!rounded-none !border-0 !outline-0 hover:!outline-0 h-full w-full grid place-items-center !p-0 active:bg-[var(--color-surface-btn-hover)] active:text-[var(--color-text-inverse)] focus-visible:outline-2 focus-visible:outline-[var(--color-surface-btn-hover)]"
-                onClick={() => fileInputRef.current?.click()}
-                title="Browse for image file"
-              >
-                <svg
-                  className="w-[2.67cqh] h-[2.67cqh]"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
+                  <svg
+                    className="w-[2.67cqh] h-[2.67cqh]"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                  >
+                    <rect x="9" y="3" width="6" height="4" rx="1" />
+                    <path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h7" />
+                    <rect x="12" y="10" width="8" height="10" rx="1" />
+                  </svg>
+                </SettingsButton>
+                <SettingsButton
+                  variant="secondary"
+                  className="!rounded-none !border-0 !outline-0 hover:!outline-0 h-full w-full grid place-items-center !p-0 active:bg-[var(--color-surface-btn-hover)] active:text-[var(--color-text-inverse)] focus-visible:outline-2 focus-visible:outline-[var(--color-surface-btn-hover)]"
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Browse for image file"
                 >
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" strokeLinecap="round" strokeLinejoin="round" />
-                  <polyline points="17 8 12 3 7 8" strokeLinecap="round" strokeLinejoin="round" />
-                  <line x1="12" y1="3" x2="12" y2="15" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </SettingsButton>
-            </div>
+                  <svg
+                    className="w-[2.67cqh] h-[2.67cqh]"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                  >
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" strokeLinecap="round" strokeLinejoin="round" />
+                    <polyline points="17 8 12 3 7 8" strokeLinecap="round" strokeLinejoin="round" />
+                    <line x1="12" y1="3" x2="12" y2="15" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </SettingsButton>
+              </div>
+            )}
             {seeds.map((seed) => (
               <SceneCard
                 key={`scene-${seed.filename}`}

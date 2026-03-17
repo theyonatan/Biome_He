@@ -4,6 +4,7 @@ import SocialCtaRow from './SocialCtaRow'
 import ViewLabel from './ui/ViewLabel'
 import MenuButton from './ui/MenuButton'
 import { HEADING_BASE } from '../styles'
+import { ALLOW_USER_SCENES } from '../constants'
 
 interface PauseMainViewProps {
   pinnedScenes: SeedRecord[]
@@ -40,7 +41,8 @@ const PauseMainView = ({
     <section className="absolute top-[var(--edge-top-xl)] left-[var(--edge-left)] w-[77%] flex flex-col">
       <h2 className={`${HEADING_BASE} text-heading text-text-primary font-normal text-left`}>Pinned Scenes</h2>
       <p className="m-0 font-serif text-caption text-text-muted max-w-[103.12cqh] text-left">
-        Your pinned scenes. Use the Scenes button to view, pin or upload more scenes.
+        Your pinned scenes. Use the Scenes button to view{ALLOW_USER_SCENES ? ', pin or upload' : ' or pin'} more
+        scenes.
       </p>
       <div className="pause-scene-scroll overflow-y-auto pr-[0.8cqh] max-h-[62cqh] mt-[1.1cqh]">
         <div className="grid grid-cols-[repeat(auto-fill,25.78cqh)] gap-[1.28cqh] w-full">
