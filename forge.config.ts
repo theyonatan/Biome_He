@@ -22,6 +22,7 @@ const config: ForgeConfig = {
   makers: [
     new MakerNSIS({
       getAppBuilderConfig: async () => ({
+        publish: null,
         win: {
           icon: 'app-icon.ico',
           publisherName: 'Overworld'
