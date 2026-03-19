@@ -56,7 +56,7 @@ MODEL_CFG = {
     "waypoint-1.5": {
         "label": "waypoint-1.5 (multi-frame)",
         "is_multiframe": True,
-        "seed_target_size": (512, 1024),
+        "seed_target_size": (720, 1280),
         "has_prompt_conditioning": False,
     },
 }
