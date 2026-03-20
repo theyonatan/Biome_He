@@ -78,6 +78,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     frameId,
     genTime,
     latentGenMs,
+    nFrames,
     frameGenMsRef,
     frameNFramesRef,
     frameIdRef,
@@ -420,7 +421,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
   // so values are always based on real decode completion times.
   const frameTimelineRef = useRef<{ currentIndex: number; slotDisplayAts: (number | null)[] }>({
     currentIndex: 0,
-    slotDisplayAts: [null, null, null, null]
+    slotDisplayAts: []
   })
   const drawRafRef = useRef<number | null>(null)
 
@@ -437,7 +438,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
       const item = bitmapQueueRef.current[0]
       if (item && now >= item.displayAt) {
         bitmapQueueRef.current.shift()
-        frameTimelineRef.current.currentIndex = item.frameId % 4
+        frameTimelineRef.current.currentIndex = item.frameId % frameNFramesRef.current
         frameCountRef.current++
         if (now - lastFpsUpdateRef.current >= 1000) {
           setFps(frameCountRef.current)
@@ -468,7 +469,8 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (!frame || !canvasReady) return
 
-    const genMs = frameGenMsRef.current / frameNFramesRef.current
+    const nFrames = frameNFramesRef.current
+    const genMs = frameGenMsRef.current / nFrames
     const capturedFrameId = frameIdRef.current
 
     const source =
@@ -483,9 +485,9 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
         const displayAt = Math.max(lastScheduledAtRef.current, now) + genMs
         lastScheduledAtRef.current = displayAt
 
-        const batchIndex = capturedFrameId % 4
+        const batchIndex = capturedFrameId % nFrames
         if (batchIndex === 0) {
-          frameTimelineRef.current.slotDisplayAts = [null, null, null, null]
+          frameTimelineRef.current.slotDisplayAts = Array.from({ length: nFrames }, () => null)
         }
         frameTimelineRef.current.slotDisplayAts[batchIndex] = displayAt
 
@@ -623,6 +625,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     // Stats
     genTime,
     latentGenMs,
+    nFrames,
     frameId,
     fps,
     stats: {

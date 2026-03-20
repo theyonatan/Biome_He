@@ -50,7 +50,8 @@ const computeFrametimeStats = (samples: number[]): FrametimeStats | null => {
 }
 
 const PerformanceStatsOverlay = () => {
-  const { performanceStatsOverlay, isStreaming, serverMetrics, inputLatency, fps, latentGenMs } = useStreaming()
+  const { performanceStatsOverlay, isStreaming, serverMetrics, inputLatency, fps, latentGenMs, nFrames } =
+    useStreaming()
   const [, setTick] = useState(0)
   const [ftStats, setFtStats] = useState<FrametimeStats | null>(null)
 
@@ -66,7 +67,6 @@ const PerformanceStatsOverlay = () => {
 
   // Derive LFPS and FPS from gen time
   const latentFps = latentGenMs !== null && latentGenMs > 0 ? 1000 / latentGenMs : 0
-  const nFrames = serverMetrics?.isMultiframe ? 4 : 1
   const perceivedFps = latentFps * nFrames
 
   // Change-detection refs (all declared before any conditional logic)
@@ -139,7 +139,7 @@ const PerformanceStatsOverlay = () => {
         sparkValues={fpsBuf.values}
         sparkColor={COLOR_HUD}
       />
-      {m?.isMultiframe && (
+      {nFrames > 1 && (
         <Row
           label="LFPS"
           value={latentFps > 0 ? `${latentFps.toFixed(2)} lfps` : '--'}

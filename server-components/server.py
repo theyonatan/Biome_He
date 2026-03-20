@@ -1755,12 +1755,13 @@ async def websocket_endpoint(websocket: WebSocket):
                     # Update GPU metrics cache before sending frames
                     _update_gpu_metrics()
 
-                    if world_engine.is_multiframe:
-                        for i in range(4):
+                    n_frames = world_engine.n_frames
+                    if n_frames > 1:
+                        for i in range(result.shape[0]):
                             session.frame_count += 1
                             frame = result[i]
                             jpeg = world_engine.frame_to_jpeg(frame)
-                            queue_send(build_binary_frame(jpeg, session.frame_count, client_ts, gen_time, n_frames=4))
+                            queue_send(build_binary_frame(jpeg, session.frame_count, client_ts, gen_time, n_frames=n_frames))
                     else:
                         session.frame_count += 1
                         jpeg = world_engine.frame_to_jpeg(result)

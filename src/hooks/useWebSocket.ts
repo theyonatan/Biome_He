@@ -30,6 +30,7 @@ type WebSocketHook = {
   frameId: number
   genTime: number | null
   latentGenMs: number | null
+  nFrames: number
   frameGenMsRef: { current: number }
   frameNFramesRef: { current: number }
   frameIdRef: { current: number }
@@ -77,6 +78,7 @@ export const useWebSocket = (): WebSocketHook => {
   const frameGenMsRef = useRef<number>(0)
   const frameNFramesRef = useRef<number>(1)
   const frameIdRef = useRef<number>(0)
+  const [nFrames, setNFrames] = useState(1)
   const staticMetricsRef = useRef<{ gpuName: string | null; cpuName: string | null; model: string }>({
     gpuName: null,
     cpuName: null,
@@ -177,22 +179,23 @@ export const useWebSocket = (): WebSocketHook => {
         }
 
         // Binary frame
-        const nFrames = (header.n_frames as number) ?? 1
-        frameNFramesRef.current = nFrames
+        const headerNFrames = (header.n_frames as number) ?? 1
+        frameNFramesRef.current = headerNFrames
+        setNFrames(headerNFrames)
         if (typeof header.gen_ms === 'number') {
           frameGenMsRef.current = header.gen_ms
           setGenTime(Math.round(header.gen_ms))
         }
         frameIdRef.current = (header.frame_id as number) ?? 0
         // First display frame of each latent pass: update latent gen stats and GPU metrics
-        if ((frameIdRef.current - 1) % nFrames === 0) {
+        if ((frameIdRef.current - 1) % headerNFrames === 0) {
           if (typeof header.gen_ms === 'number') {
             setLatentGenMs(Math.round(header.gen_ms))
           }
           // GPU metrics from frame header
           setServerMetrics({
             ...staticMetricsRef.current,
-            isMultiframe: nFrames > 1,
+            isMultiframe: headerNFrames > 1,
             vramUsedMb: (header.vram_used_mb as number) ?? -1,
             vramTotalMb: (header.vram_total_mb as number) ?? -1,
             vramPercent: (header.vram_percent as number) ?? -1,
@@ -417,6 +420,7 @@ export const useWebSocket = (): WebSocketHook => {
     frameId,
     genTime,
     latentGenMs,
+    nFrames,
     frameGenMsRef,
     frameNFramesRef,
     frameIdRef,

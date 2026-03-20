@@ -45,17 +45,19 @@ N_FRAMES = 4096
 DEVICE = "cuda"
 JPEG_QUALITY = 85
 
-# Model-specific runtime configuration
+# Model-specific runtime configuration.
+# n_frames is derived from model_cfg.temporal_compression at load time;
+# the value here is only a fallback for models that don't expose it.
 MODEL_CFG = {
     "legacy": {
         "label": "legacy (single-frame)",
-        "is_multiframe": False,
+        "n_frames": 1,
         "seed_target_size": (360, 640),
         "has_prompt_conditioning": False,
     },
     "waypoint-1.5": {
         "label": "waypoint-1.5 (multi-frame)",
-        "is_multiframe": True,
+        "n_frames": 4,
         "seed_target_size": (720, 1280),
         "has_prompt_conditioning": False,
     },
@@ -125,7 +127,8 @@ class WorldEngineManager:
         self.current_prompt = DEFAULT_PROMPT
         self.engine_warmed_up = False
         self.cfg = MODEL_CFG["legacy"].copy()
-        self.is_multiframe = self.cfg["is_multiframe"]
+        self.n_frames = self.cfg["n_frames"]
+        self.is_multiframe = self.n_frames > 1
         self.seed_target_size = self.cfg["seed_target_size"]
         self.has_prompt_conditioning = self.cfg["has_prompt_conditioning"]
         self._progress_callback = None
@@ -173,7 +176,7 @@ class WorldEngineManager:
         )
 
     def _resolve_runtime_cfg(self, model_cfg) -> dict:
-        """Resolve runtime config from defaults and override certain values from model_cfg (just prompt_conditioning for now)."""
+        """Resolve runtime config from defaults, overridden by model_cfg attributes."""
         model_type = getattr(model_cfg, "model_type", None)
         if model_type is not None and model_type not in MODEL_CFG:
             raise RuntimeError(
@@ -185,6 +188,11 @@ class WorldEngineManager:
         cfg["has_prompt_conditioning"] = (
             getattr(model_cfg, "prompt_conditioning", None) is not None
         )
+
+        # Prefer temporal_compression from the model config over the hardcoded default
+        temporal_compression = getattr(model_cfg, "temporal_compression", None)
+        if temporal_compression is not None:
+            cfg["n_frames"] = int(temporal_compression)
 
         return cfg
 
@@ -226,7 +234,8 @@ class WorldEngineManager:
         self.seed_frame = None
         self.engine_warmed_up = False
         self.cfg = MODEL_CFG["legacy"].copy()
-        self.is_multiframe = self.cfg["is_multiframe"]
+        self.n_frames = self.cfg["n_frames"]
+        self.is_multiframe = self.n_frames > 1
         self.seed_target_size = self.cfg["seed_target_size"]
         self.has_prompt_conditioning = self.cfg["has_prompt_conditioning"]
         self._free_cuda_memory_sync()
@@ -249,7 +258,7 @@ class WorldEngineManager:
                 .contiguous()
             )
             if self.is_multiframe:
-                frame = frame.unsqueeze(0).expand(4, -1, -1, -1).contiguous()
+                frame = frame.unsqueeze(0).expand(self.n_frames, -1, -1, -1).contiguous()
             return frame
         except Exception as e:
             logger.error(f"Failed to load seed from file {file_path}: {e}")
@@ -280,7 +289,7 @@ class WorldEngineManager:
                 .contiguous()
             )
             if self.is_multiframe:
-                frame = frame.unsqueeze(0).expand(4, -1, -1, -1).contiguous()
+                frame = frame.unsqueeze(0).expand(self.n_frames, -1, -1, -1).contiguous()
             return frame
         except Exception as e:
             logger.error(f"Failed to load seed from base64: {e}")
@@ -382,7 +391,8 @@ class WorldEngineManager:
 
             # Resolve runtime config from defaults overridden by model config.
             self.cfg = self._resolve_runtime_cfg(self.engine.model_cfg)
-            self.is_multiframe = self.cfg["is_multiframe"]
+            self.n_frames = self.cfg["n_frames"]
+            self.is_multiframe = self.n_frames > 1
             self.seed_target_size = self.cfg["seed_target_size"]
             self.has_prompt_conditioning = self.cfg["has_prompt_conditioning"]
             logger.info(f"[2/4] Model type: {self.cfg['label']}")
