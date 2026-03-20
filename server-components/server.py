@@ -1561,6 +1561,17 @@ async def websocket_endpoint(websocket: WebSocket):
             "gpu_util_percent": -1.0,
         }
 
+        # One-time NVML init for GPU utilization queries (same backend as nvidia-smi)
+        _nvml_handle = None
+        try:
+            import pynvml
+            pynvml.nvmlInit()
+            _nvml_handle = pynvml.nvmlDeviceGetHandleByIndex(
+                torch.cuda.current_device() if torch.cuda.is_available() else 0
+            )
+        except Exception:
+            pass
+
         def _update_gpu_metrics() -> None:
             try:
                 if torch.cuda.is_available():
@@ -1569,10 +1580,17 @@ async def websocket_endpoint(websocket: WebSocket):
                     vram_pct = (vram_used / vram_total * 100) if vram_total > 0 else 0
                 else:
                     vram_used = vram_total = vram_pct = -1
+                gpu_util = -1
                 try:
                     gpu_util = torch.cuda.utilization()
                 except Exception:
-                    gpu_util = -1
+                    pass
+                if gpu_util < 0 and _nvml_handle is not None:
+                    try:
+                        import pynvml
+                        gpu_util = pynvml.nvmlDeviceGetUtilizationRates(_nvml_handle).gpu
+                    except Exception:
+                        pass
                 _cached_gpu_metrics.update({
                     "vram_used_mb": round(vram_used, 0),
                     "vram_total_mb": round(vram_total, 0),
