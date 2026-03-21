@@ -117,6 +117,7 @@ const PerformanceStatsOverlay = () => {
   if (!performanceStatsOverlay || !isStreaming) return null
 
   const m = serverMetrics
+  const p = m?.profile ?? null
 
   return (
     <div
@@ -179,17 +180,37 @@ const PerformanceStatsOverlay = () => {
         sparkColor={COLOR_WARM}
       />
       <div className="border-t border-white/15 mt-[0.5cqh] mb-[0.3cqh]" />
-      <div style={{ color: COLOR_LABEL }} className="text-center mb-[0.3cqh]">
-        GEN stats
-      </div>
-      <Row label="MEAN" value={ftStats ? `${ftStats.mean.toFixed(1)} ms` : '--'} color={COLOR_WARM} />
-      <Row label="SDEV" value={ftStats ? `${ftStats.stddev.toFixed(1)} ms` : '--'} color={COLOR_LABEL} />
-      <Row label="MIN" value={ftStats ? `${ftStats.min.toFixed(1)} ms` : '--'} color={COLOR_GOOD} />
-      <Row label="P1" value={ftStats ? `${ftStats.p1.toFixed(1)} ms` : '--'} color={COLOR_GOOD} />
-      <Row label="P99" value={ftStats ? `${ftStats.p99.toFixed(1)} ms` : '--'} color={COLOR_ERROR} />
-      <Row label="MAX" value={ftStats ? `${ftStats.max.toFixed(1)} ms` : '--'} color={COLOR_ERROR} />
-      <div style={{ color: COLOR_LABEL }} className="text-center mt-[0.2cqh]">
-        {`n=${ftBufRef.current.length}`}
+      <div className="flex gap-[1.5cqh]">
+        <div className="flex-1">
+          <div style={{ color: COLOR_LABEL }} className="text-center mb-[0.3cqh]">
+            GEN stats
+          </div>
+          <Row label="MEAN" value={ftStats ? `${ftStats.mean.toFixed(1)} ms` : '--'} color={COLOR_WARM} />
+          <Row label="SDEV" value={ftStats ? `${ftStats.stddev.toFixed(1)} ms` : '--'} color={COLOR_LABEL} />
+          <Row label="MIN" value={ftStats ? `${ftStats.min.toFixed(1)} ms` : '--'} color={COLOR_GOOD} />
+          <Row label="P1" value={ftStats ? `${ftStats.p1.toFixed(1)} ms` : '--'} color={COLOR_GOOD} />
+          <Row label="P99" value={ftStats ? `${ftStats.p99.toFixed(1)} ms` : '--'} color={COLOR_ERROR} />
+          <Row label="MAX" value={ftStats ? `${ftStats.max.toFixed(1)} ms` : '--'} color={COLOR_ERROR} />
+        </div>
+        {p && (
+          <div className="flex-1">
+            <div style={{ color: COLOR_LABEL }} className="text-center mb-[0.3cqh]">
+              Frame profile
+            </div>
+            <Row label="INFER" value={`${p.inferMs.toFixed(1)} ms`} color={COLOR_HUD} />
+            <Row label="SYNC" value={`${p.syncMs.toFixed(1)} ms`} color={COLOR_WARM} />
+            <Row label="ENC" value={`${p.encMs.toFixed(1)} ms`} color={COLOR_WARM} />
+            <Row label="MTRC" value={`${p.metricsMs.toFixed(1)} ms`} color={COLOR_LABEL} />
+            <Row label="OVER" value={`${p.overheadMs.toFixed(1)} ms`} color={COLOR_LABEL} />
+            {inputLatency !== null && (
+              <Row
+                label="XMIT"
+                value={`${Math.max(0, inputLatency - p.inferMs - p.syncMs - p.encMs - p.metricsMs - p.overheadMs).toFixed(1)} ms`}
+                color={COLOR_ERROR}
+              />
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

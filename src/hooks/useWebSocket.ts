@@ -9,6 +9,14 @@ const MAX_VISIBLE_LOG_LINES = 500
 
 type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error'
 
+export type FrameProfile = {
+  inferMs: number
+  syncMs: number
+  encMs: number
+  metricsMs: number
+  overheadMs: number
+}
+
 export type ServerMetrics = {
   isMultiframe: boolean
   vramUsedMb: number
@@ -18,6 +26,7 @@ export type ServerMetrics = {
   gpuName: string | null
   cpuName: string | null
   model: string
+  profile: FrameProfile | null
 }
 
 type WebSocketHook = {
@@ -199,7 +208,17 @@ export const useWebSocket = (): WebSocketHook => {
             vramUsedMb: (header.vram_used_mb as number) ?? -1,
             vramTotalMb: (header.vram_total_mb as number) ?? -1,
             vramPercent: (header.vram_percent as number) ?? -1,
-            gpuUtilPercent: (header.gpu_util_percent as number) ?? -1
+            gpuUtilPercent: (header.gpu_util_percent as number) ?? -1,
+            profile:
+              header.t_infer_ms != null
+                ? {
+                    inferMs: header.t_infer_ms as number,
+                    syncMs: header.t_sync_ms as number,
+                    encMs: header.t_enc_ms as number,
+                    metricsMs: header.t_metrics_ms as number,
+                    overheadMs: (header.t_overhead_ms as number) ?? 0
+                  }
+                : null
           })
         }
         setFrame(imageBlob)
@@ -251,7 +270,8 @@ export const useWebSocket = (): WebSocketHook => {
               vramUsedMb: (msg.vram_used_mb as number) ?? -1,
               vramTotalMb: (msg.vram_total_mb as number) ?? -1,
               vramPercent: (msg.vram_percent as number) ?? -1,
-              gpuUtilPercent: (msg.gpu_util_percent as number) ?? -1
+              gpuUtilPercent: (msg.gpu_util_percent as number) ?? -1,
+              profile: null
             })
             break
           }

@@ -1525,6 +1525,7 @@ async def websocket_endpoint(websocket: WebSocket):
         }
         ctrl_lock = threading.Lock()
         frame_queue: Queue = Queue(maxsize=16)
+        frame_ready = asyncio.Event()
         main_loop = asyncio.get_running_loop()
 
         # Cache device names — queried once per session (both can be slow)
@@ -1550,6 +1551,7 @@ async def websocket_endpoint(websocket: WebSocket):
         def queue_send(payload: dict | bytes) -> None:
             try:
                 frame_queue.put_nowait(payload)
+                main_loop.call_soon_threadsafe(frame_ready.set)
             except Exception:
                 pass
 
@@ -1600,9 +1602,11 @@ async def websocket_endpoint(websocket: WebSocket):
             except Exception:
                 pass  # metrics are best-effort
 
-        def build_binary_frame(jpeg: bytes, frame_id: int, client_ts: float, gen_ms: float, n_frames: int = 1) -> bytes:
+        def build_binary_frame(jpeg: bytes, frame_id: int, client_ts: float, gen_ms: float, n_frames: int = 1, profile: dict | None = None) -> bytes:
             header_data = {"frame_id": frame_id, "client_ts": client_ts, "gen_ms": gen_ms, "n_frames": n_frames}
             header_data.update(_cached_gpu_metrics)
+            if profile is not None:
+                header_data.update(profile)
             header = json.dumps(header_data, separators=(",", ":")).encode("utf-8")
             return struct.pack("<I", len(header)) + header + jpeg
 
@@ -1709,15 +1713,16 @@ async def websocket_endpoint(websocket: WebSocket):
             nonlocal running
             while running:
                 try:
-                    try:
+                    # Wait for signal from generator thread instead of polling
+                    await frame_ready.wait()
+                    frame_ready.clear()
+                    # Drain all available frames in one batch
+                    while not frame_queue.empty():
                         payload = frame_queue.get_nowait()
-                    except Empty:
-                        await asyncio.sleep(0.001)
-                        continue
-                    if isinstance(payload, bytes):
-                        await websocket.send_bytes(payload)
-                    else:
-                        await websocket.send_text(json.dumps(payload))
+                        if isinstance(payload, bytes):
+                            await websocket.send_bytes(payload)
+                        else:
+                            await websocket.send_text(json.dumps(payload))
                 except Exception as e:
                     logger.error(f"[{client_host}] Sender error: {e}", exc_info=True)
                     running = False
@@ -1764,26 +1769,41 @@ async def websocket_endpoint(websocket: WebSocket):
 
                     ctrl = world_engine.CtrlInput(button=buttons, mouse=(mouse_dx, mouse_dy))
 
+                    # client_ts is a performance.now() timestamp from the browser;
+                    # we can't compare clocks, but we CAN forward it so the client
+                    # can measure the full round-trip on its own clock.
                     t0 = time.perf_counter()
                     result = run_coro(world_engine.generate_frame(ctrl))
+                    t_infer = time.perf_counter()
+
                     if torch.cuda.is_available():
                         torch.cuda.synchronize()
-                    gen_time = (time.perf_counter() - t0) * 1000
+                    t_sync = time.perf_counter()
 
-                    # Update GPU metrics cache before sending frames
-                    _update_gpu_metrics()
+                    gen_time = (t_sync - t0) * 1000
 
                     n_frames = world_engine.n_frames
                     if n_frames > 1:
-                        for i in range(result.shape[0]):
-                            session.frame_count += 1
-                            frame = result[i]
-                            jpeg = world_engine.frame_to_jpeg(frame)
-                            queue_send(build_binary_frame(jpeg, session.frame_count, client_ts, gen_time, n_frames=n_frames))
+                        encoded = [world_engine.frame_to_jpeg(result[i]) for i in range(result.shape[0])]
                     else:
+                        encoded = [world_engine.frame_to_jpeg(result)]
+                    t_enc = time.perf_counter()
+
+                    if session.frame_count % 5 == 0:
+                        _update_gpu_metrics()
+                    t_metrics = time.perf_counter()
+
+                    for jpeg in encoded:
                         session.frame_count += 1
-                        jpeg = world_engine.frame_to_jpeg(result)
-                        queue_send(build_binary_frame(jpeg, session.frame_count, client_ts, gen_time, n_frames=1))
+                        t_queued = time.perf_counter()
+                        profile = {
+                            "t_infer_ms": round((t_infer - t0) * 1000, 1),
+                            "t_sync_ms": round((t_sync - t_infer) * 1000, 1),
+                            "t_enc_ms": round((t_enc - t_sync) * 1000, 1),
+                            "t_metrics_ms": round((t_metrics - t_enc) * 1000, 1),
+                            "t_overhead_ms": round((t_queued - t_metrics) * 1000, 1),
+                        }
+                        queue_send(build_binary_frame(jpeg, session.frame_count, client_ts, gen_time, n_frames=n_frames, profile=profile))
 
                     if session.frame_count % 60 == 0:
                         logger.info(
