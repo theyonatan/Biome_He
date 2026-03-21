@@ -17,6 +17,11 @@ import torch
 import torch.nn.functional as F
 from PIL import Image
 
+try:
+    import simplejpeg
+except ImportError:
+    simplejpeg = None
+
 from progress_stages import (
     SESSION_INIT_FRAME,
     SESSION_INIT_RESET,
@@ -415,10 +420,13 @@ class WorldEngineManager:
             logger.info("=" * 60)
 
     def frame_to_jpeg(self, frame: torch.Tensor, quality: int = JPEG_QUALITY) -> bytes:
-        """Convert frame tensor to JPEG bytes."""
+        """Convert frame tensor to JPEG bytes using simplejpeg (fast) or PIL (fallback)."""
         if frame.dtype != torch.uint8:
             frame = frame.clamp(0, 255).to(torch.uint8)
-        img = Image.fromarray(frame.cpu().numpy(), mode="RGB")
+        rgb = frame.cpu().contiguous().numpy()
+        if simplejpeg is not None:
+            return simplejpeg.encode_jpeg(rgb, quality=quality, colorspace='RGB')
+        img = Image.fromarray(rgb, mode="RGB")
         buf = io.BytesIO()
         img.save(buf, format="JPEG", quality=quality)
         return buf.getvalue()
