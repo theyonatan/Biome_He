@@ -99,11 +99,11 @@ export const useSeeds = (): UseSeedsResult => {
           setSeeds(seedList)
         }
 
-        if (!seedList.some((s) => s.filename === 'default.png')) {
-          throw new Error('Required seed file "default.png" not found in seeds folder')
+        if (!seedList.some((s) => s.filename === 'default.jpg')) {
+          throw new Error('Required seed file "default.jpg" not found in seeds folder')
         }
 
-        const result = await wsRequest<{ blob: Blob }>('seeds_image', { filename: 'default.png' })
+        const result = await wsRequest<{ blob: Blob }>('seeds_image', { filename: 'default.jpg' })
         return result.blob
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)

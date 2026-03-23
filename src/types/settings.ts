@@ -14,11 +14,11 @@ export const localhostUrl = (port: number) => `http://localhost:${port}`
 export const DEFAULT_STANDALONE_URL = localhostUrl(STANDALONE_PORT)
 
 export const DEFAULT_PINNED_SCENES = [
-  'default.png',
-  'starter_2.png',
-  'starter_3.png',
-  'sample_00032.png',
-  'sample_00046.png'
+  'default.jpg',
+  'crystal_desert_blade.jpg',
+  'enchanted_swamp_torch.jpg',
+  'shattered_cockpit_nebula.jpg',
+  'sunken_city_depths.jpg'
 ]
 
 export const DEFAULT_KEYBINDINGS = {

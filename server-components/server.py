@@ -326,7 +326,7 @@ def _read_log_tail_lines(max_lines: int) -> list[str]:
 SEEDS_BASE_DIR = Path(__file__).parent.parent / "world_engine" / "seeds"
 DEFAULT_SEEDS_DIR = SEEDS_BASE_DIR / "default"
 UPLOADS_DIR = SEEDS_BASE_DIR / "uploads"
-DEFAULT_INITIAL_SEED = "default.png"
+DEFAULT_INITIAL_SEED = "default.jpg"
 CACHE_FILE = Path(__file__).parent.parent / "world_engine" / ".seeds_cache.bin"
 
 # Local seeds directory (for dev/standalone usage - relative to project root)

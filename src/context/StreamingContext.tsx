@@ -129,7 +129,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
   const lastFpsUpdateRef = useRef(performance.now())
   const inputLoopRef = useRef<number | null>(null)
   const lastAppliedModelRef = useRef<string | null>(null)
-  const lastSeedRef = useRef<string>('default.png')
+  const lastSeedRef = useRef<string>('default.jpg')
   const warmBootstrapSentRef = useRef(false)
   const warmFlowCancelledRef = useRef(false)
   const loadingFailureStopHandledRef = useRef(false)
