@@ -1734,18 +1734,55 @@ async def websocket_endpoint(websocket: WebSocket):
             def run_coro(coro):
                 return asyncio.run_coroutine_threadsafe(coro, main_loop).result()
 
+            def _flush_pending():
+                """JPEG-encode + queue pending CPU frames."""
+                if not _flush_pending.work:
+                    return
+                cpu_frames, gen_time, n_frames, client_ts, t0, t_infer, t_sync = _flush_pending.work
+                _flush_pending.work = None
+
+                t_enc_start = time.perf_counter()
+                encoded = [world_engine._numpy_to_jpeg(rgb) for rgb in cpu_frames]
+                t_enc = time.perf_counter()
+
+                if session.frame_count % 5 == 0:
+                    _update_gpu_metrics()
+                t_metrics = time.perf_counter()
+
+                for jpeg in encoded:
+                    session.frame_count += 1
+                    t_queued = time.perf_counter()
+                    profile = {
+                        "t_infer_ms": round((t_infer - t0) * 1000, 1),
+                        "t_sync_ms": round((t_sync - t_infer) * 1000, 1),
+                        "t_enc_ms": round((t_enc - t_enc_start) * 1000, 1),
+                        "t_metrics_ms": round((t_metrics - t_enc) * 1000, 1),
+                        "t_overhead_ms": round((t_queued - t_metrics) * 1000, 1),
+                    }
+                    queue_send(build_binary_frame(jpeg, session.frame_count, client_ts, gen_time, n_frames=n_frames, profile=profile))
+
+                if session.frame_count % 60 == 0:
+                    logger.info(
+                        f"[{client_host}] Sent frame {session.frame_count} (gen={gen_time:.1f}ms)"
+                    )
+
+            _flush_pending.work = None
+
             while running:
                 if paused:
+                    _flush_pending()
                     time.sleep(0.01)
                     continue
 
                 try:
                     if prompt_pending is not None:
+                        _flush_pending()
                         world_engine.current_prompt = prompt_pending
                         prompt_pending = None
                         run_coro(reset_engine())
 
                     if reset_flag or session.frame_count >= session.max_frames:
+                        _flush_pending()
                         if session.frame_count >= session.max_frames:
                             logger.info(f"[{client_host}] Auto-reset at frame limit")
                         run_coro(reset_engine())
@@ -1764,6 +1801,7 @@ async def websocket_endpoint(websocket: WebSocket):
                             ctrl_state["dirty"] = False
 
                     if buttons is None:
+                        _flush_pending()
                         time.sleep(0.001)
                         continue
 
@@ -1773,7 +1811,18 @@ async def websocket_endpoint(websocket: WebSocket):
                     # we can't compare clocks, but we CAN forward it so the client
                     # can measure the full round-trip on its own clock.
                     t0 = time.perf_counter()
-                    result = run_coro(world_engine.generate_frame(ctrl))
+
+                    # Submit inference to CUDA thread (non-blocking) so we can
+                    # overlap JPEG encoding of the previous batch with GPU work.
+                    gpu_future = world_engine.cuda_executor.submit(
+                        lambda c=ctrl: world_engine.engine.gen_frame(ctrl=c)
+                    )
+
+                    # Encode + send previous batch while GPU is busy
+                    _flush_pending()
+
+                    # Wait for GPU result
+                    result = gpu_future.result()
                     t_infer = time.perf_counter()
 
                     if torch.cuda.is_available():
@@ -1781,36 +1830,22 @@ async def websocket_endpoint(websocket: WebSocket):
                     t_sync = time.perf_counter()
 
                     gen_time = (t_sync - t0) * 1000
-
                     n_frames = world_engine.n_frames
+
+                    # Transfer result tensors to CPU numpy arrays immediately
+                    # while the data is still valid (gen_frame may reuse GPU
+                    # buffers on the next call).
                     if n_frames > 1:
-                        encoded = [world_engine.frame_to_jpeg(result[i]) for i in range(result.shape[0])]
+                        cpu_frames = [world_engine._tensor_to_numpy(result[i]) for i in range(result.shape[0])]
                     else:
-                        encoded = [world_engine.frame_to_jpeg(result)]
-                    t_enc = time.perf_counter()
+                        cpu_frames = [world_engine._tensor_to_numpy(result)]
 
-                    if session.frame_count % 5 == 0:
-                        _update_gpu_metrics()
-                    t_metrics = time.perf_counter()
-
-                    for jpeg in encoded:
-                        session.frame_count += 1
-                        t_queued = time.perf_counter()
-                        profile = {
-                            "t_infer_ms": round((t_infer - t0) * 1000, 1),
-                            "t_sync_ms": round((t_sync - t_infer) * 1000, 1),
-                            "t_enc_ms": round((t_enc - t_sync) * 1000, 1),
-                            "t_metrics_ms": round((t_metrics - t_enc) * 1000, 1),
-                            "t_overhead_ms": round((t_queued - t_metrics) * 1000, 1),
-                        }
-                        queue_send(build_binary_frame(jpeg, session.frame_count, client_ts, gen_time, n_frames=n_frames, profile=profile))
-
-                    if session.frame_count % 60 == 0:
-                        logger.info(
-                            f"[{client_host}] Received control (buttons={buttons}, mouse=({mouse_dx},{mouse_dy})) -> Sent frame {session.frame_count} (gen={gen_time:.1f}ms)"
-                        )
+                    # Stash this batch's CPU frames for deferred JPEG encoding
+                    _flush_pending.work = (cpu_frames, gen_time, n_frames, client_ts, t0, t_infer, t_sync)
 
                 except Exception as cuda_err:
+                    _flush_pending.work = None
+
                     error_msg = str(cuda_err)
                     is_cuda_error = any(
                         keyword in error_msg.lower()
@@ -1848,6 +1883,12 @@ async def websocket_endpoint(websocket: WebSocket):
                         queue_send({"type": "error", "message": str(cuda_err)})
                         running = False
                         break
+
+            # Flush the last batch before the thread exits
+            try:
+                _flush_pending()
+            except Exception:
+                pass
 
         gen_thread = threading.Thread(target=generator, daemon=True, name=f"gen-{client_host}")
         gen_thread.start()

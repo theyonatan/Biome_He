@@ -419,17 +419,26 @@ class WorldEngineManager:
             logger.info("SERVER READY - Waiting for WebSocket connections on /ws")
             logger.info("=" * 60)
 
-    def frame_to_jpeg(self, frame: torch.Tensor, quality: int = JPEG_QUALITY) -> bytes:
-        """Convert frame tensor to JPEG bytes using simplejpeg (fast) or PIL (fallback)."""
+    @staticmethod
+    def _tensor_to_numpy(frame: torch.Tensor):
+        """Transfer a frame tensor to a CPU numpy array (uint8 RGB)."""
         if frame.dtype != torch.uint8:
             frame = frame.clamp(0, 255).to(torch.uint8)
-        rgb = frame.cpu().contiguous().numpy()
+        return frame.cpu().contiguous().numpy()
+
+    @staticmethod
+    def _numpy_to_jpeg(rgb, quality: int = JPEG_QUALITY) -> bytes:
+        """Encode a CPU numpy RGB array to JPEG bytes."""
         if simplejpeg is not None:
             return simplejpeg.encode_jpeg(rgb, quality=quality, colorspace='RGB')
         img = Image.fromarray(rgb, mode="RGB")
         buf = io.BytesIO()
         img.save(buf, format="JPEG", quality=quality)
         return buf.getvalue()
+
+    def frame_to_jpeg(self, frame: torch.Tensor, quality: int = JPEG_QUALITY) -> bytes:
+        """Convert frame tensor to JPEG bytes using simplejpeg (fast) or PIL (fallback)."""
+        return self._numpy_to_jpeg(self._tensor_to_numpy(frame), quality)
 
     async def generate_frame(self, ctrl_input) -> torch.Tensor:
         """Generate next frame using WorldEngine."""
