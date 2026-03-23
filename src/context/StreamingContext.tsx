@@ -484,8 +484,12 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
       .then((blob) => createImageBitmap(blob))
       .then((bitmap) => {
         const now = performance.now()
-        const displayAt = Math.max(lastScheduledAtRef.current, now) + genMs
-        lastScheduledAtRef.current = displayAt
+        // Display immediately when the queue is caught up (first frame of a new
+        // batch), otherwise chain after the previously reserved slot.  The slot
+        // reservation (lastScheduledAtRef) always advances by genMs so that
+        // subsequent frames in the same batch are evenly spaced.
+        const displayAt = Math.max(lastScheduledAtRef.current, now)
+        lastScheduledAtRef.current = displayAt + genMs
 
         const batchIndex = capturedFrameId % nFrames
         if (batchIndex === 0) {
