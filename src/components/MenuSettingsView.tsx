@@ -20,6 +20,7 @@ import Button from './ui/Button'
 import WorldEngineSection from './WorldEngineSection'
 import EngineInstallModal from './EngineInstallModal'
 import attributionText from '../../assets/audio/ATTRIBUTION.md?raw'
+import { normalizeServerUrl, toHealthUrl } from '../utils/serverUrl'
 
 type MenuModelOption = {
   id: string
@@ -142,11 +143,13 @@ const MenuSettingsView = ({ onBack, wide }: MenuSettingsViewProps) => {
     const validate = async () => {
       setServerUrlStatus('loading')
       try {
-        const ok = await invoke('probe-server-health', `${menuServerUrl}/health`, 5000)
+        const normalizedUrl = normalizeServerUrl(menuServerUrl)
+        const ok = await invoke('probe-server-health', toHealthUrl(normalizedUrl), 5000)
         if (cancelled) return
         if (ok) {
           setServerUrlStatus('valid')
-          setLastValidatedServerUrl(menuServerUrl)
+          setLastValidatedServerUrl(normalizedUrl)
+          setMenuServerUrl((prev) => (prev === normalizedUrl ? prev : normalizedUrl))
         } else {
           setServerUrlStatus('error')
         }
@@ -247,9 +250,7 @@ const MenuSettingsView = ({ onBack, wide }: MenuSettingsViewProps) => {
 
     let normalizedUrl: string
     try {
-      const url = new URL(menuServerUrl)
-      const normalizedPort = Number(url.port) || (url.protocol === 'https:' ? 443 : 80)
-      normalizedUrl = `${url.protocol}//${url.hostname}:${normalizedPort}`
+      normalizedUrl = normalizeServerUrl(menuServerUrl)
       setMenuServerUrl(normalizedUrl)
     } catch {
       setMenuServerUrl(configServerUrl)
@@ -260,7 +261,7 @@ const MenuSettingsView = ({ onBack, wide }: MenuSettingsViewProps) => {
 
     setServerUrlStatus('loading')
     try {
-      const ok = await invoke('probe-server-health', `${normalizedUrl}/health`, 5000)
+      const ok = await invoke('probe-server-health', toHealthUrl(normalizedUrl), 5000)
       if (ok) {
         setServerUrlStatus('valid')
         setLastValidatedServerUrl(normalizedUrl)
@@ -333,7 +334,7 @@ const MenuSettingsView = ({ onBack, wide }: MenuSettingsViewProps) => {
     let nextServerUrl = menuServerUrl
     if (nextServerUrl.trim()) {
       try {
-        new URL(nextServerUrl)
+        nextServerUrl = normalizeServerUrl(nextServerUrl)
       } catch {
         nextServerUrl = configServerUrl
         setMenuServerUrl(configServerUrl)
