@@ -1,5 +1,6 @@
 import { STANDALONE_PORT, localhostUrl } from '../types/settings'
 import type { StageId } from '../stages'
+import { toHealthUrl, toWebSocketUrl } from '../utils/serverUrl'
 
 type WarmConnectionOptions = {
   currentServerPort: number | null
@@ -35,39 +36,6 @@ const STARTUP_HEALTH_TIMEOUT_MS = 120_000
 const STANDALONE_PORT_SCAN_LIMIT = 1337
 
 const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
-
-const normalizeWsEndpoint = (endpoint: string, preferSecure: boolean): string => {
-  let raw = endpoint.trim()
-  if (!raw) raw = localhostUrl(STANDALONE_PORT)
-
-  if (!/^[a-z]+:\/\//i.test(raw)) {
-    raw = `${preferSecure ? 'wss' : 'ws'}://${raw}`
-  }
-
-  const url = new URL(raw)
-  if (url.protocol === 'http:') url.protocol = 'ws:'
-  if (url.protocol === 'https:') url.protocol = 'wss:'
-  if (url.protocol !== 'ws:' && url.protocol !== 'wss:') {
-    url.protocol = preferSecure ? 'wss:' : 'ws:'
-  }
-  if (!url.pathname || url.pathname === '/') {
-    url.pathname = '/ws'
-  }
-  return url.toString()
-}
-
-const toHealthUrl = (normalizedWsUrl: string): string => {
-  const url = new URL(normalizedWsUrl)
-  if (url.protocol === 'wss:') {
-    url.protocol = 'https:'
-  } else {
-    url.protocol = 'http:'
-  }
-  url.pathname = '/health'
-  url.search = ''
-  url.hash = ''
-  return url.toString()
-}
 
 const probeServerHealth = async (
   wsUrl: string,
@@ -150,8 +118,7 @@ export const runWarmConnectionFlow = async ({
 }: WarmConnectionOptions): Promise<void> => {
   // In server mode, derive WS URL from the configured server URL (or override endpoint).
   // In standalone mode, wsUrl is always overwritten below with localhost:{port}.
-  const preferSecureTransport = !isStandaloneMode && serverUrl.startsWith('https')
-  let wsUrl = normalizeWsEndpoint(endpointUrl || serverUrl, preferSecureTransport)
+  let wsUrl = toWebSocketUrl(endpointUrl || serverUrl || localhostUrl(STANDALONE_PORT))
 
   if (isStandaloneMode) {
     onStage('setup.checking')
@@ -165,7 +132,7 @@ export const runWarmConnectionFlow = async ({
         const status = await checkEngineStatus()
         if (status?.server_port) selectedPort = status.server_port
       }
-      wsUrl = normalizeWsEndpoint(localhostUrl(selectedPort), false)
+      wsUrl = toWebSocketUrl(localhostUrl(selectedPort))
 
       const serverAlreadyReady = await checkServerReady()
       if (serverAlreadyReady) {
@@ -194,7 +161,7 @@ export const runWarmConnectionFlow = async ({
         return
       }
       selectedPort = openPort
-      wsUrl = normalizeWsEndpoint(localhostUrl(selectedPort), false)
+      wsUrl = toWebSocketUrl(localhostUrl(selectedPort))
 
       const status = await checkEngineStatus()
       if (!status?.uv_installed || !status?.repo_cloned || !status?.dependencies_synced) {

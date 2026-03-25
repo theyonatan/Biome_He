@@ -20,6 +20,7 @@ import Button from './ui/Button'
 import WorldEngineSection from './WorldEngineSection'
 import EngineInstallModal from './EngineInstallModal'
 import attributionText from '../../assets/audio/ATTRIBUTION.md?raw'
+import { normalizeServerUrl, toHealthUrl } from '../utils/serverUrl'
 
 type MenuModelOption = {
   id: string
@@ -113,6 +114,10 @@ const MenuSettingsView = ({ onBack, wide }: MenuSettingsViewProps) => {
   const [lastValidatedServerUrl, setLastValidatedServerUrl] = useState('')
   const [showServerErrorModal, setShowServerErrorModal] = useState(false)
 
+  const serverUrlUsesSecureTransport = /^\s*wss?:\/\//i.test(menuServerUrl)
+    ? /^\s*wss:\/\//i.test(menuServerUrl)
+    : /^\s*https:\/\//i.test(menuServerUrl)
+
   const [customModelStatus, setCustomModelStatus] = useState<{
     state: 'idle' | 'loading' | 'error'
     error: string | null
@@ -142,11 +147,12 @@ const MenuSettingsView = ({ onBack, wide }: MenuSettingsViewProps) => {
     const validate = async () => {
       setServerUrlStatus('loading')
       try {
-        const ok = await invoke('probe-server-health', `${menuServerUrl}/health`, 5000)
+        const normalizedUrl = normalizeServerUrl(menuServerUrl)
+        const ok = await invoke('probe-server-health', toHealthUrl(normalizedUrl), 5000)
         if (cancelled) return
         if (ok) {
           setServerUrlStatus('valid')
-          setLastValidatedServerUrl(menuServerUrl)
+          setLastValidatedServerUrl(normalizedUrl)
         } else {
           setServerUrlStatus('error')
         }
@@ -247,12 +253,9 @@ const MenuSettingsView = ({ onBack, wide }: MenuSettingsViewProps) => {
 
     let normalizedUrl: string
     try {
-      const url = new URL(menuServerUrl)
-      const normalizedPort = Number(url.port) || (url.protocol === 'https:' ? 443 : 80)
-      normalizedUrl = `${url.protocol}//${url.hostname}:${normalizedPort}`
-      setMenuServerUrl(normalizedUrl)
+      normalizedUrl = normalizeServerUrl(menuServerUrl)
     } catch {
-      setMenuServerUrl(configServerUrl)
+      setServerUrlStatus('error')
       return
     }
 
@@ -260,7 +263,7 @@ const MenuSettingsView = ({ onBack, wide }: MenuSettingsViewProps) => {
 
     setServerUrlStatus('loading')
     try {
-      const ok = await invoke('probe-server-health', `${normalizedUrl}/health`, 5000)
+      const ok = await invoke('probe-server-health', toHealthUrl(normalizedUrl), 5000)
       if (ok) {
         setServerUrlStatus('valid')
         setLastValidatedServerUrl(normalizedUrl)
@@ -333,10 +336,9 @@ const MenuSettingsView = ({ onBack, wide }: MenuSettingsViewProps) => {
     let nextServerUrl = menuServerUrl
     if (nextServerUrl.trim()) {
       try {
-        new URL(nextServerUrl)
+        normalizeServerUrl(nextServerUrl)
       } catch {
         nextServerUrl = configServerUrl
-        setMenuServerUrl(configServerUrl)
       }
     }
 
@@ -678,7 +680,7 @@ const MenuSettingsView = ({ onBack, wide }: MenuSettingsViewProps) => {
           title="Server Unreachable"
           description={
             menuServerUrl.trim()
-              ? `Could not connect to ${menuServerUrl}. The server may be down, the URL may be wrong, or a firewall may be blocking the connection.`
+              ? `Could not connect to ${menuServerUrl}. The server may be down, the URL may be wrong, or a firewall may be blocking the connection.${serverUrlUsesSecureTransport ? '\n\nHTTPS and WSS are not supported by default; if you are connecting directly to the Biome server, try using HTTP or WS instead.' : ''}`
               : 'Please enter a server URL before leaving settings.'
           }
           onConfirm={() => setShowServerErrorModal(false)}

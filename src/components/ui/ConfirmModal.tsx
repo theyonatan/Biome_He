@@ -21,7 +21,9 @@ const ConfirmModal = ({
   cancelLabel = 'Cancel'
 }: ConfirmModalProps) => (
   <Modal title={title}>
-    <p className="m-0 font-serif text-[var(--color-text-modal-muted)] text-[2.4cqh]">{description}</p>
+    <p className="m-0 font-serif text-[var(--color-text-modal-muted)] text-[2.4cqh] whitespace-pre-line">
+      {description}
+    </p>
     <div className="flex justify-end mt-[1.4cqh] gap-[1.42cqh]">
       <Button variant="secondary" className={MODAL_BUTTON} onClick={onCancel}>
         {cancelLabel}

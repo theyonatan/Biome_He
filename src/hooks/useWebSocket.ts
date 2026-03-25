@@ -3,6 +3,7 @@ import stripAnsi from 'strip-ansi'
 import { createLogger } from '../utils/logger'
 import { WsRpcClient } from '../lib/wsRpc'
 import type { StageId } from '../stages'
+import { toWebSocketUrl } from '../utils/serverUrl'
 
 const log = createLogger('WebSocket')
 const MAX_VISIBLE_LOG_LINES = 500
@@ -141,10 +142,13 @@ export const useWebSocket = (): WebSocketHook => {
     setLogs([])
 
     let wsUrl: string
-    if (endpointUrl.startsWith('ws://') || endpointUrl.startsWith('wss://')) {
-      wsUrl = endpointUrl.includes('/ws') ? endpointUrl : `${endpointUrl}/ws`
-    } else {
-      wsUrl = `ws://${endpointUrl}/ws`
+    try {
+      wsUrl = toWebSocketUrl(endpointUrl)
+    } catch (err) {
+      isConnectingRef.current = false
+      setConnectionState('error')
+      setError(err instanceof Error ? err.message : 'Invalid WebSocket endpoint')
+      return
     }
 
     let ws: WebSocket
