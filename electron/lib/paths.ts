@@ -8,6 +8,7 @@ export const SERVER_COMPONENT_FILES = [
   'server.py',
   'pyproject.toml',
   'engine_manager.py',
+  'inpainting_manager.py',
   'safety.py',
   'progress_stages.py'
 ]

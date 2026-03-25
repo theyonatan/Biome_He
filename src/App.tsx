@@ -21,13 +21,14 @@ import SocialCtaRow from './components/SocialCtaRow'
 import ViewLabel from './components/ui/ViewLabel'
 import MenuButton from './components/ui/MenuButton'
 import PauseOverlay from './components/PauseOverlay'
+import SceneEditOverlay from './components/SceneEditOverlay'
 import ConnectionLostOverlay from './components/ConnectionLostOverlay'
 import WindowControls from './components/WindowControls'
 import ConfirmModal from './components/ui/ConfirmModal'
 import useBackgroundCycle from './hooks/useBackgroundCycle'
 import useSceneGlowColor from './hooks/useSceneGlowColor'
 import usePortalGlowSample from './hooks/usePortalGlowSample'
-import { PORTAL_SPARKS_DEBUG, MENU_VIEW, type MenuViewKey } from './constants'
+import { PORTAL_SPARKS_DEBUG, SCENE_EDIT_DEBUG_PREVIEW, MENU_VIEW, type MenuViewKey } from './constants'
 import { viewFadeVariants } from './transitions'
 import PortalSparksConfigurator from './components/PortalSparksConfigurator'
 import PerformanceStatsOverlay from './components/PerformanceStatsOverlay'
@@ -53,8 +54,16 @@ const AppShell = () => {
     toggleSettings,
     transitionTo
   } = usePortal()
-  const { isStreaming, isPaused, connectionState, warning, connectionLost, statusStage, prepareReturnToMainMenu } =
-    useStreaming()
+  const {
+    isStreaming,
+    isPaused,
+    connectionState,
+    warning,
+    connectionLost,
+    statusStage,
+    prepareReturnToMainMenu,
+    sceneEditState
+  } = useStreaming()
   const {
     getVideoElement,
     currentIndex,
@@ -303,7 +312,28 @@ const AppShell = () => {
             <InputOverlay />
             <FrameTimelineOverlay />
             <div className="absolute z-[2] pointer-events-none" id="logo-container"></div>
-            <PauseOverlay isActive={isPaused} />
+            <PauseOverlay isActive={isPaused && sceneEditState.phase === 'inactive'} />
+            <SceneEditOverlay />
+            {SCENE_EDIT_DEBUG_PREVIEW && sceneEditState.lastPreview && (
+              <div className="absolute bottom-[2cqh] right-[2cqw] z-40 pointer-events-none flex flex-col gap-[0.5cqh]">
+                <div className="flex flex-col items-end">
+                  <span className="font-serif text-[1.6cqh] text-white/70 mb-[0.3cqh]">Before</span>
+                  <img
+                    src={`data:image/jpeg;base64,${sceneEditState.lastPreview.originalB64}`}
+                    alt="Before inpainting"
+                    className="h-[18cqh] border border-white/30 shadow-lg"
+                  />
+                </div>
+                <div className="flex flex-col items-end">
+                  <span className="font-serif text-[1.6cqh] text-white/70 mb-[0.3cqh]">After</span>
+                  <img
+                    src={`data:image/jpeg;base64,${sceneEditState.lastPreview.inpaintedB64}`}
+                    alt="After inpainting"
+                    className="h-[18cqh] border border-white/30 shadow-lg"
+                  />
+                </div>
+              </div>
+            )}
             {warning && !connectionLost && (
               <div
                 key={warning}

@@ -1,6 +1,7 @@
 import type { EngineStatus } from '../types/app'
 import type { StageId } from '../stages'
 import type { ServerMetrics } from '../hooks/useWebSocket'
+import type { SceneEditState, SceneEditEvent } from './sceneEditMachine'
 
 export type StreamingStats = {
   gentime: number
@@ -23,6 +24,8 @@ export type StreamingContextValue = {
   unlockDelayMs: number
   pauseElapsedMs: number
   settingsOpen: boolean
+  sceneEditState: SceneEditState
+  dispatchSceneEdit: (event: SceneEditEvent) => void
   statusStage: StageId | null
   isFreshInstall: boolean
 

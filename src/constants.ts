@@ -18,3 +18,6 @@ export const PORTAL_SPARKS_DEBUG = false
 
 /** Allow users to add their own scenes via drag-and-drop, paste, or file picker. */
 export const ALLOW_USER_SCENES = false
+
+/** Show the last inpainted frame as a debug thumbnail in the bottom-right during streaming. */
+export const SCENE_EDIT_DEBUG_PREVIEW = true

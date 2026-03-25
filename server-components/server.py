@@ -289,6 +289,7 @@ except Exception as e:
 # ============================================================================
 
 world_engine = None
+inpainting_manager = None
 safety_checker = None
 safe_seeds_cache = {}  # Maps filename -> {hash, is_safe, path}
 rescan_lock = None  # Prevent concurrent rescans (initialized in lifespan)
@@ -632,7 +633,7 @@ def _broadcast_startup_stage(stage: Stage) -> None:
 
 async def _heavy_init() -> None:
     """Run heavy startup work (safety warmup, seed validation) in background."""
-    global world_engine, safety_checker, safe_seeds_cache, startup_complete, startup_error
+    global world_engine, inpainting_manager, safety_checker, safe_seeds_cache, startup_complete, startup_error
 
     try:
         _broadcast_startup_stage(STARTUP_BEGIN)
@@ -641,6 +642,9 @@ async def _heavy_init() -> None:
         logger.info("Initializing WorldEngine...")
         _broadcast_startup_stage(STARTUP_ENGINE_MANAGER)
         world_engine = WorldEngineManager()
+
+        from inpainting_manager import InpaintingManager
+        inpainting_manager = InpaintingManager(world_engine.cuda_executor)
 
         logger.info("Initializing Safety Checker...")
         _broadcast_startup_stage(STARTUP_SAFETY_CHECKER)
@@ -869,6 +873,8 @@ async def dispatch_request(msg: dict, websocket: WebSocket) -> dict | BinaryResp
         return await _handle_seeds_rescan(msg)
     elif req_type == "model_info":
         return await _handle_model_info(msg)
+    elif req_type == "scene_edit_warmup":
+        return await _handle_scene_edit_warmup(msg)
     else:
         return {"success": False, "error": f"Unknown request type: {req_type}"}
 
@@ -1189,6 +1195,67 @@ async def _handle_model_info(msg: dict) -> dict:
         return {"success": True, "data": {"id": model_id, "size_bytes": None, "exists": True, "error": "Could not check model"}}
 
 
+def _run_scene_edit_on_generator(prompt: str, cpu_frames: list) -> dict:
+    """Run inpainting on the generator thread, append via CUDA executor.
+
+    Takes the last subframe from the most recent gen_frame output,
+    inpaints it, expands to a full n_frames tensor, submits append_frame
+    to the CUDA executor (required for CUDA graph compatibility), and
+    returns preview data for the RPC response.
+    """
+    import base64
+
+    last_frame_np = cpu_frames[-1]
+
+    # Encode original for debug preview
+    original_jpeg = world_engine._numpy_to_jpeg(last_frame_np)
+    original_b64 = base64.b64encode(original_jpeg).decode("ascii")
+
+    # Run inpainting (diffusers pipeline, not CUDA-graph dependent)
+    inpainted = inpainting_manager._inpaint_sync(
+        last_frame_np, prompt, world_engine.seed_target_size
+    )
+
+    # Encode inpainted for debug preview
+    preview_jpeg = world_engine._numpy_to_jpeg(
+        world_engine._tensor_to_numpy(inpainted)
+    )
+    preview_b64 = base64.b64encode(preview_jpeg).decode("ascii")
+
+    # Expand to full n_frames for multiframe models
+    if world_engine.is_multiframe:
+        inpainted = (
+            inpainted.unsqueeze(0)
+            .expand(world_engine.n_frames, -1, -1, -1)
+            .contiguous()
+        )
+
+    # append_frame uses @torch.compile with CUDA graphs — must run on
+    # the dedicated CUDA executor thread.
+    world_engine.cuda_executor.submit(
+        lambda f=inpainted: world_engine.engine.append_frame(f)
+    ).result()
+
+    return {
+        "original_jpeg_b64": original_b64,
+        "preview_jpeg_b64": preview_b64,
+    }
+
+
+async def _handle_scene_edit_warmup(msg: dict) -> dict:
+    """Load the inpainting model to GPU so it's ready for scene editing."""
+    if inpainting_manager is None:
+        return {"success": False, "error": "Inpainting not available"}
+    if inpainting_manager.is_loaded:
+        return {"success": True, "data": {"already_loaded": True}}
+    try:
+        await inpainting_manager.warmup()
+        return {"success": True, "data": {"already_loaded": False}}
+    except Exception as e:
+        logger.error(f"[SCENE_EDIT] Warmup failed: {e}", exc_info=True)
+        return {"success": False, "error": str(e)}
+
+
 # ============================================================================
 # WorldEngine WebSocket
 # ============================================================================
@@ -1427,6 +1494,8 @@ async def websocket_endpoint(websocket: WebSocket):
             await send_stage(SESSION_WAITING_FOR_SEED)
         logger.info(f"[{client_host}] Model loaded: {world_engine.model_uri}")
 
+    scene_edit_requested = False
+
     try:
         # Wait for initial seed from client
         await send_stage(SESSION_WAITING_FOR_SEED)
@@ -1456,6 +1525,8 @@ async def websocket_endpoint(websocket: WebSocket):
                     continue
 
                 if msg_type == "set_model":
+                    if msg.get("scene_edit"):
+                        scene_edit_requested = True
                     await handle_model_request(
                         msg.get("model"),
                         live_switch=False,
@@ -1489,6 +1560,18 @@ async def websocket_endpoint(websocket: WebSocket):
             world_engine.set_progress_callback(None)
             return
 
+        # Load inpainting model BEFORE WorldEngine warmup so CUDA graphs
+        # are compiled with the inpainting model's memory already allocated.
+        if scene_edit_requested and inpainting_manager is not None and not inpainting_manager.is_loaded:
+            from progress_stages import SESSION_INPAINTING_LOAD, SESSION_INPAINTING_READY
+            await send_stage(SESSION_INPAINTING_LOAD)
+            try:
+                await inpainting_manager.warmup()
+                await send_stage(SESSION_INPAINTING_READY)
+            except Exception as e:
+                logger.error(f"[{client_host}] Inpainting warmup failed: {e}", exc_info=True)
+                await send_warning(f"Scene edit model failed to load: {e}")
+
         # Warmup on first connection AFTER seed is loaded
         if not world_engine.engine_warmed_up:
             await world_engine.warmup()
@@ -1516,6 +1599,11 @@ async def websocket_endpoint(websocket: WebSocket):
         paused = False
         reset_flag = False
         prompt_pending: str | None = None
+        # Scene edit: receiver posts a prompt + future, generator picks it up
+        # after the current gen_frame, runs inpainting on the last subframe,
+        # appends the result, and resolves the future with preview data.
+        scene_edit_request: dict | None = None  # {"prompt": str, "future": concurrent.futures.Future}
+        last_generated_cpu_frames = None  # Most recent CPU numpy frames for scene editing (list)
         ctrl_state = {
             "buttons": set(),
             "mouse_dx": 0.0,
@@ -1613,7 +1701,7 @@ async def websocket_endpoint(websocket: WebSocket):
         queue_send(_build_initial_metrics())
 
         async def receiver() -> None:
-            nonlocal running, paused, reset_flag, prompt_pending
+            nonlocal running, paused, reset_flag, prompt_pending, scene_edit_request
             while running:
                 try:
                     raw = await websocket.receive_text()
@@ -1621,7 +1709,29 @@ async def websocket_endpoint(websocket: WebSocket):
                     msg_type = msg.get("type", "control")
 
                     if "req_id" in msg:
-                        result = await dispatch_request(msg, websocket)
+                        # scene_edit is handled by the generator thread at
+                        # the next clean frame boundary — post a request and
+                        # await the future.
+                        if msg.get("type") == "scene_edit":
+                            prompt = msg.get("prompt", "").strip()
+                            if not prompt:
+                                result = {"success": False, "error": "Empty prompt"}
+                            elif inpainting_manager is None or not inpainting_manager.is_loaded:
+                                result = {"success": False, "error": "Inpainting model not loaded. Enable Scene Edit in Experimental settings."}
+                            elif scene_edit_request is not None:
+                                result = {"success": False, "error": "Scene edit already in progress"}
+                            else:
+                                import concurrent.futures
+                                fut = concurrent.futures.Future()
+                                scene_edit_request = {"prompt": prompt, "future": fut}
+                                # Await the future (generator will resolve it)
+                                try:
+                                    preview_data = await asyncio.wrap_future(fut)
+                                    result = {"success": True, "data": {**preview_data}}
+                                except Exception as e:
+                                    result = {"success": False, "error": str(e)}
+                        else:
+                            result = await dispatch_request(msg, websocket)
                         req_id = msg["req_id"]
                         if isinstance(result, BinaryResponse):
                             header = json.dumps(
@@ -1729,7 +1839,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     break
 
         def generator() -> None:
-            nonlocal running, paused, reset_flag, prompt_pending
+            nonlocal running, paused, reset_flag, prompt_pending, scene_edit_request, last_generated_cpu_frames
 
             def run_coro(coro):
                 return asyncio.run_coroutine_threadsafe(coro, main_loop).result()
@@ -1788,6 +1898,21 @@ async def websocket_endpoint(websocket: WebSocket):
                         run_coro(reset_engine())
                         reset_flag = False
 
+                    # Handle pending scene edit — runs inpainting on the last
+                    # subframe from the most recent gen_frame, then appends.
+                    if scene_edit_request is not None and last_generated_cpu_frames is not None:
+                        req = scene_edit_request
+                        scene_edit_request = None
+                        _flush_pending()
+                        try:
+                            preview = _run_scene_edit_on_generator(
+                                req["prompt"], last_generated_cpu_frames
+                            )
+                            req["future"].set_result(preview)
+                        except Exception as e:
+                            logger.error(f"[SCENE_EDIT] Failed: {e}", exc_info=True)
+                            req["future"].set_exception(e)
+
                     with ctrl_lock:
                         if not ctrl_state["dirty"]:
                             buttons = None
@@ -1839,6 +1964,9 @@ async def websocket_endpoint(websocket: WebSocket):
                         cpu_frames = [world_engine._tensor_to_numpy(result[i]) for i in range(result.shape[0])]
                     else:
                         cpu_frames = [world_engine._tensor_to_numpy(result)]
+
+                    # Keep all subframes for scene editing (read by receiver thread)
+                    last_generated_cpu_frames = cpu_frames
 
                     # Stash this batch's CPU frames for deferred JPEG encoding
                     _flush_pending.work = (cpu_frames, gen_time, n_frames, client_ts, t0, t_infer, t_sync)

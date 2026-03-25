@@ -82,7 +82,8 @@ export const useGameInput = (
   enabled = false,
   containerRef: RefObject<HTMLElement | null> | null = null,
   onReset: (() => void) | null = null,
-  keybindings: Keybindings = DEFAULT_KEYBINDINGS
+  keybindings: Keybindings = DEFAULT_KEYBINDINGS,
+  onSceneEdit?: (() => void) | null
 ): UseGameInputResult => {
   const [pressedKeys, setPressedKeys] = useState<Set<string>>(new Set())
   const [mouseButtons, setMouseButtons] = useState<Set<string>>(new Set())
@@ -95,8 +96,9 @@ export const useGameInput = (
   const effectiveKeyMap = useMemo(() => {
     const map = { ...KEY_MAP }
     delete map[keybindings.reset_scene]
+    delete map[keybindings.scene_edit]
     return map
-  }, [keybindings.reset_scene])
+  }, [keybindings.reset_scene, keybindings.scene_edit])
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -114,6 +116,11 @@ export const useGameInput = (
         e.preventDefault()
         return
       }
+      if (e.code === keybindings.scene_edit) {
+        onSceneEdit?.()
+        e.preventDefault()
+        return
+      }
       if (e.code === 'Tab' && e.altKey) return
 
       const button = effectiveKeyMap[e.code]
@@ -122,7 +129,7 @@ export const useGameInput = (
         setPressedKeys((prev) => new Set([...prev, button]))
       }
     },
-    [enabled, onReset, keybindings.reset_scene, effectiveKeyMap]
+    [enabled, onReset, onSceneEdit, keybindings.reset_scene, keybindings.scene_edit, effectiveKeyMap]
   )
 
   const handleKeyUp = useCallback(

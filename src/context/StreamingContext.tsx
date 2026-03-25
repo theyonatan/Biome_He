@@ -27,6 +27,7 @@ import useEngine from '../hooks/useEngine'
 import useSeeds from '../hooks/useSeeds'
 import { createLogger } from '../utils/logger'
 import type { StreamingContextValue } from './streamingContextTypes'
+import { initialSceneEditState, sceneEditReducer } from './sceneEditMachine'
 
 const log = createLogger('Streaming')
 
@@ -108,6 +109,8 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
   const [pausedAt, setPausedAt] = useState<number | null>(null)
   const [pauseElapsedMs, setPauseElapsedMs] = useState(0)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [sceneEditState, dispatchSceneEdit] = useReducer(sceneEditReducer, initialSceneEditState)
+  const sceneEditActive = sceneEditState.phase !== 'inactive'
   const [showStats, setShowStats] = useState(false)
   const [mouseSensitivity, setMouseSensitivity] = useState(() => settings.mouse_sensitivity ?? 1.0)
   const [fps, setFps] = useState(0)
@@ -142,7 +145,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
 
   const hasReceivedFrame = frame !== null
   const isStreaming = state === states.STREAMING
-  const inputEnabled = isStreaming && isReady && !isPaused && !settingsOpen && !connectionLost
+  const inputEnabled = isStreaming && isReady && !isPaused && !settingsOpen && !connectionLost && !sceneEditActive
   const canUnpause = pauseElapsedMs >= UNLOCK_DELAY_MS
 
   // Track elapsed time since pause for unlock delay
@@ -216,10 +219,21 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
         setPlaceholderFrame(result.blob)
       })
       .catch(() => null)
-    sendModel(selectedModel, seed)
+    sendModel(selectedModel, seed, {
+      sceneEdit: settings.experimental?.scene_edit_enabled ?? false
+    })
     lastAppliedModelRef.current = selectedModel
     warmBootstrapSentRef.current = true
-  }, [state, states.LOADING, isConnected, settings?.engine_model, sendModel, setPlaceholderFrame, wsRequest])
+  }, [
+    state,
+    states.LOADING,
+    isConnected,
+    settings?.engine_model,
+    settings.experimental?.scene_edit_enabled,
+    sendModel,
+    setPlaceholderFrame,
+    wsRequest
+  ])
 
   useEffect(() => {
     if (!isConnected) {
@@ -258,11 +272,16 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     requestPointerLock()
   }, [reset, requestPointerLock])
 
+  const handleSceneEdit = useCallback(() => {
+    dispatchSceneEdit({ type: 'OPEN' })
+  }, [])
+
   const { pressedKeys, mouseButtons, getInputState, isPointerLocked } = useGameInput(
     inputEnabled,
     containerRef,
     handleReset,
-    settings.keybindings
+    settings.keybindings,
+    settings.experimental?.scene_edit_enabled ? handleSceneEdit : null
   )
 
   useEffect(() => {
@@ -625,6 +644,8 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     unlockDelayMs: UNLOCK_DELAY_MS,
     pauseElapsedMs,
     settingsOpen,
+    sceneEditState,
+    dispatchSceneEdit,
     statusStage: effectiveStatusStage,
     isFreshInstall,
 

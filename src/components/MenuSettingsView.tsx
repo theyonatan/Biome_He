@@ -103,6 +103,9 @@ const MenuSettingsView = ({ onBack, wide }: MenuSettingsViewProps) => {
   const [showCredits, setShowCredits] = useState(false)
 
   const [menuKeybindings, setMenuKeybindings] = useState<Keybindings>(() => ({ ...settings.keybindings }))
+  const [menuSceneEditEnabled, setMenuSceneEditEnabled] = useState(
+    () => settings.experimental?.scene_edit_enabled ?? false
+  )
   const [menuPerformanceStats, setMenuPerformanceStats] = useState(() => settings.debug_overlays.performance_stats)
   const [menuInputOverlay, setMenuInputOverlay] = useState(() => settings.debug_overlays.input)
   const [menuFrameTimeline, setMenuFrameTimeline] = useState(() => settings.debug_overlays.frame_timeline)
@@ -230,6 +233,7 @@ const MenuSettingsView = ({ onBack, wide }: MenuSettingsViewProps) => {
     setMenuMouseSensitivity(streamingToMenu(settings.mouse_sensitivity ?? mouseSensitivity))
     setMenuServerUrl(configServerUrl)
     setMenuKeybindings({ ...settings.keybindings })
+    setMenuSceneEditEnabled(settings.experimental?.scene_edit_enabled ?? false)
     setMenuPerformanceStats(settings.debug_overlays.performance_stats)
     setMenuInputOverlay(settings.debug_overlays.input)
     setMenuFrameTimeline(settings.debug_overlays.frame_timeline)
@@ -353,6 +357,9 @@ const MenuSettingsView = ({ onBack, wide }: MenuSettingsViewProps) => {
       mouse_sensitivity: streamingValue,
       keybindings: menuKeybindings,
       audio: volume.getAudioSettings(),
+      experimental: {
+        scene_edit_enabled: menuSceneEditEnabled
+      },
       debug_overlays: {
         performance_stats: menuPerformanceStats,
         input: menuInputOverlay,
@@ -368,6 +375,7 @@ const MenuSettingsView = ({ onBack, wide }: MenuSettingsViewProps) => {
     menuServerUrl,
     menuWorldModel,
     menuKeybindings,
+    menuSceneEditEnabled,
     menuPerformanceStats,
     menuInputOverlay,
     menuFrameTimeline,
@@ -603,14 +611,31 @@ const MenuSettingsView = ({ onBack, wide }: MenuSettingsViewProps) => {
               label="Reset Scene"
               value={menuKeybindings.reset_scene}
               onChange={(code) => setMenuKeybindings((prev) => ({ ...prev, reset_scene: code }))}
-              warning={getKeybindConflict(menuKeybindings.reset_scene, [])}
+              warning={getKeybindConflict(menuKeybindings.reset_scene, [menuKeybindings.scene_edit])}
             />
+            {menuSceneEditEnabled && (
+              <KeybindRow
+                label="Scene Edit"
+                value={menuKeybindings.scene_edit}
+                onChange={(code) => setMenuKeybindings((prev) => ({ ...prev, scene_edit: code }))}
+                warning={getKeybindConflict(menuKeybindings.scene_edit, [menuKeybindings.reset_scene])}
+              />
+            )}
           </SettingsSection>
 
           <SettingsSection title="Fixed Controls" description="what are the built-in controls?">
             {FIXED_CONTROLS.map((ctrl) => (
               <KeybindRow key={ctrl.label} label={ctrl.label} fixedLabel={fixedControlDisplay(ctrl)} />
             ))}
+          </SettingsSection>
+
+          <SettingsSection title="Experimental" description="features that are still in development">
+            <SettingsCheckbox
+              label="Scene Edit"
+              description="Press a key during gameplay to inpaint part of the scene with a text prompt. Requires ~1.5GB additional VRAM."
+              checked={menuSceneEditEnabled}
+              onChange={setMenuSceneEditEnabled}
+            />
           </SettingsSection>
 
           <SettingsSection title="Debug Metrics" description="want to see what's happening under the hood?">
