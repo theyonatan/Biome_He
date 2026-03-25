@@ -680,7 +680,7 @@ const MenuSettingsView = ({ onBack, wide }: MenuSettingsViewProps) => {
           title="Server Unreachable"
           description={
             menuServerUrl.trim()
-              ? `Could not connect to ${menuServerUrl}. The server may be down, the URL may be wrong, or a firewall may be blocking the connection.${serverUrlUsesSecureTransport ? ' HTTPS and WSS are not supported by default. If you are connecting directly to the Biome server, try using HTTP or WS instead.' : ''}`
+              ? `Could not connect to ${menuServerUrl}. The server may be down, the URL may be wrong, or a firewall may be blocking the connection.${serverUrlUsesSecureTransport ? '\n\nHTTPS and WSS are not supported by default; if you are connecting directly to the Biome server, try using HTTP or WS instead.' : ''}`
               : 'Please enter a server URL before leaving settings.'
           }
           onConfirm={() => setShowServerErrorModal(false)}
