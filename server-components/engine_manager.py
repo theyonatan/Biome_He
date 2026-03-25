@@ -54,8 +54,8 @@ JPEG_QUALITY = 85
 # n_frames is derived from model_cfg.temporal_compression at load time;
 # the value here is only a fallback for models that don't expose it.
 MODEL_CFG = {
-    "legacy": {
-        "label": "legacy (single-frame)",
+    "waypoint-1": {
+        "label": "waypoint-1 (single-frame)",
         "n_frames": 1,
         "seed_target_size": (360, 640),
         "has_prompt_conditioning": False,
@@ -131,7 +131,7 @@ class WorldEngineManager:
         self.model_uri = DEFAULT_MODEL_URI
         self.current_prompt = DEFAULT_PROMPT
         self.engine_warmed_up = False
-        self.cfg = MODEL_CFG["legacy"].copy()
+        self.cfg = MODEL_CFG["waypoint-1"].copy()
         self.n_frames = self.cfg["n_frames"]
         self.is_multiframe = self.n_frames > 1
         self.seed_target_size = self.cfg["seed_target_size"]
@@ -183,12 +183,12 @@ class WorldEngineManager:
     def _resolve_runtime_cfg(self, model_cfg) -> dict:
         """Resolve runtime config from defaults, overridden by model_cfg attributes."""
         model_type = getattr(model_cfg, "model_type", None)
-        if model_type is not None and model_type not in MODEL_CFG:
+        if model_type not in MODEL_CFG:
             raise RuntimeError(
-                f"Unsupported model_type '{model_type}'. Only 'waypoint-1.5' and legacy (no model_type) are supported."
+                f"Unsupported model_type '{model_type}'. Only 'waypoint-1' and 'waypoint-1.5' are supported."
             )
 
-        cfg_key = model_type or "legacy"
+        cfg_key = model_type
         cfg = MODEL_CFG[cfg_key].copy()
         cfg["has_prompt_conditioning"] = (
             getattr(model_cfg, "prompt_conditioning", None) is not None
@@ -238,7 +238,7 @@ class WorldEngineManager:
         self.engine = None
         self.seed_frame = None
         self.engine_warmed_up = False
-        self.cfg = MODEL_CFG["legacy"].copy()
+        self.cfg = MODEL_CFG["waypoint-1"].copy()
         self.n_frames = self.cfg["n_frames"]
         self.is_multiframe = self.n_frames > 1
         self.seed_target_size = self.cfg["seed_target_size"]
@@ -364,9 +364,6 @@ class WorldEngineManager:
                             device=DEVICE,
                             quant=QUANT,
                             dtype=dtype,
-                            # Our models don't use prompt conditioning, but
-                            # WorldEngine's config expects the field to be present.
-                            model_config_overrides={"prompt_conditioning": None},
                         )
 
                     new_engine = await self._run_on_cuda_thread(_create_engine)
