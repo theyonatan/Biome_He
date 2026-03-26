@@ -15,13 +15,15 @@ export type SceneEditState = {
   errorMessage: string
   /** Debug preview of the last inpaint operation (before + after). */
   lastPreview: SceneEditDebugPreview | null
+  /** The VLM-generated edit prompt used for the last edit (for notification). */
+  lastEditPrompt: string | null
 }
 
 export type SceneEditEvent =
   | { type: 'OPEN' }
   | { type: 'DISMISS' }
   | { type: 'SUBMIT'; prompt: string }
-  | { type: 'SUCCESS'; preview?: SceneEditDebugPreview }
+  | { type: 'SUCCESS'; preview?: SceneEditDebugPreview; editPrompt?: string }
   | { type: 'ERROR'; message: string }
   | { type: 'ERROR_TIMEOUT' }
 
@@ -29,7 +31,8 @@ export const initialSceneEditState: SceneEditState = {
   phase: 'inactive',
   prompt: '',
   errorMessage: '',
-  lastPreview: null
+  lastPreview: null,
+  lastEditPrompt: null
 }
 
 export function sceneEditReducer(state: SceneEditState, event: SceneEditEvent): SceneEditState {
@@ -48,7 +51,11 @@ export function sceneEditReducer(state: SceneEditState, event: SceneEditEvent): 
 
     case 'SUCCESS':
       if (state.phase !== 'loading') return state
-      return { ...initialSceneEditState, lastPreview: event.preview ?? state.lastPreview }
+      return {
+        ...initialSceneEditState,
+        lastPreview: event.preview ?? state.lastPreview,
+        lastEditPrompt: event.editPrompt ?? null
+      }
 
     case 'ERROR':
       if (state.phase !== 'loading') return state

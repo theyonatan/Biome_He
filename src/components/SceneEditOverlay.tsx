@@ -52,13 +52,15 @@ const SceneEditOverlay = () => {
         elapsed_ms: number
         original_jpeg_b64?: string
         preview_jpeg_b64?: string
+        edit_prompt?: string
       }>('scene_edit', { prompt: trimmed }, 30_000)
       dispatchSceneEdit({
         type: 'SUCCESS',
         preview:
           result?.original_jpeg_b64 && result?.preview_jpeg_b64
             ? { originalB64: result.original_jpeg_b64, inpaintedB64: result.preview_jpeg_b64 }
-            : undefined
+            : undefined,
+        editPrompt: result?.edit_prompt
       })
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)

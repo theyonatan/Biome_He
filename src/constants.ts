@@ -21,3 +21,9 @@ export const ALLOW_USER_SCENES = false
 
 /** Show the last inpainted frame as a debug thumbnail in the bottom-right during streaming. */
 export const SCENE_EDIT_DEBUG_PREVIEW = true
+
+/** How long (ms) to show the edit prompt toast at the bottom of the screen. */
+export const SCENE_EDIT_PROMPT_TOAST_MS = 2500
+
+/** How long (ms) to show the before/after debug preview (2× prompt toast by default). */
+export const SCENE_EDIT_PREVIEW_TOAST_MS = SCENE_EDIT_PROMPT_TOAST_MS * 2

@@ -1214,7 +1214,7 @@ def _run_scene_edit_on_generator(prompt: str, cpu_frames: list) -> dict:
     original_b64 = base64.b64encode(original_jpeg).decode("ascii")
 
     # Run inpainting (diffusers pipeline, not CUDA-graph dependent)
-    inpainted = inpainting_manager._inpaint_sync(
+    inpainted, edit_prompt = inpainting_manager._inpaint_sync(
         last_frame_np, prompt, world_engine.seed_target_size
     )
 
@@ -1255,6 +1255,7 @@ def _run_scene_edit_on_generator(prompt: str, cpu_frames: list) -> dict:
     return {
         "original_jpeg_b64": original_b64,
         "preview_jpeg_b64": preview_b64,
+        "edit_prompt": edit_prompt,
     }
 
 
