@@ -222,7 +222,9 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     sendModel(selectedModel, seed, {
       sceneEdit: settings.experimental?.scene_edit_enabled ?? false
     })
-    lastAppliedModelRef.current = selectedModel
+    lastAppliedModelRef.current = settings.experimental?.scene_edit_enabled
+      ? `${selectedModel}+scene_edit`
+      : selectedModel
     warmBootstrapSentRef.current = true
   }, [
     state,
@@ -298,7 +300,8 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
         socketReady: isReady,
         isPointerLocked,
         settingsOpen,
-        isPaused
+        isPaused,
+        sceneEditEnabled: settings.experimental?.scene_edit_enabled
       })
     })
   }, [
@@ -306,6 +309,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     connectionState,
     error,
     settings?.engine_model,
+    settings.experimental?.scene_edit_enabled,
     engineError,
     hasReceivedFrame,
     isReady,
