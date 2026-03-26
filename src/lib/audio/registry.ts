@@ -9,6 +9,8 @@ export const SOUND_CATEGORIES: Record<SoundId, SoundCategory> = {
   ui_back: 'sfx',
   ui_toggle_on: 'sfx',
   ui_toggle_off: 'sfx',
+  goose_start: 'sfx',
+  goose_end: 'sfx',
   error: 'sfx',
   portal_swoosh: 'sfx',
   portal_swoosh_long: 'sfx',
@@ -28,6 +30,8 @@ export const SOUND_CATEGORIES: Record<SoundId, SoundCategory> = {
  *   ui_click: new URL('../../../assets/audio/click.wav', import.meta.url).href
  */
 export const SOUND_ASSETS: Partial<Record<SoundId, string>> = {
+  goose_start: new URL('../../../assets/audio/goose_start.mp3', import.meta.url).href,
+  goose_end: new URL('../../../assets/audio/goose_end.mp3', import.meta.url).href,
   music_menu: new URL('../../../assets/audio/music_menu.mp3', import.meta.url).href,
   vortex_loop: new URL('../../../assets/audio/vortex_loop.wav', import.meta.url).href
 }

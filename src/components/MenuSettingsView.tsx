@@ -19,6 +19,7 @@ import ConfirmModal from './ui/ConfirmModal'
 import Button from './ui/Button'
 import WorldEngineSection from './WorldEngineSection'
 import EngineInstallModal from './EngineInstallModal'
+import { GooseModeCheckbox } from './GooseMode'
 import attributionText from '../../assets/audio/ATTRIBUTION.md?raw'
 import { normalizeServerUrl, toHealthUrl } from '../utils/serverUrl'
 
@@ -106,6 +107,7 @@ const MenuSettingsView = ({ onBack, wide }: MenuSettingsViewProps) => {
   const [menuPerformanceStats, setMenuPerformanceStats] = useState(() => settings.debug_overlays.performance_stats)
   const [menuInputOverlay, setMenuInputOverlay] = useState(() => settings.debug_overlays.input)
   const [menuFrameTimeline, setMenuFrameTimeline] = useState(() => settings.debug_overlays.frame_timeline)
+  const [menuGooseMode, setMenuGooseMode] = useState(() => settings.goose_mode)
 
   const configServerUrl = settings.server_url
   const [menuServerUrl, setMenuServerUrl] = useState(configServerUrl)
@@ -233,6 +235,7 @@ const MenuSettingsView = ({ onBack, wide }: MenuSettingsViewProps) => {
     setMenuPerformanceStats(settings.debug_overlays.performance_stats)
     setMenuInputOverlay(settings.debug_overlays.input)
     setMenuFrameTimeline(settings.debug_overlays.frame_timeline)
+    setMenuGooseMode(settings.goose_mode)
   }, [
     configEngineMode,
     configWorldModel,
@@ -242,7 +245,8 @@ const MenuSettingsView = ({ onBack, wide }: MenuSettingsViewProps) => {
     settings.keybindings,
     settings.debug_overlays.performance_stats,
     settings.debug_overlays.input,
-    settings.debug_overlays.frame_timeline
+    settings.debug_overlays.frame_timeline,
+    settings.goose_mode
   ])
 
   const handleServerUrlBlur = useCallback(async () => {
@@ -350,6 +354,7 @@ const MenuSettingsView = ({ onBack, wide }: MenuSettingsViewProps) => {
       server_url: nextServerUrl,
       engine_mode: engineModeValue,
       engine_model: menuWorldModel,
+      goose_mode: menuGooseMode,
       mouse_sensitivity: streamingValue,
       keybindings: menuKeybindings,
       audio: volume.getAudioSettings(),
@@ -371,6 +376,7 @@ const MenuSettingsView = ({ onBack, wide }: MenuSettingsViewProps) => {
     menuPerformanceStats,
     menuInputOverlay,
     menuFrameTimeline,
+    menuGooseMode,
     volume.getAudioSettings,
     saveSettings,
     setMouseSensitivity
@@ -456,7 +462,7 @@ const MenuSettingsView = ({ onBack, wide }: MenuSettingsViewProps) => {
           Tweak your world to your liking.
         </p>
         <div
-          className={`styled-scrollbar overflow-y-auto pr-[0.8cqh] max-h-[62cqh] mt-[1.1cqh] relative z-[4] flex flex-col gap-[2.3cqh] ${wide ? 'w-[83%]' : 'w-[63%]'}`}
+          className={`styled-scrollbar overflow-y-auto pr-[0.8cqh] pb-[1.2cqh] max-h-[62cqh] mt-[1.1cqh] relative z-[4] flex flex-col gap-[2.3cqh] ${wide ? 'w-[83%]' : 'w-[63%]'}`}
         >
           <SettingsSection
             title="Engine Mode"
@@ -622,6 +628,7 @@ const MenuSettingsView = ({ onBack, wide }: MenuSettingsViewProps) => {
               />
               <SettingsCheckbox label="Input Overlay" checked={menuInputOverlay} onChange={setMenuInputOverlay} />
               <SettingsCheckbox label="Frame Timeline" checked={menuFrameTimeline} onChange={setMenuFrameTimeline} />
+              <GooseModeCheckbox checked={menuGooseMode} onChange={setMenuGooseMode} />
             </div>
           </SettingsSection>
         </div>
