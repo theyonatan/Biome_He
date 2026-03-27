@@ -13,6 +13,8 @@ node scripts/release.mjs <version> # Cut a release (bump versions, commit, tag)
 
 No test framework is configured.
 
+Run `npm run lint` after every major block of work to catch formatting and type errors early. Use `npm run lint-fix` to auto-fix formatting issues found by the linter.
+
 ## Architecture
 
 Biome is an Electron desktop app that runs AI-generated worlds locally on GPU via a Python-based World Engine server.
