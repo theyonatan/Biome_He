@@ -125,6 +125,47 @@ Prettier with: no semicolons, single quotes, arrow parens always, 120 char width
 - **Shared styles**: `src/styles.ts` exports reusable Tailwind class constants (e.g. `SETTINGS_CONTROL_BASE`, `HEADING_BASE`). `src/transitions.ts` exports Framer Motion variants. Extract shared Tailwind strings into constants and create components for duplicated UI patterns.
 - **Animations**: `src/css/animations.css` for `@keyframes`, `src/css/video-mask.css` for the CRT shutdown effect. Applied via conditional CSS classes.
 
+## Localisation
+
+Translations live in `src/i18n/` as TypeScript constant files (`en.ts`, `ja.ts`, `zh.ts`). The i18next module augmentation in `src/i18n/i18next.d.ts` enables **compile-time enforcement** of translation keys — passing an invalid key to `t()` or to any component that accepts a `TranslationKey` is a type error.
+
+### Translation key type
+
+`TranslationKey` (exported from `src/i18n/index.ts`) is the union of all valid dot-separated translation paths (e.g. `'app.buttons.close'`). Use it in component props wherever the value should be a translation key.
+
+### Translated vs Raw components
+
+UI components **prefer translation keys by default**. Components that accept user-visible text have two variants:
+
+| Translated (default)                       | Raw (escape hatch)                          | When to use Raw                       |
+| ------------------------------------------ | ------------------------------------------- | ------------------------------------- |
+| `Button` (`label: TranslationKey`)         | `RawButton` (`children: ReactNode`)         | Icons, mixed content, dynamic strings |
+| `MenuButton` (`label: TranslationKey`)     | `RawMenuButton` (`children: ReactNode`)     | Same                                  |
+| `SettingsButton` (`label: TranslationKey`) | `RawSettingsButton` (`children: ReactNode`) | Same                                  |
+
+Other components use prop-level `raw` prefixes for escape hatches:
+
+| Component               | Translated prop                                                         | Raw escape hatch                      |
+| ----------------------- | ----------------------------------------------------------------------- | ------------------------------------- |
+| `SettingsSection`       | `description: TranslationKey`                                           | `rawDescription: ReactNode`           |
+| `SettingsSelect` option | `label: TranslationKey`                                                 | `rawLabel: string`                    |
+| `SettingsSelect`        | `customLabel`, `deleteLabel`: `TranslationKey`                          | `rawCustomPrefix: string`             |
+| `ConfirmModal`          | `title`, `description`, `confirmLabel`, `cancelLabel`: `TranslationKey` | `descriptionParams` for interpolation |
+| `Modal`, `OverlayModal` | `title: TranslationKey`                                                 | —                                     |
+| `SettingsCheckbox`      | `label: TranslationKey`                                                 | —                                     |
+| `SettingsSlider`        | `label: TranslationKey`                                                 | —                                     |
+| `SettingsTextInput`     | `placeholder: TranslationKey`                                           | —                                     |
+| `SettingsToggle`        | `options[].label: TranslationKey`                                       | —                                     |
+| `ServerLogDisplay`      | `title`, `exportActionLabel`: `TranslationKey`                          | —                                     |
+
+**Prefer the translated variant.** Only reach for `Raw*` components or `raw*` props when the content genuinely cannot be a single translation key (e.g. SVG icons as button content, dynamically constructed strings, model names from an API).
+
+### Adding new translations
+
+1. Add the key to `src/i18n/en.ts` (the source of truth for key structure)
+2. Add corresponding translations to `ja.ts` and `zh.ts`
+3. Use the key in components — TypeScript will verify it exists
+
 ## Key Conventions
 
 - Shared utilities in `electron/lib/` (paths, serverState, uv, platform, seeds)
