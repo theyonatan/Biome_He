@@ -71,6 +71,8 @@ const zh = {
           title: '无法连接到服务器',
           withUrl: '无法连接到 {{url}}。服务器可能已停止、URL 有误，或被防火墙拦截。',
           noUrl: '离开设置前请输入服务器 URL。',
+          withUrlSecure:
+            '无法连接到 {{url}}。服务器可能已停止、URL 有误，或被防火墙拦截。\n\n默认不支持 HTTPS 和 WSS；如果你是直接连接 Biome 服务器，请尝试使用 HTTP 或 WS。',
           secureTransportHint: '默认不支持 HTTPS 和 WSS；如果你是直接连接 Biome 服务器，请尝试使用 HTTP 或 WS。'
         }
       },

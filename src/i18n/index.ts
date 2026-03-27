@@ -1,6 +1,9 @@
 import i18n from 'i18next'
+import type { ParseKeys } from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import { resources } from './resources'
+
+export type TranslationKey = ParseKeys
 
 export const FALLBACK_LOCALE = 'en' as const
 export const SUPPORTED_LOCALES = ['en', 'ja', 'zh'] as const
