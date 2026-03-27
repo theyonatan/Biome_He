@@ -160,11 +160,21 @@ Other components use prop-level `raw` prefixes for escape hatches:
 
 **Prefer the translated variant.** Only reach for `Raw*` components or `raw*` props when the content genuinely cannot be a single translation key (e.g. SVG icons as button content, dynamically constructed strings, model names from an API).
 
-### Adding new translations
+### Adding new translation keys
 
 1. Add the key to `src/i18n/en.ts` (the source of truth for key structure)
-2. Add corresponding translations to `ja.ts` and `zh.ts`
+2. Add corresponding translations to every other locale file (`ja.ts`, `zh.ts`, etc.)
 3. Use the key in components — TypeScript will verify it exists
+4. If you forget a locale, `tsc` will report a "Property '...' is missing" error (enforced by `KeyShape` in `resources.ts`)
+
+### Adding a new language
+
+1. Create `src/i18n/{code}.ts` with the same key structure as `en.ts` (`resources.ts` enforces this at compile time)
+2. Import it in `src/i18n/resources.ts` and add it to the `resources` object
+3. Add the locale code to `SUPPORTED_LOCALES`, `LOCALE_DISPLAY_NAMES`, and `LOCALE_MAP` in `src/i18n/index.ts`
+4. Add the locale code to the `AppLocale` type in `src/types/settings.ts`
+
+Language display names (e.g. "English", "日本語", "中文") are **not** translation keys — they live in `LOCALE_DISPLAY_NAMES` in `src/i18n/index.ts` and always appear in their native script regardless of the current locale. Only the "System Default" option is translated.
 
 ## Key Conventions
 
