@@ -7,6 +7,7 @@ import { useSettings } from '../hooks/useSettings'
 import { useEngineLogs } from '../hooks/useEngineLogs'
 import Button from './ui/Button'
 import { GooseFactTicker } from './GooseMode'
+import { isGooseMode } from '../i18n'
 import RawButton from './ui/RawButton'
 import ServerLogDisplay from './ServerLogDisplay'
 import SocialCtaRow from './SocialCtaRow'
@@ -153,7 +154,7 @@ const TerminalDisplay = ({ onCancel }: TerminalDisplayProps) => {
               />
             </div>
           </div>
-          {!errorDetail && settings.goose_mode && <GooseFactTicker />}
+          {!errorDetail && isGooseMode(settings.locale) && <GooseFactTicker />}
           <div
             className="loading-inline-logs"
             style={{

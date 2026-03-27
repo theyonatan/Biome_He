@@ -212,9 +212,6 @@ const goose = {
           inputOverlay: 'Peck overlay',
           frameTimeline: 'Feather timeline'
         },
-        gooseMode: {
-          label: 'Goose Mode'
-        },
         credits: {
           title: 'The flock'
         }

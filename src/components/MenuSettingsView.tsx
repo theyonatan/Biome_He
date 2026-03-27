@@ -112,7 +112,6 @@ const MenuSettingsView = ({ onBack, wide }: MenuSettingsViewProps) => {
   const [menuPerformanceStats, setMenuPerformanceStats] = useState(() => settings.debug_overlays.performance_stats)
   const [menuInputOverlay, setMenuInputOverlay] = useState(() => settings.debug_overlays.input)
   const [menuFrameTimeline, setMenuFrameTimeline] = useState(() => settings.debug_overlays.frame_timeline)
-  const [menuGooseMode, setMenuGooseMode] = useState(() => settings.goose_mode)
 
   const configServerUrl = settings.server_url
   const [menuServerUrl, setMenuServerUrl] = useState(configServerUrl)
@@ -236,7 +235,6 @@ const MenuSettingsView = ({ onBack, wide }: MenuSettingsViewProps) => {
     setMenuPerformanceStats(settings.debug_overlays.performance_stats)
     setMenuInputOverlay(settings.debug_overlays.input)
     setMenuFrameTimeline(settings.debug_overlays.frame_timeline)
-    setMenuGooseMode(settings.goose_mode)
   }, [
     settings.locale,
     configEngineMode,
@@ -247,8 +245,7 @@ const MenuSettingsView = ({ onBack, wide }: MenuSettingsViewProps) => {
     settings.keybindings,
     settings.debug_overlays.performance_stats,
     settings.debug_overlays.input,
-    settings.debug_overlays.frame_timeline,
-    settings.goose_mode
+    settings.debug_overlays.frame_timeline
   ])
 
   const handleServerUrlBlur = useCallback(async () => {
@@ -334,10 +331,8 @@ const MenuSettingsView = ({ onBack, wide }: MenuSettingsViewProps) => {
 
   const handleLocaleChange = useCallback(
     (locale: AppLocale) => {
-      const gooseMode = locale === 'goose'
       setMenuLocale(locale)
-      setMenuGooseMode(gooseMode)
-      void saveSettings({ ...settings, locale, goose_mode: gooseMode })
+      void saveSettings({ ...settings, locale })
     },
     [settings, saveSettings]
   )
@@ -361,7 +356,6 @@ const MenuSettingsView = ({ onBack, wide }: MenuSettingsViewProps) => {
       server_url: nextServerUrl,
       engine_mode: engineModeValue,
       engine_model: menuWorldModel,
-      goose_mode: menuGooseMode,
       mouse_sensitivity: streamingValue,
       keybindings: menuKeybindings,
       audio: volume.getAudioSettings(),
@@ -384,7 +378,6 @@ const MenuSettingsView = ({ onBack, wide }: MenuSettingsViewProps) => {
     menuPerformanceStats,
     menuInputOverlay,
     menuFrameTimeline,
-    menuGooseMode,
     volume.getAudioSettings,
     saveSettings,
     setMouseSensitivity

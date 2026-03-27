@@ -24,6 +24,11 @@ const LOCALE_MAP: Record<string, SupportedLocale> = {
   goose: 'goose'
 }
 
+/** Whether the given locale setting enables goose mode. */
+export function isGooseMode(locale: string | null | undefined): boolean {
+  return locale === 'goose'
+}
+
 export function resolveLocale(locale: string | null | undefined): SupportedLocale {
   if (locale && locale !== 'system') {
     return LOCALE_MAP[locale] ?? FALLBACK_LOCALE

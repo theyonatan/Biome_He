@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import { useAudio } from '../context/AudioContext'
+import { isGooseMode } from '../i18n'
 import { useSettings } from './useSettings'
 import type { SoundId } from '../lib/audio'
 
@@ -23,13 +24,13 @@ export const useUISound = () => {
 
   const playUiSound = useCallback(
     (id: SoundId) => {
-      if (settings.goose_mode) {
+      if (isGooseMode(settings.locale)) {
         play(GOOSE_UI_SOUND_MAP[id] ?? id)
         return
       }
       play(id)
     },
-    [play, settings.goose_mode]
+    [play, settings.locale]
   )
 
   const playHover = useCallback(() => {

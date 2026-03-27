@@ -40,7 +40,6 @@ export const settingsSchema = z.object({
   engine_mode: z.enum(['standalone', 'server']).default('standalone'),
   engine_model: z.string().default(DEFAULT_WORLD_ENGINE_MODEL),
   custom_models: z.array(z.string()).default([]),
-  goose_mode: z.boolean().default(false),
   mouse_sensitivity: z.number().min(0.1).max(3.0).default(1.0),
   pinned_scenes: z.array(z.string()).default(DEFAULT_PINNED_SCENES),
   keybindings: z

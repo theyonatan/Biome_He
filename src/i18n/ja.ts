@@ -210,9 +210,6 @@ const ja = {
           inputOverlay: '入力オーバーレイ',
           frameTimeline: 'フレームタイムライン'
         },
-        gooseMode: {
-          label: 'グースモード'
-        },
         credits: {
           title: 'クレジット'
         }

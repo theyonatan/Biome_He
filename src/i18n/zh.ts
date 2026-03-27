@@ -205,9 +205,6 @@ const zh = {
           inputOverlay: '输入叠层',
           frameTimeline: '帧时间线'
         },
-        gooseMode: {
-          label: '鹅模式'
-        },
         credits: {
           title: '鸣谢'
         }

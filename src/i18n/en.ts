@@ -211,9 +211,6 @@ const en = {
           inputOverlay: 'Input Overlay',
           frameTimeline: 'Frame Timeline'
         },
-        gooseMode: {
-          label: 'Goose Mode'
-        },
         credits: {
           title: 'Credits'
         }

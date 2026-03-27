@@ -15,6 +15,8 @@
  * - Pauses the rAF loop when no component owns the canvas or the tab is hidden
  */
 import { createContext, useContext, useRef, useEffect, useCallback, type ReactNode } from 'react'
+import { useSettings } from '../hooks/useSettings'
+import { isGooseMode } from '../i18n'
 import { VortexRenderer, VORTEX_PORTAL_COUNT, VORTEX_LOADING_COUNT } from '../lib/vortexRenderer'
 
 const GOOSE_SPRITESHEET_URL = new URL('../../assets/goose-spritesheet.png', import.meta.url).href
@@ -37,12 +39,16 @@ const VortexContext = createContext<VortexContextValue | null>(null)
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v))
 
 export function VortexProvider({ children }: { children: ReactNode }) {
+  const { settings } = useSettings()
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const rendererRef = useRef<VortexRenderer | null>(null)
   const rafRef = useRef<number | null>(null)
   const lastTimeRef = useRef<number>(0)
   const ownerRef = useRef<HTMLElement | null>(null)
   const resizeObserverRef = useRef<ResizeObserver | null>(null)
+  const modeRef = useRef<VortexMode | null>(null)
+  const localeRef = useRef(settings.locale)
+  localeRef.current = settings.locale
 
   useEffect(() => {
     const canvas = document.createElement('canvas')
@@ -148,7 +154,8 @@ export function VortexProvider({ children }: { children: ReactNode }) {
       renderer.setViewWarp(1, 1)
       renderer.setSpeedMultiplier(1)
       renderer.setErrorMode(false)
-      renderer.setGooseEnabled(mode === 'loading')
+      modeRef.current = mode
+      renderer.setGooseEnabled(mode === 'loading' && isGooseMode(localeRef.current))
       renderer.respawnAllParticles()
       renderer.respawnAllGoose()
       lastSizeRef.current = { w: 0, h: 0 }
@@ -176,6 +183,7 @@ export function VortexProvider({ children }: { children: ReactNode }) {
       canvas.parentNode.removeChild(canvas)
     }
     ownerRef.current = null
+    modeRef.current = null
     resizeObserverRef.current?.disconnect()
 
     if (rafRef.current != null) {
@@ -183,6 +191,11 @@ export function VortexProvider({ children }: { children: ReactNode }) {
       rafRef.current = null
     }
   }, [])
+
+  // Sync goose visibility when locale changes
+  useEffect(() => {
+    rendererRef.current?.setGooseEnabled(modeRef.current === 'loading' && isGooseMode(settings.locale))
+  }, [settings.locale])
 
   const setErrorMode = useCallback((error: boolean) => {
     rendererRef.current?.setErrorMode(error)
