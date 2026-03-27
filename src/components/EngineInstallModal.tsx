@@ -87,7 +87,7 @@ const EngineInstallModal = ({ onClose }: EngineInstallModalProps) => {
     >
       <div className="w-[135.11cqh] max-w-[92vw] pointer-events-auto">
         <ServerLogDisplay
-          title={t('app.dialogs.install.title')}
+          title="app.dialogs.install.title"
           logs={installLogs}
           showProgress={engineSetupInProgress}
           progressMessage={
@@ -102,7 +102,7 @@ const EngineInstallModal = ({ onClose }: EngineInstallModalProps) => {
           showExportAction={!engineSetupInProgress && !!engineSetupError}
           onExportAction={() => void handleExportInstallDiagnostics()}
           isExportingAction={isExportingInstallDiagnostics}
-          exportActionLabel={t('app.buttons.exportLogs')}
+          exportActionLabel="app.buttons.exportLogs"
           actionStatus={installExportStatus}
           headerAction={
             engineSetupInProgress ? (
@@ -110,25 +110,23 @@ const EngineInstallModal = ({ onClose }: EngineInstallModalProps) => {
                 <Button
                   variant="secondary"
                   autoShrinkLabel
+                  label={isAbortingInstall ? 'app.buttons.aborting' : 'app.buttons.abort'}
                   className="text-[1.8cqh] px-[1.2cqh] py-[0.25cqh]"
                   onClick={() => void handleAbortInstall()}
                   disabled={isAbortingInstall}
                   aria-label={t('app.dialogs.install.abortEngineInstall')}
-                >
-                  {isAbortingInstall ? t('app.buttons.aborting') : t('app.buttons.abort')}
-                </Button>
+                />
               </div>
             ) : (
               <div className="flex items-center gap-[0.8cqh]">
                 <Button
                   variant="secondary"
                   autoShrinkLabel
+                  label="app.buttons.close"
                   className="text-[1.8cqh] px-[1.2cqh] py-[0.25cqh]"
                   onClick={onClose}
                   aria-label={t('app.dialogs.install.closeInstallLogs')}
-                >
-                  {t('app.buttons.close')}
-                </Button>
+                />
               </div>
             )
           }

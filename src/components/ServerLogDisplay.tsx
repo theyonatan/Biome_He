@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import type { TranslationKey } from '../i18n'
 import Button from './ui/Button'
 
 const MAX_ERROR_MESSAGE_CHARS = 220
@@ -47,7 +48,7 @@ const ServerLogDisplay = ({
   showExportAction = false,
   onExportAction,
   isExportingAction = false,
-  exportActionLabel = 'Export Logs',
+  exportActionLabel,
   actionStatus = null
 }: {
   errorMessage?: string | null
@@ -55,12 +56,12 @@ const ServerLogDisplay = ({
   progressMessage?: string | null
   headerAction?: ReactNode
   logs?: string[]
-  title?: string | null
+  title?: TranslationKey | null
   buildDiagnosticsPayload: () => Promise<Record<string, unknown>>
   showExportAction?: boolean
   onExportAction?: () => void
   isExportingAction?: boolean
-  exportActionLabel?: string
+  exportActionLabel?: TranslationKey
   actionStatus?: string | null
 }) => {
   const { t } = useTranslation()
@@ -193,7 +194,9 @@ const ServerLogDisplay = ({
       {(title || headerAction) && (
         <div className="flex items-center gap-[1.42cqh] px-[2.13cqh] py-[0.8cqh] bg-white/8 border-b border-white/20 justify-between">
           <div className="flex items-center gap-[1.42cqh]">
-            <span className="font-serif text-[2.13cqh] tracking-[0.02em] text-text-primary">{title}</span>
+            <span className="font-serif text-[2.13cqh] tracking-[0.02em] text-text-primary">
+              {title ? t(title) : null}
+            </span>
           </div>
           {headerAction}
         </div>
@@ -231,28 +234,26 @@ const ServerLogDisplay = ({
         <div className="flex flex-col gap-[0.4cqh] px-[2.13cqh] py-[0.8cqh] bg-white/5 border-t border-white/10">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-[0.8cqh]">
-              {showExportAction && onExportAction && (
+              {showExportAction && onExportAction && exportActionLabel && (
                 <Button
                   variant="secondary"
                   autoShrinkLabel
+                  label={exportActionLabel}
                   className="text-[2.13cqh] px-[1.4cqh] py-[0.4cqh]"
                   onClick={onExportAction}
                   disabled={isExportingAction}
                   title={t('app.loading.terminal.exportDiagnosticsJson')}
-                >
-                  {isExportingAction ? `${exportActionLabel}...` : exportActionLabel}
-                </Button>
+                />
               )}
               <Button
                 variant="secondary"
                 autoShrinkLabel
+                label={isCopyingReport ? 'app.loading.terminal.copying' : 'app.buttons.copyReport'}
                 className="text-[2.13cqh] px-[1.4cqh] py-[0.4cqh]"
                 onClick={() => void handleCopyBugReport()}
                 disabled={isCopyingReport}
                 title={t('app.loading.terminal.copyDiagnosticsJsonForBugReports')}
-              >
-                {isCopyingReport ? t('app.loading.terminal.copying') : t('app.buttons.copyReport')}
-              </Button>
+              />
               {(reportActionStatus || actionStatus) && (
                 <span className="ml-[0.4cqh] font-serif text-[2.13cqh] text-text-muted whitespace-nowrap">
                   {reportActionStatus || actionStatus}
@@ -263,22 +264,20 @@ const ServerLogDisplay = ({
               <Button
                 variant="primary"
                 autoShrinkLabel
+                label={isOpeningIssue ? 'app.loading.terminal.opening' : 'app.buttons.reportOnGithub'}
                 className="text-[2.13cqh] px-[1.4cqh] py-[0.4cqh]"
                 onClick={() => void handleOpenGithubIssue()}
                 disabled={isOpeningIssue}
                 title={t('app.loading.terminal.openPrefilledIssueOnGithub')}
-              >
-                {isOpeningIssue ? t('app.loading.terminal.opening') : t('app.buttons.reportOnGithub')}
-              </Button>
+              />
               <Button
                 variant="primary"
                 autoShrinkLabel
+                label="app.buttons.askOnDiscord"
                 className="text-[2.13cqh] px-[1.4cqh] py-[0.4cqh]"
                 onClick={() => window.open(DISCORD_HELP_URL, '_blank', 'noopener,noreferrer')}
                 title={t('app.loading.terminal.askForHelpInDiscord')}
-              >
-                {t('app.buttons.askOnDiscord')}
-              </Button>
+              />
             </div>
           </div>
         </div>

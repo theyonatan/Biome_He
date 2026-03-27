@@ -20,7 +20,7 @@ const seededRandom = (seed: number) => {
   }
 }
 
-const shuffleWithSeed = <T,>(items: T[], seed: number): T[] => {
+const shuffleWithSeed = <T,>(items: readonly T[], seed: number): T[] => {
   const random = seededRandom(seed)
   const shuffled = [...items]
   for (let i = shuffled.length - 1; i > 0; i -= 1) {
@@ -77,7 +77,7 @@ export const GooseFactTicker = () => {
   const [gooseFactIndex, setGooseFactIndex] = useState(0)
   const [shuffleSeed] = useState(() => makeSeed())
 
-  const facts = t('app.settings.gooseMode.facts', { returnObjects: true }) as string[]
+  const facts = t('app.settings.gooseMode.facts', { returnObjects: true }) as readonly string[]
   const activeTips = useMemo(() => shuffleWithSeed(facts, shuffleSeed), [facts, shuffleSeed])
 
   useEffect(() => {

@@ -74,6 +74,8 @@ const en = {
           withUrl:
             'Could not connect to {{url}}. The server may be down, the URL may be wrong, or a firewall may be blocking the connection.',
           noUrl: 'Please enter a server URL before leaving settings.',
+          withUrlSecure:
+            'Could not connect to {{url}}. The server may be down, the URL may be wrong, or a firewall may be blocking the connection.\n\nHTTPS and WSS are not supported by default; if you are connecting directly to the Biome server, try using HTTP or WS instead.',
           secureTransportHint:
             'HTTPS and WSS are not supported by default; if you are connecting directly to the Biome server, try using HTTP or WS instead.'
         }
@@ -125,10 +127,7 @@ const en = {
         language: {
           title: 'Language',
           description: 'which language should Biome use?',
-          system: 'System Default',
-          english: 'English',
-          japanese: '日本語',
-          chinese: '中文'
+          system: 'System Default'
         },
         engineMode: {
           title: 'Engine Mode',
