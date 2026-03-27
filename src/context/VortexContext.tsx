@@ -17,6 +17,8 @@
 import { createContext, useContext, useRef, useEffect, useCallback, type ReactNode } from 'react'
 import { VortexRenderer, VORTEX_PORTAL_COUNT, VORTEX_LOADING_COUNT } from '../lib/vortexRenderer'
 
+const GOOSE_SPRITESHEET_URL = new URL('../../assets/goose-spritesheet.png', import.meta.url).href
+
 type VortexMode = 'portal' | 'loading'
 
 const PARTICLE_COUNTS: Record<VortexMode, number> = {
@@ -49,6 +51,11 @@ export function VortexProvider({ children }: { children: ReactNode }) {
 
     const renderer = new VortexRenderer(canvas)
     rendererRef.current = renderer
+
+    // Load goose spritesheet
+    const gooseImg = new Image()
+    gooseImg.onload = () => renderer.loadGooseSpritesheet(gooseImg)
+    gooseImg.src = GOOSE_SPRITESHEET_URL
 
     const handleVisibility = () => {
       if (document.hidden) {
@@ -141,7 +148,9 @@ export function VortexProvider({ children }: { children: ReactNode }) {
       renderer.setViewWarp(1, 1)
       renderer.setSpeedMultiplier(1)
       renderer.setErrorMode(false)
+      renderer.setGooseEnabled(mode === 'loading')
       renderer.respawnAllParticles()
+      renderer.respawnAllGoose()
       lastSizeRef.current = { w: 0, h: 0 }
 
       resizeObserverRef.current?.disconnect()
