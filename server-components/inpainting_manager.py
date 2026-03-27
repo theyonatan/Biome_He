@@ -29,8 +29,9 @@ VLM_GGUF_REPO = "unsloth/Qwen3.5-4B-GGUF"
 VLM_GGUF_FILE = "Qwen3.5-4B-UD-Q5_K_XL.gguf"
 VLM_MMPROJ_FILE = "mmproj-F16.gguf"
 VLM_CTX_SIZE = 4096
-VLM_MAX_TOKENS = 2048
+VLM_MAX_TOKENS = 768  # Enough for thinking + tool call, prevents overthinking
 VLM_MAX_RETRIES = 3  # Retry tool-call parsing up to this many times
+VLM_IMAGE_MAX_SIZE = 384  # Downscale frame to this max dimension before sending to VLM
 
 VLM_SYSTEM_PROMPT = (
     "You write image editing instructions for an AI image editor. "
@@ -62,6 +63,8 @@ VLM_SYSTEM_PROMPT = (
     'hand in the bottom-right corner of the frame, as in a first-person '
     'shooter. Keep everything else unchanged."\n\n'
     "Always end with 'Keep everything else unchanged.'\n\n"
+    "IMPORTANT: Be concise. Think briefly (2-3 sentences max), then "
+    "immediately submit your instruction. Do not deliberate at length.\n\n"
     "You MUST submit your instruction by calling the "
     "submit_edit_instruction tool using this exact format:\n\n"
     "<tool_call>\n"
@@ -185,7 +188,10 @@ class InpaintingManager:
         Uses tool calling for structured output, with retries on parse failure.
         Raises RuntimeError after VLM_MAX_RETRIES failed attempts.
         """
-        image_uri = _pil_to_data_uri(frame_pil)
+        # Downscale frame to reduce vision token count and speed up inference
+        vlm_frame = frame_pil.copy()
+        vlm_frame.thumbnail((VLM_IMAGE_MAX_SIZE, VLM_IMAGE_MAX_SIZE), Image.LANCZOS)
+        image_uri = _pil_to_data_uri(vlm_frame)
         messages = [
             {"role": "system", "content": VLM_SYSTEM_PROMPT},
             {
@@ -210,6 +216,12 @@ class InpaintingManager:
             result = self.vlm.create_chat_completion(
                 messages=messages,
                 max_tokens=VLM_MAX_TOKENS,
+                temperature=1.0,
+                top_p=0.95,
+                top_k=20,
+                min_p=0.0,
+                present_penalty=1.5,
+                repeat_penalty=1.0,
             )
             elapsed_ms = (time.perf_counter() - t0) * 1000
 
