@@ -41,10 +41,13 @@ import PortalSparksConfigurator from './components/PortalSparksConfigurator'
 import PerformanceStatsOverlay from './components/PerformanceStatsOverlay'
 import InputOverlay from './components/InputOverlay'
 import FrameTimelineOverlay from './components/FrameTimelineOverlay'
+import I18nSync from './components/I18nSync'
+import { useTranslation } from 'react-i18next'
 
 const LAUNCH_PRE_SHRINK_MS = 420
 
 const AppShell = () => {
+  const { t } = useTranslation()
   const [isPortalHovered, setIsPortalHovered] = useState(false)
   const { play, startLoop, stopLoop, fadeOutLoop } = useAudio()
   const [isLaunchShrinking, setIsLaunchShrinking] = useState(false)
@@ -288,15 +291,14 @@ const AppShell = () => {
             >
               <SocialCtaRow />
 
-              <ViewLabel>Biome</ViewLabel>
+              <ViewLabel>{t('app.name')}</ViewLabel>
 
               <MenuButton
                 variant="secondary"
+                label="app.buttons.settings"
                 className="absolute z-[1] right-[var(--edge-right)] bottom-[var(--edge-bottom)] min-w-[132px] m-0 p-[0.9cqh_2.67cqh] box-border appearance-none text-[3.91cqh] tracking-tight pointer-events-auto"
                 onClick={toggleSettings}
-              >
-                Settings
-              </MenuButton>
+              />
             </motion.div>
           )}
           {activeMenuView === MENU_VIEW.SETTINGS && (
@@ -414,8 +416,12 @@ const AppShell = () => {
       {PORTAL_SPARKS_DEBUG && <PortalSparksConfigurator />}
       {availableUpdate && (
         <ConfirmModal
-          title="Update Available"
-          description={`A new Biome release is available (${availableUpdate.latest_version}). You are on ${availableUpdate.current_version}.`}
+          title="app.dialogs.updateAvailable.title"
+          description="app.dialogs.updateAvailable.description"
+          descriptionParams={{
+            latestVersion: availableUpdate.latest_version,
+            currentVersion: availableUpdate.current_version
+          }}
           onCancel={() => setAvailableUpdate(null)}
           onConfirm={() => {
             const releaseUrl = availableUpdate.release_url
@@ -424,8 +430,8 @@ const AppShell = () => {
             }
             setAvailableUpdate(null)
           }}
-          confirmLabel="Upgrade"
-          cancelLabel="Later"
+          confirmLabel="app.buttons.upgrade"
+          cancelLabel="app.buttons.later"
         />
       )}
     </div>
@@ -442,6 +448,7 @@ const App = () => {
         <PortalProvider>
           <StreamingProvider>
             <VortexProvider>
+              <I18nSync />
               <AudioController />
               <AppShell />
             </VortexProvider>
