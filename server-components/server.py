@@ -1206,6 +1206,7 @@ def _run_scene_edit_on_generator(prompt: str, cpu_frames: list) -> dict:
     returns preview data for the RPC response.
     """
     import base64
+    from PIL import Image
 
     last_frame_np = cpu_frames[-1]
 
@@ -1219,10 +1220,18 @@ def _run_scene_edit_on_generator(prompt: str, cpu_frames: list) -> dict:
     )
 
     # Encode inpainted for debug preview
-    preview_jpeg = world_engine._numpy_to_jpeg(
-        world_engine._tensor_to_numpy(inpainted)
-    )
+    inpainted_np = world_engine._tensor_to_numpy(inpainted)
+    preview_jpeg = world_engine._numpy_to_jpeg(inpainted_np)
     preview_b64 = base64.b64encode(preview_jpeg).decode("ascii")
+
+    # Safety check on the inpainted result
+    inpainted_pil = Image.fromarray(inpainted_np)
+    safety_result = safety_checker.check_pil_image(inpainted_pil)
+    if not safety_result["is_safe"]:
+        logger.warning(
+            f"[SCENE_EDIT] Safety checker rejected inpainted image: {safety_result['scores']}"
+        )
+        raise RuntimeError("Scene edit rejected: the generated image did not pass the safety check.")
 
     # Expand to full n_frames for multiframe models
     if world_engine.is_multiframe:
@@ -1584,7 +1593,10 @@ async def websocket_endpoint(websocket: WebSocket):
         # Load inpainting model BEFORE WorldEngine warmup so CUDA graphs
         # are compiled with the inpainting model's memory already allocated.
         if scene_edit_requested and inpainting_manager is not None and not inpainting_manager.is_loaded:
-            from progress_stages import SESSION_INPAINTING_LOAD, SESSION_INPAINTING_READY
+            from progress_stages import (
+                SESSION_INPAINTING_LOAD, SESSION_INPAINTING_READY,
+                SESSION_SAFETY_LOAD, SESSION_SAFETY_READY,
+            )
             await send_stage(SESSION_INPAINTING_LOAD)
             try:
                 await inpainting_manager.warmup()
@@ -1593,6 +1605,18 @@ async def websocket_endpoint(websocket: WebSocket):
                 logger.error(f"[{client_host}] Inpainting warmup failed: {e}", exc_info=True)
                 await send_json({"type": "error", "message": f"Scene edit model failed to load: {e}"})
                 return
+
+            # Load safety checker on GPU and keep it resident for fast
+            # repeated checks on inpainted frames.
+            if not safety_checker.is_resident:
+                await send_stage(SESSION_SAFETY_LOAD)
+                try:
+                    await asyncio.to_thread(safety_checker.load_resident, "cuda")
+                    await send_stage(SESSION_SAFETY_READY)
+                except Exception as e:
+                    logger.error(f"[{client_host}] Safety checker GPU load failed: {e}", exc_info=True)
+                    await send_json({"type": "error", "message": f"Content filter failed to load: {e}"})
+                    return
 
         # Warmup on first connection AFTER seed is loaded
         if not world_engine.engine_warmed_up:
