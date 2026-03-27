@@ -1,16 +1,20 @@
 """
 Scene editing module - Uses FLUX.2 Klein 4B for reference-based image editing,
-with Qwen3.5 vision to construct an edit-aware prompt grounded in the frame.
+with Qwen3.5 vision (via llama.cpp) to construct an edit-aware prompt grounded in the frame.
 """
 
 import asyncio
+import base64
 import gc
 import logging
 import time
+from io import BytesIO
 
 import numpy as np
 import torch
 from PIL import Image
+
+from qwen_tool_parser import parse_tool_calls
 
 logger = logging.getLogger(__name__)
 
@@ -21,8 +25,59 @@ EDIT_APPEND_COUNT = 32  # How many times to append the edited frame to strengthe
 EDIT_RESET_WITH_FRAME = True  # Reset engine with edited frame as new seed (vs append)
 
 # ── Vision-language model configuration ─────────────────────────────
-VLM_MODEL_ID = "Qwen/Qwen3.5-4B"
-VLM_MAX_PIXELS = 512 * 28 * 28  # Cap vision tokens for speed/VRAM
+VLM_GGUF_REPO = "unsloth/Qwen3.5-4B-GGUF"
+VLM_GGUF_FILE = "Qwen3.5-4B-UD-Q5_K_XL.gguf"
+VLM_MMPROJ_FILE = "mmproj-F16.gguf"
+VLM_CTX_SIZE = 4096
+VLM_MAX_TOKENS = 2048
+VLM_MAX_RETRIES = 3  # Retry tool-call parsing up to this many times
+
+VLM_SYSTEM_PROMPT = (
+    "You write image editing instructions for an AI image editor. "
+    "The editor receives a reference image and your instruction, then "
+    "produces an edited version. Instructions should describe WHAT TO "
+    "CHANGE, not the full scene — the reference image provides the "
+    "visual context.\n\n"
+    "This is a first-person game screenshot. Follow these rules:\n\n"
+    "1. DEFAULT: ADD elements to the scene unless told to replace/remove.\n"
+    "2. HANDHELD OBJECTS (weapons, tools, items): Place in a right hand "
+    "at the bottom-right of the frame, as in a first-person shooter. "
+    "If a hand is already visible, put the object in it. If not, add "
+    "a hand holding the object in the bottom-right corner.\n"
+    "3. SCENE ELEMENTS (buildings, creatures, weather): Place naturally "
+    "in the environment.\n"
+    "4. STYLE/MOOD changes: Describe the transformation clearly.\n\n"
+    "EXAMPLES:\n"
+    '- User: "sword" → "Add a glowing sword held in a right hand in '
+    'the bottom-right corner of the frame, as in a first-person game. '
+    'Keep everything else unchanged."\n'
+    '- User: "dragon" → "Add a large dragon flying in the sky above '
+    'the scene. Keep everything else unchanged."\n'
+    '- User: "make it night" → "Change the lighting to nighttime with '
+    'a dark sky, moonlight, and shadows. Keep everything else unchanged."\n'
+    '- User: "remove the tree" → "Remove the tree from the scene and '
+    'fill the area with the surrounding environment. Keep everything '
+    'else unchanged."\n'
+    '- User: "shotgun" → "Add a pump-action shotgun held in a right '
+    'hand in the bottom-right corner of the frame, as in a first-person '
+    'shooter. Keep everything else unchanged."\n\n'
+    "Always end with 'Keep everything else unchanged.'\n\n"
+    "You MUST submit your instruction by calling the "
+    "submit_edit_instruction tool using this exact format:\n\n"
+    "<tool_call>\n"
+    "<function=submit_edit_instruction>\n"
+    "<parameter=instruction>YOUR INSTRUCTION HERE</parameter>\n"
+    "</function>\n"
+    "</tool_call>"
+)
+
+
+def _pil_to_data_uri(image: Image.Image) -> str:
+    """Convert a PIL Image to a base64 data URI for llama-cpp-python."""
+    buf = BytesIO()
+    image.save(buf, format="PNG")
+    b64 = base64.b64encode(buf.getvalue()).decode()
+    return f"data:image/png;base64,{b64}"
 
 
 class InpaintingManager:
@@ -31,8 +86,7 @@ class InpaintingManager:
     def __init__(self, cuda_executor):
         self.cuda_executor = cuda_executor
         self.pipeline = None
-        self.vlm_model = None
-        self.vlm_processor = None
+        self.vlm = None  # llama_cpp.Llama instance
         self._loaded = False
 
     @property
@@ -46,7 +100,7 @@ class InpaintingManager:
 
     async def warmup(self):
         """Load both the VLM and editing model to GPU."""
-        logger.info(f"[SCENE_EDIT] Loading VLM {VLM_MODEL_ID}...")
+        logger.info(f"[SCENE_EDIT] Loading VLM {VLM_GGUF_REPO}/{VLM_GGUF_FILE}...")
         t0 = time.perf_counter()
         await self._run_on_cuda_thread(self._load_vlm_sync)
         logger.info(f"[SCENE_EDIT] VLM loaded in {time.perf_counter() - t0:.1f}s")
@@ -59,19 +113,21 @@ class InpaintingManager:
         self._loaded = True
 
     def _load_vlm_sync(self):
-        """Load the Qwen3.5 vision-language model (int4 quantized)."""
-        from transformers import AutoModelForImageTextToText, AutoProcessor, BitsAndBytesConfig
+        """Load the Qwen3.5 vision-language model via llama.cpp (GGUF)."""
+        from huggingface_hub import hf_hub_download
+        from llama_cpp import Llama
+        from llama_cpp.llama_chat_format import Qwen25VLChatHandler
 
-        bnb_config = BitsAndBytesConfig(load_in_4bit=True)
-        self.vlm_model = AutoModelForImageTextToText.from_pretrained(
-            VLM_MODEL_ID,
-            torch_dtype=torch.float16,
-            quantization_config=bnb_config,
-            device_map="auto",
-        )
-        self.vlm_processor = AutoProcessor.from_pretrained(
-            VLM_MODEL_ID,
-            max_pixels=VLM_MAX_PIXELS,
+        model_path = hf_hub_download(repo_id=VLM_GGUF_REPO, filename=VLM_GGUF_FILE)
+        mmproj_path = hf_hub_download(repo_id=VLM_GGUF_REPO, filename=VLM_MMPROJ_FILE)
+
+        chat_handler = Qwen25VLChatHandler(clip_model_path=mmproj_path, verbose=False)
+        self.vlm = Llama(
+            model_path=model_path,
+            chat_handler=chat_handler,
+            n_ctx=VLM_CTX_SIZE,
+            n_gpu_layers=-1,
+            verbose=False,
         )
 
     def _load_edit_sync(self):
@@ -107,102 +163,74 @@ class InpaintingManager:
         pipe.set_progress_bar_config(disable=True)
         self.pipeline = pipe
 
-    def _build_edit_prompt(self, frame_pil: Image.Image, user_request: str) -> str:
-        """Ask the VLM to write a Klein edit instruction from the user's request."""
-        from qwen_vl_utils import process_vision_info
+    @staticmethod
+    def _parse_edit_instruction(text: str) -> str:
+        """Extract the 'instruction' from a submit_edit_instruction tool call.
 
+        Raises ValueError if no valid tool call is found or the instruction is missing.
+        """
+        tool_calls = parse_tool_calls(text)
+        for call in tool_calls:
+            if call.name == "submit_edit_instruction":
+                instruction = call.arguments.get("instruction", "")
+                if instruction:
+                    return instruction
+        raise ValueError(
+            f"No submit_edit_instruction tool call with an instruction found in: {text!r}"
+        )
+
+    def _build_edit_prompt(self, frame_pil: Image.Image, user_request: str) -> str:
+        """Ask the VLM to write a Klein edit instruction from the user's request.
+
+        Uses tool calling for structured output, with retries on parse failure.
+        Raises RuntimeError after VLM_MAX_RETRIES failed attempts.
+        """
+        image_uri = _pil_to_data_uri(frame_pil)
         messages = [
-            {
-                "role": "system",
-                "content": (
-                    "You write image editing instructions for an AI image editor. "
-                    "The editor receives a reference image and your instruction, then "
-                    "produces an edited version. Instructions should describe WHAT TO "
-                    "CHANGE, not the full scene — the reference image provides the "
-                    "visual context.\n\n"
-                    "This is a first-person game screenshot. Follow these rules:\n\n"
-                    "1. DEFAULT: ADD elements to the scene unless told to replace/remove.\n"
-                    "2. HANDHELD OBJECTS (weapons, tools, items): Place in a right hand "
-                    "at the bottom-right of the frame, as in a first-person shooter. "
-                    "If a hand is already visible, put the object in it. If not, add "
-                    "a hand holding the object in the bottom-right corner.\n"
-                    "3. SCENE ELEMENTS (buildings, creatures, weather): Place naturally "
-                    "in the environment.\n"
-                    "4. STYLE/MOOD changes: Describe the transformation clearly.\n\n"
-                    "EXAMPLES:\n"
-                    '- User: "sword" → "Add a glowing sword held in a right hand in '
-                    'the bottom-right corner of the frame, as in a first-person game. '
-                    'Keep everything else unchanged."\n'
-                    '- User: "dragon" → "Add a large dragon flying in the sky above '
-                    'the scene. Keep everything else unchanged."\n'
-                    '- User: "make it night" → "Change the lighting to nighttime with '
-                    'a dark sky, moonlight, and shadows. Keep everything else unchanged."\n'
-                    '- User: "remove the tree" → "Remove the tree from the scene and '
-                    'fill the area with the surrounding environment. Keep everything '
-                    'else unchanged."\n'
-                    '- User: "shotgun" → "Add a pump-action shotgun held in a right '
-                    'hand in the bottom-right corner of the frame, as in a first-person '
-                    'shooter. Keep everything else unchanged."\n\n'
-                    "Always end with 'Keep everything else unchanged.'\n"
-                    "Reply with ONLY a single one-line instruction. No preamble, "
-                    "no explanation, no line breaks."
-                ),
-            },
+            {"role": "system", "content": VLM_SYSTEM_PROMPT},
             {
                 "role": "user",
                 "content": [
-                    {"type": "image", "image": frame_pil},
+                    {"type": "image_url", "image_url": {"url": image_uri}},
                     {
                         "type": "text",
                         "text": (
-                            f"The user wants: \"{user_request}\"\n\n"
-                            "Look at the image and write a specific edit instruction."
+                            f'The user wants: "{user_request}"\n\n'
+                            "Look at the image and write a specific edit instruction. "
+                            "Submit it using the submit_edit_instruction tool."
                         ),
                     },
                 ],
             },
         ]
 
-        text = self.vlm_processor.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=True,
-            enable_thinking=False,
-        )
-        image_inputs, video_inputs = process_vision_info(messages)
-        inputs = self.vlm_processor(
-            text=[text],
-            images=image_inputs,
-            videos=video_inputs,
-            padding=True,
-            return_tensors="pt",
-        ).to(self.vlm_model.device)
+        last_error = None
+        for attempt in range(1, VLM_MAX_RETRIES + 1):
+            t0 = time.perf_counter()
+            result = self.vlm.create_chat_completion(
+                messages=messages,
+                max_tokens=VLM_MAX_TOKENS,
+            )
+            elapsed_ms = (time.perf_counter() - t0) * 1000
 
-        with torch.no_grad():
-            output_ids = self.vlm_model.generate(
-                **inputs,
-                max_new_tokens=256,
+            raw_output = result["choices"][0]["message"]["content"] or ""
+            logger.info(
+                f"[SCENE_EDIT] VLM raw (attempt {attempt}, {elapsed_ms:.0f}ms): {raw_output}"
             )
 
-        generated_ids = output_ids[0, inputs.input_ids.shape[1] :].tolist()
+            try:
+                edit_prompt = self._parse_edit_instruction(raw_output)
+                logger.info(f"[SCENE_EDIT] Edit prompt: {edit_prompt}")
+                return edit_prompt
+            except ValueError as exc:
+                last_error = exc
+                logger.warning(
+                    f"[SCENE_EDIT] Tool call parse failed (attempt {attempt}/{VLM_MAX_RETRIES}): {exc}"
+                )
 
-        # Find </think> token (ID 151668) and take only what follows.
-        # With enable_thinking=False this shouldn't be needed, but as a
-        # safety net in case reasoning leaks through.
-        THINK_END_TOKEN = 151668
-        try:
-            index = len(generated_ids) - generated_ids[::-1].index(THINK_END_TOKEN)
-        except ValueError:
-            index = 0
-
-        edit_prompt = self.vlm_processor.tokenizer.decode(
-            generated_ids[index:], skip_special_tokens=True
-        ).strip()
-
-        raw_full = self.vlm_processor.tokenizer.decode(
-            generated_ids, skip_special_tokens=True
-        ).strip()
-        logger.info(f"[SCENE_EDIT] VLM raw: {raw_full}")
-        logger.info(f"[SCENE_EDIT] Edit prompt: {edit_prompt}")
-        return edit_prompt
+        raise RuntimeError(
+            f"VLM failed to produce a valid tool call after {VLM_MAX_RETRIES} attempts: {last_error}"
+        )
 
     async def inpaint(
         self,
@@ -268,9 +296,10 @@ class InpaintingManager:
 
     def unload(self):
         """Free GPU memory used by both models."""
+        if self.vlm is not None:
+            self.vlm.close()
         self.pipeline = None
-        self.vlm_model = None
-        self.vlm_processor = None
+        self.vlm = None
         self._loaded = False
         gc.collect()
         if torch.cuda.is_available():

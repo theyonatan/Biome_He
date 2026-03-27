@@ -1,7 +1,7 @@
 [project]
 name = "biome-server"
 version = "1.0.0-rc2"
-requires-python = "==3.13.*"
+requires-python = "==3.12.*"
 dependencies = [
   "world-engine @ https://github.com/Overworldai/world_engine/archive/d211f595335f2e6c46a42003622a12724845cc6c.zip",
   "torch",
@@ -21,7 +21,7 @@ dependencies = [
   "accelerate>=0.25.0",
   "peft>=0.7.0",
   "bitsandbytes>=0.41.0",
-  "qwen-vl-utils>=0.0.2",
+  "llama-cpp-python>=0.3.0",
   "gguf>=0.6.0",
 ]
 
@@ -34,8 +34,14 @@ index-strategy = "unsafe-best-match"
 [tool.uv.sources]
 torch = { index = "pytorch-cu128" }
 torchvision = { index = "pytorch-cu128" }
+llama-cpp-python = { index = "llama-cpp-python-cu124" }
 
 [[tool.uv.index]]
 name = "pytorch-cu128"
 url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[[tool.uv.index]]
+name = "llama-cpp-python-cu124"
+url = "https://abetlen.github.io/llama-cpp-python/whl/cu124"
 explicit = true
