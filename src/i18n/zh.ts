@@ -214,7 +214,7 @@ const zh = {
         title: '已暂停',
         pinnedScenes: {
           title: '已固定场景',
-          description: '这是你固定的场景。使用 Scenes 按钮可{{suffix}}查看更多场景。',
+          description: '这是你固定的场景。使用场景按钮可{{suffix}}更多场景。',
           uploadSuffix: '查看、固定或上传',
           pinSuffix: '查看或固定'
         },
