@@ -68,10 +68,13 @@ const G_SPEED = 3
 const G_FRAME_OFFSET = 4
 const G_TILT = 5
 const G_ANIM_TIME = 6
-const GOOSE_FLOATS_PER_PARTICLE = 7
+const G_SIZE_MULT = 7 // per-goose size variation (0.7–1.3)
+const G_HUE_SHIFT = 8 // per-goose hue shift in radians
+const G_BRIGHTNESS = 9 // per-goose brightness variation (0.8–1.1)
+const GOOSE_FLOATS_PER_PARTICLE = 10
 
-// Per-instance data: center(2) + scale(1) + rotation(1) + frame(1) + alpha(1) + flipX(1) = 7 floats
-const GOOSE_INSTANCE_FLOATS = 7
+// Per-instance data: center(2) + scale(1) + rotation(1) + frame(1) + alpha(1) + flipX(1) + colorShift(3) = 10 floats
+const GOOSE_INSTANCE_FLOATS = 10
 
 // Minimum angular separation (radians) between geese at similar z depths
 const GOOSE_MIN_ANGLE_SEP = Math.PI / 4 // 45 degrees
@@ -121,6 +124,9 @@ function randomGoose(out: Float32Array, offset: number, spreadZ: boolean, index 
   out[offset + G_FRAME_OFFSET] = Math.floor(Math.random() * GOOSE_FRAME_COUNT)
   out[offset + G_TILT] = (Math.random() - 0.5) * 0.5 // ±~14 degrees
   out[offset + G_ANIM_TIME] = Math.random() * GOOSE_FRAME_COUNT // random start phase
+  out[offset + G_SIZE_MULT] = 0.7 + Math.random() * 0.6 // 0.7–1.3
+  out[offset + G_HUE_SHIFT] = (Math.random() - 0.5) * 0.3 // ±0.15 radians (~±9°)
+  out[offset + G_BRIGHTNESS] = 0.85 + Math.random() * 0.25 // 0.85–1.1
 }
 
 // --- Tuning constants (exported for easy tweaking) ---
@@ -268,6 +274,7 @@ layout(location = 4) in float a_rotation; // radians
 layout(location = 5) in float a_frame;   // sprite frame index
 layout(location = 6) in float a_alpha;
 layout(location = 7) in float a_flipX;  // 1.0 to mirror horizontally, 0.0 normal
+layout(location = 8) in vec3 a_colorTint; // per-goose color variation
 
 uniform float u_aspect;       // viewport width / height
 uniform float u_spriteAspect; // sprite frame width / height
@@ -275,6 +282,7 @@ uniform float u_frameCount;   // number of frames in spritesheet
 
 out vec2 v_uv;
 out float v_alpha;
+out vec3 v_colorTint;
 
 void main() {
   // Work in square (aspect-corrected) space for rotation, then convert to clip space.
@@ -296,6 +304,7 @@ void main() {
   float u = mix(a_quadUV.x, 1.0 - a_quadUV.x, a_flipX);
   v_uv = vec2(u * frameWidth + a_frame * frameWidth, a_quadUV.y);
   v_alpha = a_alpha;
+  v_colorTint = a_colorTint;
 }
 `
 
@@ -304,6 +313,7 @@ precision highp float;
 
 in vec2 v_uv;
 in float v_alpha;
+in vec3 v_colorTint;
 
 uniform sampler2D u_spritesheet;
 
@@ -311,7 +321,7 @@ out vec4 fragColor;
 
 void main() {
   vec4 texel = texture(u_spritesheet, v_uv);
-  fragColor = vec4(texel.rgb, texel.a * v_alpha);
+  fragColor = vec4(texel.rgb * v_colorTint, texel.a * v_alpha);
 }
 `
 
@@ -591,6 +601,10 @@ export class VortexRenderer {
       gl.enableVertexAttribArray(7)
       gl.vertexAttribPointer(7, 1, gl.FLOAT, false, instStride, 24)
       gl.vertexAttribDivisor(7, 1)
+      // a_colorTint (location 8) — vec3
+      gl.enableVertexAttribArray(8)
+      gl.vertexAttribPointer(8, 3, gl.FLOAT, false, instStride, 28)
+      gl.vertexAttribDivisor(8, 1)
 
       gl.bindVertexArray(null)
     }
@@ -973,7 +987,8 @@ export class VortexRenderer {
       const z = this.gooseParticles[off + G_Z]
 
       const persp = 1.0 / (1.0 + (1.0 - z) * VORTEX_PERSPECTIVE_DEPTH)
-      const scale = GOOSE_MIN_SCALE + (GOOSE_MAX_SCALE - GOOSE_MIN_SCALE) * persp
+      const sizeMult = this.gooseParticles[off + G_SIZE_MULT]
+      const scale = (GOOSE_MIN_SCALE + (GOOSE_MAX_SCALE - GOOSE_MIN_SCALE) * persp) * sizeMult
 
       // Center position in clip space — fly straight out from center along fixed angle
       const cx = ((radius * Math.cos(angle) * persp) / aspect) * warpX
@@ -1010,6 +1025,16 @@ export class VortexRenderer {
       this.gooseInstanceData[iOff + 4] = frame
       this.gooseInstanceData[iOff + 5] = fadeIn * fadeOut
       this.gooseInstanceData[iOff + 6] = flipX
+
+      // Color tint from hue shift + brightness
+      const hue = this.gooseParticles[off + G_HUE_SHIFT]
+      const bright = this.gooseParticles[off + G_BRIGHTNESS]
+      // Approximate hue rotation as RGB multiplier: shift toward warm or cool
+      const cosH = Math.cos(hue)
+      const sinH = Math.sin(hue)
+      this.gooseInstanceData[iOff + 7] = bright * (0.7 + 0.3 * cosH + 0.15 * sinH) // R
+      this.gooseInstanceData[iOff + 8] = bright * (0.7 + 0.3 * cosH - 0.08 * sinH) // G
+      this.gooseInstanceData[iOff + 9] = bright * (0.7 + 0.3 * cosH - 0.2 * sinH) // B
     }
 
     // Switch to standard alpha blending for sprites
