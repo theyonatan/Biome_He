@@ -3,7 +3,6 @@ import { invoke } from '../bridge'
 import { useStreaming } from '../context/StreamingContext'
 import { useEngineLogs } from '../hooks/useEngineLogs'
 import Button from './ui/Button'
-import RawButton from './ui/RawButton'
 import ServerLogDisplay from './ServerLogDisplay'
 import { useTranslation } from 'react-i18next'
 
