@@ -1,8 +1,18 @@
 import { createLogger } from '../utils/logger'
+import { TranslatableError } from '../i18n'
 
 const log = createLogger('WsRpc')
 
 const DEFAULT_TIMEOUT_MS = 30_000
+
+/** Error from a server RPC response, optionally carrying a translation key. */
+export class RpcError extends Error {
+  readonly errorId: string | undefined
+  constructor(message: string, errorId?: string) {
+    super(message)
+    this.errorId = errorId
+  }
+}
 
 type PendingRequest = {
   resolve: (data: unknown) => void
@@ -23,7 +33,7 @@ export class WsRpcClient {
     this.ws = null
     for (const [, entry] of this.pending) {
       clearTimeout(entry.timer)
-      entry.reject(new Error('WebSocket disconnected'))
+      entry.reject(new TranslatableError('app.server.websocketDisconnected'))
     }
     this.pending.clear()
   }
@@ -48,7 +58,8 @@ export class WsRpcClient {
     if (msg.success) {
       entry.resolve(msg.data)
     } else {
-      entry.reject(new Error(String(msg.error ?? 'Request failed')))
+      const errorId = msg.error_id as string | undefined
+      entry.reject(new RpcError(String(msg.error ?? errorId ?? 'Request failed'), errorId))
     }
 
     return true
@@ -74,7 +85,8 @@ export class WsRpcClient {
     if (header.success) {
       entry.resolve({ blob })
     } else {
-      entry.reject(new Error(String(header.error ?? 'Request failed')))
+      const errorId = header.error_id as string | undefined
+      entry.reject(new RpcError(String(header.error ?? errorId ?? 'Request failed'), errorId))
     }
 
     return true
@@ -86,7 +98,7 @@ export class WsRpcClient {
    */
   request<T = unknown>(type: string, params?: Record<string, unknown>, timeoutMs?: number): Promise<T> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      return Promise.reject(new Error('WebSocket not connected'))
+      return Promise.reject(new TranslatableError('app.server.websocketNotConnected'))
     }
 
     const reqId = String(this.nextReqId++)
@@ -95,7 +107,7 @@ export class WsRpcClient {
     return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(reqId)
-        reject(new Error(`Request "${type}" timed out after ${timeout}ms`))
+        reject(new TranslatableError('app.server.requestTimeout', { type, timeout: String(timeout) }))
       }, timeout)
 
       this.pending.set(reqId, {

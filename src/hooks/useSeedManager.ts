@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { invoke } from '../bridge'
+import { TranslatableError } from '../i18n'
 import type { SeedRecord, SeedRecordWithThumbnail } from '../types/app'
 
 type SeedsWithThumbsResponse = {
@@ -48,12 +49,12 @@ function readBlobAsBase64(blob: Blob): Promise<string> {
     reader.onload = (event: ProgressEvent<FileReader>) => {
       const result = event.target?.result
       if (typeof result !== 'string' || !result.includes(',')) {
-        reject(new Error('Failed to read image data'))
+        reject(new TranslatableError('app.scenes.failedToReadImageData'))
         return
       }
       resolve(result.split(',')[1])
     }
-    reader.onerror = () => reject(new Error('Failed to read image data'))
+    reader.onerror = () => reject(new TranslatableError('app.scenes.failedToReadImageData'))
     reader.readAsDataURL(blob)
   })
 }
@@ -183,7 +184,7 @@ export function useSeedManager({ wsRequest, isActive, onPinnedSceneRemoved }: Us
       } catch (err) {
         if (!cancelled) {
           console.error('[PauseOverlay] Failed to load seeds/thumbnails:', err)
-          setUploadError(err instanceof Error ? err.message : 'Failed to load scenes')
+          setUploadError(err instanceof Error ? err.message : String(err))
         }
       } finally {
         loadingRef.current = false
@@ -208,7 +209,7 @@ export function useSeedManager({ wsRequest, isActive, onPinnedSceneRemoved }: Us
       onPinnedSceneRemoved(seed.filename)
       await refreshSeeds()
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : 'Failed to remove scene')
+      setUploadError(err instanceof Error ? err.message : String(err))
     }
   }
 
@@ -297,11 +298,11 @@ export function useSeedManager({ wsRequest, isActive, onPinnedSceneRemoved }: Us
         }
       }
 
-      if (files.length === 0) throw new Error('No image found in clipboard')
+      if (files.length === 0) throw new TranslatableError('app.scenes.noImageInClipboard')
 
       return await uploadImageFiles(files)
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : 'Failed to read image from clipboard')
+      setUploadError(err instanceof Error ? err.message : String(err))
       return []
     }
   }

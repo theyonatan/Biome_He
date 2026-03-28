@@ -11,6 +11,7 @@ import {
 } from 'react'
 import { usePortal } from './PortalContext'
 import { runWarmConnectionFlow } from './streamingWarmConnection'
+import { TranslatableError } from '../i18n'
 import type { StageId } from '../stages'
 import { buildStreamingLifecycleSyncPayload } from './streamingLifecyclePayload'
 import { createStreamingLifecycleEffectHandlers, runStreamingLifecycleEffects } from './streamingLifecycleEffects'
@@ -112,7 +113,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
   const [mouseSensitivity, setMouseSensitivity] = useState(() => settings.mouse_sensitivity ?? 1.0)
   const [fps, setFps] = useState(0)
   const [connectionLost, setConnectionLost] = useState(false)
-  const [engineError, setEngineError] = useState<string | null>(null)
+  const [engineError, setEngineError] = useState<TranslatableError | null>(null)
   const [endpointUrl, setEndpointUrl] = useState<string | null>(null)
   const [canvasReady, setCanvasReady] = useState(false)
   const [loadingConnectionJobSeq, setLoadingConnectionJobSeq] = useState(0)
@@ -300,11 +301,10 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
 
     warmFlowCancelledRef.current = false
 
-    const handleServerError = (err: unknown) => {
+    const handleServerError = (err: TranslatableError) => {
       if (warmFlowCancelledRef.current) return
-      const errorMsg = err instanceof Error ? err.message : String(err)
-      log.error('Server error:', errorMsg)
-      setEngineError(errorMsg)
+      log.error('Server error:', err)
+      setEngineError(err)
       // Don't transition to main menu immediately - wait for user to dismiss the error
     }
 
@@ -335,7 +335,10 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
       log
     }).catch((err) => {
       if (warmFlowCancelledRef.current) return
-      handleServerError(err)
+      const message = err instanceof Error ? err.message : String(err)
+      handleServerError(
+        err instanceof TranslatableError ? err : new TranslatableError('app.server.fallbackError', { message })
+      )
     })
 
     return () => {

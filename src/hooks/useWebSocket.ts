@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import stripAnsi from 'strip-ansi'
 import { createLogger } from '../utils/logger'
 import { WsRpcClient } from '../lib/wsRpc'
 import type { StageId } from '../stages'
 import { toWebSocketUrl } from '../utils/serverUrl'
+import type { TranslationKey } from '../i18n'
 
 const log = createLogger('WebSocket')
 const MAX_VISIBLE_LOG_LINES = 500
@@ -66,6 +68,7 @@ type WebSocketHook = {
 }
 
 export const useWebSocket = (): WebSocketHook => {
+  const { t } = useTranslation()
   const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected')
   const [frame, setFrame] = useState<Blob | string | null>(null)
   const [frameId, setFrameId] = useState(0)
@@ -97,6 +100,22 @@ export const useWebSocket = (): WebSocketHook => {
   const rpcRef = useRef(new WsRpcClient())
   const warningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  const resolveServerMessage = useCallback(
+    (msg: Record<string, unknown>, fallbackKey: TranslationKey): string => {
+      const messageId = msg.message_id as string | undefined
+      const detail = msg.message as string | undefined
+      if (messageId) {
+        const key = messageId as TranslationKey
+        const params = (msg.params as Record<string, string>) ?? {}
+        const resolved = t(key, { defaultValue: '', ...params })
+        if (resolved) return detail ? `${resolved}: ${detail}` : resolved
+      }
+      const message = detail ?? JSON.stringify(msg)
+      return String(t(fallbackKey, { defaultValue: fallbackKey, message }))
+    },
+    [t]
+  )
+
   const clearWarningTimer = useCallback(() => {
     if (warningTimerRef.current) {
       clearTimeout(warningTimerRef.current)
@@ -127,7 +146,7 @@ export const useWebSocket = (): WebSocketHook => {
     }
 
     if (!endpointUrl) {
-      setError('No endpoint URL provided')
+      setError(t('app.server.noEndpointUrl'))
       return
     }
 
@@ -147,7 +166,7 @@ export const useWebSocket = (): WebSocketHook => {
     } catch (err) {
       isConnectingRef.current = false
       setConnectionState('error')
-      setError(err instanceof Error ? err.message : 'Invalid WebSocket endpoint')
+      setError(err instanceof Error ? err.message : t('app.server.invalidWebsocketEndpoint'))
       return
     }
 
@@ -157,7 +176,7 @@ export const useWebSocket = (): WebSocketHook => {
     } catch (err) {
       isConnectingRef.current = false
       setConnectionState('error')
-      setError(err instanceof Error ? err.message : 'Failed to create WebSocket connection')
+      setError(err instanceof Error ? err.message : t('app.server.websocketConnectionFailed'))
       return
     }
     wsRef.current = ws
@@ -289,15 +308,14 @@ export const useWebSocket = (): WebSocketHook => {
             break
           }
           case 'error': {
-            setError((msg.message as string) ?? 'Server error')
+            setError(resolveServerMessage(msg, 'app.server.fallbackError'))
             setWarning(null)
             clearWarningTimer()
             setConnectionState('error')
             break
           }
           case 'warning': {
-            const warningMessage = (msg.message as string) ?? 'Server warning'
-            pushWarning(warningMessage)
+            pushWarning(resolveServerMessage(msg, 'app.server.fallbackWarning'))
             break
           }
           default:
@@ -311,7 +329,7 @@ export const useWebSocket = (): WebSocketHook => {
     ws.onerror = () => {
       if (wsRef.current !== ws) return
       isConnectingRef.current = false
-      setError('WebSocket error')
+      setError(t('app.server.websocketError'))
       setConnectionState('error')
     }
 

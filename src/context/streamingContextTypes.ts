@@ -1,5 +1,6 @@
 import type { EngineStatus } from '../types/app'
 import type { StageId } from '../stages'
+import type { TranslatableError } from '../i18n'
 import type { ServerMetrics } from '../hooks/useWebSocket'
 
 export type StreamingStats = {
@@ -46,7 +47,7 @@ export type StreamingContextValue = {
 
   isServerRunning: boolean
   engineReady: boolean
-  engineError: string | null
+  engineError: TranslatableError | null
   clearEngineError: () => void
   serverLogPath: string | null
   engineStatus: EngineStatus | null

@@ -14,7 +14,7 @@ const AudioController = () => {
   const { play, startLoop, stopLoop, fadeOutLoop, crossfadeLoop, stopAllLoops } = useAudio()
   const { state, states } = usePortal()
   const { error, engineError, isPaused } = useStreaming()
-  const prevErrorRef = useRef<string | null>(null)
+  const prevHasErrorRef = useRef(false)
   const prevStateRef = useRef<string | null>(null)
 
   // Manage ambient loops based on portal state
@@ -58,15 +58,15 @@ const AudioController = () => {
 
   // On error during loading: swap vortex_loop for menacing vortex_error
   useEffect(() => {
-    const currentError = error || engineError || null
-    if (currentError && currentError !== prevErrorRef.current) {
+    const hasError = !!(error || engineError)
+    if (hasError && !prevHasErrorRef.current) {
       play('error')
       if (state === states.LOADING) {
         fadeOutLoop('vortex_loop', 0.3)
         startLoop('vortex_error', 1, 0.3)
       }
     }
-    prevErrorRef.current = currentError
+    prevHasErrorRef.current = hasError
   }, [error, engineError, play, state, states, stopLoop, fadeOutLoop, startLoop])
 
   // Cleanup on unmount

@@ -1,6 +1,13 @@
 import { STANDALONE_PORT, localhostUrl } from '../types/settings'
 import type { StageId } from '../stages'
 import { toHealthUrl, toWebSocketUrl } from '../utils/serverUrl'
+import { TranslatableError } from '../i18n'
+
+const toTranslatableError = (err: unknown): TranslatableError => {
+  if (err instanceof TranslatableError) return err
+  const message = err instanceof Error ? err.message : String(err)
+  return new TranslatableError('app.server.fallbackError', { message })
+}
 
 type WarmConnectionOptions = {
   currentServerPort: number | null
@@ -20,7 +27,7 @@ type WarmConnectionOptions = {
   startServer: (port: number) => Promise<unknown>
   setupEngine: (onStage?: (stageId: StageId) => void) => Promise<unknown>
   connect: (wsUrl: string) => void
-  onServerError: (error: unknown) => void
+  onServerError: (error: TranslatableError) => void
   onStage: (stageId: StageId) => void
   onFreshInstall: (isFresh: boolean) => void
   isCancelled: () => boolean
@@ -79,7 +86,7 @@ const waitForHealthy = async (
     await delay(STARTUP_HEALTH_POLL_INTERVAL_MS)
   }
 
-  throw new Error('Server startup timeout - check logs for errors')
+  throw new TranslatableError('app.server.startupTimeout')
 }
 
 const findFirstOpenStandalonePort = async (
@@ -145,7 +152,7 @@ export const runWarmConnectionFlow = async ({
           if (isCancelled()) return
         } catch (err) {
           if (isCancelled()) return
-          onServerError(err)
+          onServerError(toTranslatableError(err))
           return
         }
       }
@@ -154,9 +161,10 @@ export const runWarmConnectionFlow = async ({
       const openPort = await findFirstOpenStandalonePort(STANDALONE_PORT, checkPortInUse, log)
       if (openPort === null) {
         onServerError(
-          new Error(
-            `No open standalone port found in range ${STANDALONE_PORT}-${STANDALONE_PORT + STANDALONE_PORT_SCAN_LIMIT - 1}.`
-          )
+          new TranslatableError('app.server.noOpenPort', {
+            rangeStart: String(STANDALONE_PORT),
+            rangeEnd: String(STANDALONE_PORT + STANDALONE_PORT_SCAN_LIMIT - 1)
+          })
         )
         return
       }
@@ -173,7 +181,7 @@ export const runWarmConnectionFlow = async ({
           if (isCancelled()) return
         } catch (err) {
           if (isCancelled()) return
-          onServerError(err)
+          onServerError(toTranslatableError(err))
           return
         }
       }
@@ -188,7 +196,7 @@ export const runWarmConnectionFlow = async ({
         if (isCancelled()) return
       } catch (err) {
         if (isCancelled()) return
-        onServerError(err)
+        onServerError(toTranslatableError(err))
         return
       }
     }
@@ -198,7 +206,7 @@ export const runWarmConnectionFlow = async ({
 
   const responsive = await probeServerHealth(wsUrl, probeServerHealthViaMain)
   if (!responsive) {
-    onServerError(new Error(`Server is not responding at ${toHealthUrl(wsUrl)}.`))
+    onServerError(new TranslatableError('app.server.notResponding', { url: toHealthUrl(wsUrl) }))
     return
   }
 

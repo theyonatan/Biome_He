@@ -112,7 +112,8 @@ const zh = {
           openPrefilledIssueOnGithub: '打开预填充的 GitHub issue',
           askForHelpInDiscord: '去 Discord 寻求帮助',
           hideLogsPanel: '隐藏日志面板',
-          showLogsPanel: '显示日志面板'
+          showLogsPanel: '显示日志面板',
+          clipboardCopyFailed: '剪贴板复制命令失败'
         }
       },
       settings: {
@@ -232,6 +233,10 @@ const zh = {
           removeScene: '删除场景'
         }
       },
+      scenes: {
+        failedToReadImageData: '无法读取图片数据',
+        noImageInClipboard: '剪贴板中未找到图片'
+      },
       window: {
         minimize: '最小化',
         maximize: '最大化',
@@ -243,42 +248,86 @@ const zh = {
         discord: 'Overworld Discord',
         github: 'Overworld GitHub',
         feedback: '发送反馈邮件'
+      },
+      server: {
+        fallbackError: '服务器错误：{{message}}',
+        fallbackWarning: '服务器警告：{{message}}',
+        websocketError: 'WebSocket 错误',
+        serverUrlEmpty: '服务器 URL 为空',
+        noEndpointUrl: '未提供端点 URL',
+        websocketDisconnected: 'WebSocket 已断开',
+        websocketNotConnected: 'WebSocket 未连接',
+        requestTimeout: '请求「{{type}}」在 {{timeout}}ms 后超时',
+        defaultSeedNotFound: '在种子文件夹中未找到必需的种子文件「default.jpg」',
+        invalidWebsocketEndpoint: '无效的 WebSocket 端点',
+        websocketConnectionFailed: '无法创建 WebSocket 连接',
+        connectionFailed: '连接失败 - 服务器可能已崩溃',
+        connectionLost: '连接丢失 - 服务器可能已崩溃',
+        startupTimeout: '服务器启动超时 - 请检查日志',
+        noOpenPort: '在范围 {{rangeStart}}–{{rangeEnd}} 中未找到可用端口',
+        notResponding: '服务器在 {{url}} 没有响应',
+        error: {
+          serverStartupFailed: '服务器启动失败',
+          timeoutWaitingForSeed: '等待初始种子超时',
+          cudaRecoveryFailed: 'CUDA 错误 - 恢复失败。请重新连接。'
+        },
+        warning: {
+          missingFilename: '缺少文件名',
+          seedSafetyCheckFailed: "种子 '{{filename}}' 安全检查失败",
+          seedUnsafe: "种子 '{{filename}}' 被标记为不安全",
+          seedNotFound: '未找到种子文件：{{filename}}',
+          seedIntegrityFailed: '文件完整性验证失败 - 请重新扫描种子',
+          seedLoadFailed: '无法加载种子图片',
+          missingModelId: '缺少模型 ID'
+        }
       }
     },
     stage: {
-      'setup.checking': '正在检查设置...',
-      'setup.uv_check': '正在检查设置...',
-      'setup.uv_download': '正在下载运行时...',
-      'setup.engine': '正在准备引擎...',
-      'setup.server_components': '正在准备引擎文件...',
-      'setup.port_scan': '正在准备启动...',
-      'setup.sync_deps': '正在安装组件...',
-      'setup.verify': '正在验证安装...',
-      'setup.server_start': '正在启动引擎...',
-      'setup.health_poll': '正在等待引擎启动...',
-      'setup.connecting': '正在连接...',
-      'startup.begin': '正在初始化...',
-      'startup.world_engine_manager': '正在准备世界引擎...',
-      'startup.safety_checker': '正在设置内容过滤器...',
-      'startup.safety_warmup': '正在预热内容过滤器...',
-      'startup.safety_ready': '内容过滤器已就绪。',
-      'startup.seed_storage': '正在整理场景...',
-      'startup.seed_validation': '正在验证场景...',
-      'startup.ready': '已准备好加载模型。',
-      'session.waiting_for_seed': '正在准备场景...',
-      'session.loading_model.import': '正在导入模型框架...',
-      'session.loading_model.load': '正在加载模型...',
-      'session.loading_model.instantiate': '正在将模型载入内存...',
-      'session.loading_model.done': '模型已加载！',
-      'session.warmup.reset': '正在准备预热...',
-      'session.warmup.seed': '正在用测试帧预热...',
-      'session.warmup.prompt': '正在用测试提示词预热...',
-      'session.warmup.compile': '正在为你的 GPU 做优化...',
-      'session.init.reset': '正在设置世界...',
-      'session.init.seed': '正在加载初始场景...',
-      'session.init.frame': '正在渲染第一帧...',
-      'session.reset': '正在从 GPU 错误中恢复...',
-      'session.ready': '准备就绪！'
+      setup: {
+        checking: '正在检查设置...',
+        uv_check: '正在检查设置...',
+        uv_download: '正在下载运行时...',
+        engine: '正在准备引擎...',
+        server_components: '正在准备引擎文件...',
+        port_scan: '正在准备启动...',
+        sync_deps: '正在安装组件...',
+        verify: '正在验证安装...',
+        server_start: '正在启动引擎...',
+        health_poll: '正在等待引擎启动...',
+        connecting: '正在连接...'
+      },
+      startup: {
+        begin: '正在初始化...',
+        world_engine_manager: '正在准备世界引擎...',
+        safety_checker: '正在设置内容过滤器...',
+        safety_warmup: '正在预热内容过滤器...',
+        safety_ready: '内容过滤器已就绪。',
+        seed_storage: '正在整理场景...',
+        seed_validation: '正在验证场景...',
+        ready: '已准备好加载模型。'
+      },
+      session: {
+        waiting_for_seed: '正在准备场景...',
+        loading_model: {
+          import: '正在导入模型框架...',
+          load: '正在加载模型...',
+          instantiate: '正在将模型载入内存...',
+          done: '模型已加载！'
+        },
+        warmup: {
+          reset: '正在准备预热...',
+          seed: '正在用测试帧预热...',
+          prompt: '正在用测试提示词预热...',
+          compile: '正在为你的 GPU 做优化...'
+        },
+        init: {
+          reset: '正在设置世界...',
+          seed: '正在加载初始场景...',
+          frame: '正在渲染第一帧...'
+        },
+        reset: '正在从 GPU 错误中恢复...',
+        ready: '准备就绪！'
+      }
     }
   }
 } as const

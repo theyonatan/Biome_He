@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { TranslationKey } from '../i18n'
+import { TranslatableError, type TranslationKey } from '../i18n'
 import Button from './ui/Button'
 
 const MAX_ERROR_MESSAGE_CHARS = 220
@@ -27,7 +27,7 @@ function copyToClipboard(text: string): Promise<void> {
       const copied = document.execCommand('copy')
       document.body.removeChild(textarea)
       if (!copied) {
-        reject(new Error('Clipboard copy command failed'))
+        reject(new TranslatableError('app.loading.terminal.clipboardCopyFailed'))
         return
       }
       resolve()

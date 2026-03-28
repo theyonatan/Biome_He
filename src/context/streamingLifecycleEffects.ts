@@ -1,4 +1,5 @@
 import { DEFAULT_WORLD_ENGINE_MODEL } from '../types/settings'
+import { TranslatableError } from '../i18n'
 import type { StreamingLifecycleEffects, StreamingLifecycleState } from './streamingLifecycleMachine'
 import type { PortalState } from './portalStateMachine'
 
@@ -29,7 +30,7 @@ type CreateHandlersArgs = {
   log: { info: (...args: unknown[]) => void; error: (...args: unknown[]) => void }
   lifecycleState: StreamingLifecycleState
   settings: { engine_model?: string | null } | null
-  setEngineError: (value: string | null) => void
+  setEngineError: (value: TranslatableError | null) => void
   setWarmConnectionJobSeq: (value: number) => void
   warmBootstrapSentRef: { current: boolean }
   warmFlowCancelledRef: { current: boolean }
@@ -72,10 +73,16 @@ export const createStreamingLifecycleEffectHandlers = ({
     suppressedIntentionalWarmError: () => {
       log.info('Intentional reconnect in loading state - suppressing engine error')
     },
-    loadingFailureError: (errorMsg) => {
+    loadingFailureError: (info) => {
       if (warmFlowCancelledRef.current) return
-      log.error('Connection error during loading state')
-      setEngineError(errorMsg)
+      log.error('Connection error during loading state:', info)
+      if (info) {
+        if ('key' in info) {
+          setEngineError(new TranslatableError(info.key))
+        } else {
+          setEngineError(new TranslatableError('app.server.fallbackError', { message: info.transportError }))
+        }
+      }
     },
     clearEngineErrorOnLoadingEntry: () => setEngineError(null),
     runLoadingConnection: () => setWarmConnectionJobSeq(lifecycleState.loadingConnectionRequestSeq),

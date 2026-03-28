@@ -118,7 +118,8 @@ const en = {
           openPrefilledIssueOnGithub: 'Open prefilled issue on GitHub',
           askForHelpInDiscord: 'Ask for help in Discord',
           hideLogsPanel: 'Hide logs panel',
-          showLogsPanel: 'Show logs panel'
+          showLogsPanel: 'Show logs panel',
+          clipboardCopyFailed: 'Clipboard copy command failed'
         }
       },
       settings: {
@@ -238,6 +239,10 @@ const en = {
           removeScene: 'Remove scene'
         }
       },
+      scenes: {
+        failedToReadImageData: 'Failed to read image data',
+        noImageInClipboard: 'No image found in clipboard'
+      },
       window: {
         minimize: 'Minimize',
         maximize: 'Maximize',
@@ -249,42 +254,86 @@ const en = {
         discord: 'Overworld Discord',
         github: 'Overworld GitHub',
         feedback: 'Send feedback email'
+      },
+      server: {
+        fallbackError: 'Server error: {{message}}',
+        fallbackWarning: 'Server warning: {{message}}',
+        websocketError: 'WebSocket error',
+        serverUrlEmpty: 'Server URL is empty',
+        noEndpointUrl: 'No endpoint URL provided',
+        websocketDisconnected: 'WebSocket disconnected',
+        websocketNotConnected: 'WebSocket not connected',
+        requestTimeout: 'Request "{{type}}" timed out after {{timeout}}ms',
+        defaultSeedNotFound: 'Required seed file "default.jpg" not found in seeds folder',
+        invalidWebsocketEndpoint: 'Invalid WebSocket endpoint',
+        websocketConnectionFailed: 'Failed to create WebSocket connection',
+        connectionFailed: 'Connection failed — server may have crashed',
+        connectionLost: 'Connection lost — server may have crashed',
+        startupTimeout: 'Server startup timeout — check logs for errors',
+        noOpenPort: 'No open standalone port found in range {{rangeStart}}–{{rangeEnd}}',
+        notResponding: 'Server is not responding at {{url}}',
+        error: {
+          serverStartupFailed: 'Server startup failed',
+          timeoutWaitingForSeed: 'Timeout waiting for initial seed',
+          cudaRecoveryFailed: 'CUDA error — recovery failed. Please reconnect.'
+        },
+        warning: {
+          missingFilename: 'Missing filename',
+          seedSafetyCheckFailed: "Seed '{{filename}}' failed safety check",
+          seedUnsafe: "Seed '{{filename}}' marked as unsafe",
+          seedNotFound: 'Seed file not found: {{filename}}',
+          seedIntegrityFailed: 'File integrity verification failed — please rescan seeds',
+          seedLoadFailed: 'Failed to load seed image',
+          missingModelId: 'Missing model ID'
+        }
       }
     },
     stage: {
-      'setup.checking': 'Checking setup...',
-      'setup.uv_check': 'Checking setup...',
-      'setup.uv_download': 'Downloading runtime...',
-      'setup.engine': 'Preparing engine...',
-      'setup.server_components': 'Preparing engine files...',
-      'setup.port_scan': 'Preparing to launch...',
-      'setup.sync_deps': 'Installing components...',
-      'setup.verify': 'Verifying installation...',
-      'setup.server_start': 'Launching engine...',
-      'setup.health_poll': 'Waiting for engine to start...',
-      'setup.connecting': 'Connecting...',
-      'startup.begin': 'Initializing...',
-      'startup.world_engine_manager': 'Preparing world engine...',
-      'startup.safety_checker': 'Setting up content filters...',
-      'startup.safety_warmup': 'Warming up content filters...',
-      'startup.safety_ready': 'Content filters ready.',
-      'startup.seed_storage': 'Organizing scenes...',
-      'startup.seed_validation': 'Verifying scenes...',
-      'startup.ready': 'Ready to load model.',
-      'session.waiting_for_seed': 'Preparing scene...',
-      'session.loading_model.import': 'Importing model framework...',
-      'session.loading_model.load': 'Loading model...',
-      'session.loading_model.instantiate': 'Loading model into memory...',
-      'session.loading_model.done': 'Model loaded!',
-      'session.warmup.reset': 'Preparing for warmup...',
-      'session.warmup.seed': 'Warming up with test frame...',
-      'session.warmup.prompt': 'Warming up with test prompt...',
-      'session.warmup.compile': 'Optimizing for your GPU...',
-      'session.init.reset': 'Setting up world...',
-      'session.init.seed': 'Loading starting scene...',
-      'session.init.frame': 'Rendering first frame...',
-      'session.reset': 'Recovering from GPU error...',
-      'session.ready': 'Ready!'
+      setup: {
+        checking: 'Checking setup...',
+        uv_check: 'Checking setup...',
+        uv_download: 'Downloading runtime...',
+        engine: 'Preparing engine...',
+        server_components: 'Preparing engine files...',
+        port_scan: 'Preparing to launch...',
+        sync_deps: 'Installing components...',
+        verify: 'Verifying installation...',
+        server_start: 'Launching engine...',
+        health_poll: 'Waiting for engine to start...',
+        connecting: 'Connecting...'
+      },
+      startup: {
+        begin: 'Initializing...',
+        world_engine_manager: 'Preparing world engine...',
+        safety_checker: 'Setting up content filters...',
+        safety_warmup: 'Warming up content filters...',
+        safety_ready: 'Content filters ready.',
+        seed_storage: 'Organizing scenes...',
+        seed_validation: 'Verifying scenes...',
+        ready: 'Ready to load model.'
+      },
+      session: {
+        waiting_for_seed: 'Preparing scene...',
+        loading_model: {
+          import: 'Importing model framework...',
+          load: 'Loading model...',
+          instantiate: 'Loading model into memory...',
+          done: 'Model loaded!'
+        },
+        warmup: {
+          reset: 'Preparing for warmup...',
+          seed: 'Warming up with test frame...',
+          prompt: 'Warming up with test prompt...',
+          compile: 'Optimizing for your GPU...'
+        },
+        init: {
+          reset: 'Setting up world...',
+          seed: 'Loading starting scene...',
+          frame: 'Rendering first frame...'
+        },
+        reset: 'Recovering from GPU error...',
+        ready: 'Ready!'
+      }
     }
   }
 } as const

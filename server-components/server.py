@@ -1290,7 +1290,7 @@ async def websocket_endpoint(websocket: WebSocket):
         ws_startup_waiters.remove(startup_queue)
 
     if startup_error:
-        await websocket.send_text(json.dumps({"type": "error", "message": f"Server startup failed: {startup_error}"}))
+        await websocket.send_text(json.dumps({"type": "error", "message_id": "app.server.error.serverStartupFailed", "message": str(startup_error)}))
         log_tail_task.cancel()
         await websocket.close()
         return
@@ -1302,8 +1302,11 @@ async def websocket_endpoint(websocket: WebSocket):
     async def send_json(data: dict):
         await websocket.send_text(json.dumps(data))
 
-    async def send_warning(message: str) -> None:
-        await send_json({"type": "warning", "message": message})
+    async def send_warning(message_id: str, params: dict | None = None) -> None:
+        payload: dict = {"type": "warning", "message_id": message_id}
+        if params:
+            payload["params"] = params
+        await send_json(payload)
 
     async def send_stage(stage: Stage) -> None:
         await send_json(
@@ -1351,7 +1354,7 @@ async def websocket_endpoint(websocket: WebSocket):
     async def load_initial_seed(filename: str | None) -> bool:
         """Validate and load seed into world_engine.seed_frame."""
         if not filename:
-            await send_warning("Missing filename")
+            await send_warning("app.server.warning.missingFilename")
             return False
 
         if filename not in safe_seeds_cache:
@@ -1360,20 +1363,20 @@ async def websocket_endpoint(websocket: WebSocket):
             )
             if not ok:
                 logger.warning(f"[{client_host}] {error}")
-                await send_warning(error)
+                await send_warning("app.server.warning.seedSafetyCheckFailed", {"filename": filename})
                 return False
 
         cached_entry = safe_seeds_cache[filename]
         if not cached_entry.get("is_safe", False):
             logger.warning(f"[{client_host}] Seed '{filename}' marked as unsafe")
-            await send_warning(f"Seed '{filename}' marked as unsafe")
+            await send_warning("app.server.warning.seedUnsafe", {"filename": filename})
             return False
 
         cached_hash = cached_entry.get("hash", "")
         file_path = cached_entry.get("path", "")
         if not os.path.exists(file_path):
             logger.error(f"[{client_host}] Seed file not found: {file_path}")
-            await send_warning(f"Seed file not found: {filename}")
+            await send_warning("app.server.warning.seedNotFound", {"filename": filename})
             return False
 
         actual_hash = await asyncio.to_thread(compute_file_hash, file_path)
@@ -1381,13 +1384,13 @@ async def websocket_endpoint(websocket: WebSocket):
             logger.warning(
                 f"[{client_host}] File integrity check failed for '{filename}' - file may have been modified"
             )
-            await send_warning("File integrity verification failed - please rescan seeds")
+            await send_warning("app.server.warning.seedIntegrityFailed")
             return False
 
         logger.info(f"[{client_host}] Loading initial seed '{filename}'")
         loaded_frame = await world_engine.load_seed_from_file(file_path)
         if loaded_frame is None:
-            await send_warning("Failed to load seed image")
+            await send_warning("app.server.warning.seedLoadFailed")
             return False
 
         world_engine.seed_frame = loaded_frame
@@ -1400,7 +1403,7 @@ async def websocket_endpoint(websocket: WebSocket):
         """Load/switch model and transition back to waiting-for-seed state."""
         model_uri = (model_uri or "").strip()
         if not model_uri:
-            await send_warning("Missing model id")
+            await send_warning("app.server.warning.missingModelId")
             return
 
         if live_switch:
@@ -1471,7 +1474,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
             except asyncio.TimeoutError:
                 await send_json(
-                    {"type": "error", "message": "Timeout waiting for initial seed"}
+                    {"type": "error", "message_id": "app.server.error.timeoutWaitingForSeed"}
                 )
                 return
 
@@ -1673,7 +1676,7 @@ async def websocket_endpoint(websocket: WebSocket):
                             filename = msg.get("filename")
                             logger.info(f"[RECV] prompt_with_seed: filename={filename}")
                             if not filename:
-                                queue_send({"type": "warning", "message": "Missing filename"})
+                                queue_send({"type": "warning", "message_id": "app.server.warning.missingFilename"})
                                 continue
                             if await load_initial_seed(filename):
                                 reset_flag = True
@@ -1872,7 +1875,7 @@ async def websocket_endpoint(websocket: WebSocket):
                             queue_send(
                                 {
                                     "type": "error",
-                                    "message": "CUDA error - recovery failed. Please reconnect.",
+                                    "message_id": "app.server.error.cudaRecoveryFailed",
                                 }
                             )
                             logger.error(f"[{client_host}] Failed to recover from CUDA error")

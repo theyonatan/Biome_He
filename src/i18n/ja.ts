@@ -117,7 +117,8 @@ const ja = {
           openPrefilledIssueOnGithub: 'GitHub の事前入力済み Issue を開く',
           askForHelpInDiscord: 'Discord で助けを求める',
           hideLogsPanel: 'ログパネルを隠す',
-          showLogsPanel: 'ログパネルを表示'
+          showLogsPanel: 'ログパネルを表示',
+          clipboardCopyFailed: 'クリップボードへのコピーに失敗しました'
         }
       },
       settings: {
@@ -237,6 +238,10 @@ const ja = {
           removeScene: 'シーンを削除'
         }
       },
+      scenes: {
+        failedToReadImageData: '画像データの読み取りに失敗しました',
+        noImageInClipboard: 'クリップボードに画像が見つかりません'
+      },
       window: {
         minimize: '最小化',
         maximize: '最大化',
@@ -248,42 +253,86 @@ const ja = {
         discord: 'Overworld の Discord',
         github: 'Overworld の GitHub',
         feedback: 'フィードバックメールを送る'
+      },
+      server: {
+        fallbackError: 'サーバーエラー: {{message}}',
+        fallbackWarning: 'サーバー警告: {{message}}',
+        websocketError: 'WebSocket エラー',
+        serverUrlEmpty: 'サーバーURLが空です',
+        noEndpointUrl: 'エンドポイントURLが指定されていません',
+        websocketDisconnected: 'WebSocket が切断されました',
+        websocketNotConnected: 'WebSocket が接続されていません',
+        requestTimeout: 'リクエスト「{{type}}」が {{timeout}}ms 後にタイムアウトしました',
+        defaultSeedNotFound: '必須のシードファイル「default.jpg」がシードフォルダに見つかりません',
+        invalidWebsocketEndpoint: '無効なWebSocketエンドポイント',
+        websocketConnectionFailed: 'WebSocket接続の作成に失敗しました',
+        connectionFailed: '接続に失敗しました — サーバーがクラッシュした可能性があります',
+        connectionLost: '接続が失われました — サーバーがクラッシュした可能性があります',
+        startupTimeout: 'サーバーの起動がタイムアウトしました — ログを確認してください',
+        noOpenPort: '範囲 {{rangeStart}}–{{rangeEnd}} で空きポートが見つかりませんでした',
+        notResponding: 'サーバーが {{url}} で応答していません',
+        error: {
+          serverStartupFailed: 'サーバーの起動に失敗しました',
+          timeoutWaitingForSeed: '初期シードの待機がタイムアウトしました',
+          cudaRecoveryFailed: 'CUDAエラー — 回復に失敗しました。再接続してください。'
+        },
+        warning: {
+          missingFilename: 'ファイル名がありません',
+          seedSafetyCheckFailed: "シード '{{filename}}' の安全性チェックに失敗しました",
+          seedUnsafe: "シード '{{filename}}' は安全でないとマークされています",
+          seedNotFound: 'シードファイルが見つかりません: {{filename}}',
+          seedIntegrityFailed: 'ファイル整合性の検証に失敗しました — シードを再スキャンしてください',
+          seedLoadFailed: 'シード画像の読み込みに失敗しました',
+          missingModelId: 'モデルIDがありません'
+        }
       }
     },
     stage: {
-      'setup.checking': 'セットアップを確認しています...',
-      'setup.uv_check': 'セットアップを確認しています...',
-      'setup.uv_download': 'ランタイムをダウンロードしています...',
-      'setup.engine': 'エンジンを準備しています...',
-      'setup.server_components': 'エンジンファイルを準備しています...',
-      'setup.port_scan': '起動準備をしています...',
-      'setup.sync_deps': 'コンポーネントをインストールしています...',
-      'setup.verify': 'インストールを検証しています...',
-      'setup.server_start': 'エンジンを起動しています...',
-      'setup.health_poll': 'エンジンの起動を待っています...',
-      'setup.connecting': '接続中...',
-      'startup.begin': '初期化しています...',
-      'startup.world_engine_manager': 'ワールドエンジンを準備しています...',
-      'startup.safety_checker': 'コンテンツフィルターを設定しています...',
-      'startup.safety_warmup': 'コンテンツフィルターをウォームアップしています...',
-      'startup.safety_ready': 'コンテンツフィルターの準備ができました。',
-      'startup.seed_storage': 'シーンを整理しています...',
-      'startup.seed_validation': 'シーンを検証しています...',
-      'startup.ready': 'モデルを読み込む準備ができました。',
-      'session.waiting_for_seed': 'シーンを準備しています...',
-      'session.loading_model.import': 'モデルフレームワークを読み込んでいます...',
-      'session.loading_model.load': 'モデルを読み込んでいます...',
-      'session.loading_model.instantiate': 'モデルをメモリに読み込んでいます...',
-      'session.loading_model.done': 'モデルを読み込みました。',
-      'session.warmup.reset': 'ウォームアップの準備をしています...',
-      'session.warmup.seed': 'テストフレームでウォームアップしています...',
-      'session.warmup.prompt': 'テストプロンプトでウォームアップしています...',
-      'session.warmup.compile': 'GPU 向けに最適化しています...',
-      'session.init.reset': '世界をセットアップしています...',
-      'session.init.seed': '開始シーンを読み込んでいます...',
-      'session.init.frame': '最初のフレームをレンダリングしています...',
-      'session.reset': 'GPU エラーから復旧しています...',
-      'session.ready': '準備完了！'
+      setup: {
+        checking: 'セットアップを確認しています...',
+        uv_check: 'セットアップを確認しています...',
+        uv_download: 'ランタイムをダウンロードしています...',
+        engine: 'エンジンを準備しています...',
+        server_components: 'エンジンファイルを準備しています...',
+        port_scan: '起動準備をしています...',
+        sync_deps: 'コンポーネントをインストールしています...',
+        verify: 'インストールを検証しています...',
+        server_start: 'エンジンを起動しています...',
+        health_poll: 'エンジンの起動を待っています...',
+        connecting: '接続中...'
+      },
+      startup: {
+        begin: '初期化しています...',
+        world_engine_manager: 'ワールドエンジンを準備しています...',
+        safety_checker: 'コンテンツフィルターを設定しています...',
+        safety_warmup: 'コンテンツフィルターをウォームアップしています...',
+        safety_ready: 'コンテンツフィルターの準備ができました。',
+        seed_storage: 'シーンを整理しています...',
+        seed_validation: 'シーンを検証しています...',
+        ready: 'モデルを読み込む準備ができました。'
+      },
+      session: {
+        waiting_for_seed: 'シーンを準備しています...',
+        loading_model: {
+          import: 'モデルフレームワークを読み込んでいます...',
+          load: 'モデルを読み込んでいます...',
+          instantiate: 'モデルをメモリに読み込んでいます...',
+          done: 'モデルを読み込みました。'
+        },
+        warmup: {
+          reset: 'ウォームアップの準備をしています...',
+          seed: 'テストフレームでウォームアップしています...',
+          prompt: 'テストプロンプトでウォームアップしています...',
+          compile: 'GPU 向けに最適化しています...'
+        },
+        init: {
+          reset: '世界をセットアップしています...',
+          seed: '開始シーンを読み込んでいます...',
+          frame: '最初のフレームをレンダリングしています...'
+        },
+        reset: 'GPU エラーから復旧しています...',
+        ready: '準備完了！'
+      }
     }
   }
 } as const
