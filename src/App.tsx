@@ -242,6 +242,7 @@ const AppShell = () => {
                 portalSceneGlowRgb={portalGlowRgb}
                 sparkGlowRgb={portalGlowRgb}
                 onShrinkComplete={completePortalShrink}
+                onInitialPreviewReady={triggerPortalEnter}
               />
             </div>
           </div>
