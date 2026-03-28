@@ -18,14 +18,16 @@ from qwen_tool_parser import parse_tool_calls
 
 logger = logging.getLogger(__name__)
 
-SAFETY_REJECTION_MESSAGE = "Scene edit rejected: the request did not pass the content safety check."
+SAFETY_REJECTION_MESSAGE_ID = "app.server.error.sceneEditSafetyRejected"
 
 
 class SafetyRejectionError(RuntimeError):
     """Raised when a scene edit is rejected by the VLM or output safety checker."""
 
+    message_id: str = SAFETY_REJECTION_MESSAGE_ID
+
     def __init__(self):
-        super().__init__(SAFETY_REJECTION_MESSAGE)
+        super().__init__(SAFETY_REJECTION_MESSAGE_ID)
 
 # ── Edit model configuration ────────────────────────────────────────
 EDIT_MODEL_ID = "black-forest-labs/FLUX.2-klein-4B"

@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useStreaming } from '../context/StreamingContext'
 import { SETTINGS_CONTROL_BASE, SETTINGS_CONTROL_TEXT } from '../styles'
 import type { SceneEditPhase } from '../context/sceneEditMachine'
+import { RpcError } from '../lib/wsRpc'
+import type { TranslationKey } from '../i18n'
 
 const SceneEditOverlay = () => {
+  const { t } = useTranslation()
   const { sceneEditState, dispatchSceneEdit, wsRequest } = useStreaming()
   const { phase, errorMessage } = sceneEditState
   const isActive = phase !== 'inactive'
@@ -63,7 +67,12 @@ const SceneEditOverlay = () => {
         editPrompt: result?.edit_prompt
       })
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
+      let msg: string
+      if (err instanceof RpcError && err.errorId) {
+        msg = t(err.errorId as TranslationKey, { defaultValue: err.message })
+      } else {
+        msg = err instanceof Error ? err.message : String(err)
+      }
       dispatchSceneEdit({ type: 'ERROR', message: msg })
     }
   }, [prompt, phase, wsRequest, dispatchSceneEdit])
@@ -88,16 +97,16 @@ const SceneEditOverlay = () => {
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           onKeyDown={handleInputKeyDown}
-          placeholder="Describe the scene change..."
+          placeholder={t('app.sceneEdit.placeholder')}
           className={`${SETTINGS_CONTROL_BASE} ${SETTINGS_CONTROL_TEXT} w-full outline-none focus:ring-1 focus:ring-border-medium`}
         />
-        <span className="font-serif text-[1.8cqh] text-text-muted">Enter to apply &middot; Esc to cancel</span>
+        <span className="font-serif text-[1.8cqh] text-text-muted">{t('app.sceneEdit.instructions')}</span>
       </div>
     ),
     loading: () => (
       <div className="flex items-center gap-[1cqw]">
         <div className="h-[2cqh] w-[2cqh] animate-spin rounded-full border-[0.3cqh] border-text-muted border-t-text-primary" />
-        <span className="font-serif text-[2.4cqh] text-text-muted">Applying scene edit...</span>
+        <span className="font-serif text-[2.4cqh] text-text-muted">{t('app.sceneEdit.applying')}</span>
       </div>
     ),
     error: () => <span className="font-serif text-[2.4cqh] text-red-400">{errorMessage}</span>
