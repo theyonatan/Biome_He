@@ -119,7 +119,8 @@ const goose = {
           openPrefilledIssueOnGithub: 'Open prefilled honk on GitHub',
           askForHelpInDiscord: 'Honk for help in Discord',
           hideLogsPanel: 'Hide honk panel',
-          showLogsPanel: 'Show honk panel'
+          showLogsPanel: 'Show honk panel',
+          clipboardCopyFailed: 'Failed to copy to goose clipboard'
         }
       },
       settings: {
@@ -247,6 +248,10 @@ const goose = {
           removeScene: 'Abandon pond'
         }
       },
+      scenes: {
+        failedToReadImageData: 'Failed to nibble image data',
+        noImageInClipboard: 'No bread crumb found in clipboard'
+      },
       window: {
         minimize: 'Tuck',
         maximize: 'Spread wings',
@@ -258,42 +263,105 @@ const goose = {
         discord: 'Gooseworld Discord',
         github: 'Gooseworld GitHub',
         feedback: 'Send a honk'
+      },
+      sceneEdit: {
+        placeholder: 'Describe the pond change...',
+        instructions: 'Enter to quack \u00b7 Esc to waddle away',
+        applying: 'Rearranging the pond...'
+      },
+      server: {
+        fallbackError: 'Goose error: {{message}}',
+        fallbackWarning: 'Goose warning: {{message}}',
+        websocketError: 'WebSocket honk failed',
+        serverUrlEmpty: 'Pond URL is empty',
+        noEndpointUrl: 'No pond address provided',
+        websocketDisconnected: 'Goose connection severed',
+        websocketNotConnected: 'Goose not connected to pond',
+        requestTimeout: 'Request "{{type}}" took too long ({{timeout}}ms) — the goose fell asleep',
+        defaultSeedNotFound: 'Required bread crumb "default.jpg" not found in the stash',
+        invalidWebsocketEndpoint: 'Invalid pond connection',
+        websocketConnectionFailed: 'Failed to waddle to the pond',
+        connectionFailed: 'Failed to reach the pond — the goose may have flown away',
+        connectionLost: 'Lost sight of the pond — the goose may have flown away',
+        startupTimeout: 'The goose took too long to wake up — check the nest logs',
+        noOpenPort: 'No open pond found in range {{rangeStart}}–{{rangeEnd}}',
+        notResponding: 'The goose is not honking back at {{url}}',
+        error: {
+          serverStartupFailed: 'The goose failed to wake up',
+          timeoutWaitingForSeed: 'Timeout waiting for bread crumb',
+          sceneEditModelLoadFailed: 'Pond edit model failed to load',
+          sceneEditSafetyRejected: 'Pond edit rejected: the honk did not pass the fox safety check.',
+          sceneEditEmptyPrompt: 'Empty quack',
+          sceneEditModelNotLoaded: 'Pond edit model not loaded. Enable Pond Edit in Experimental Honks settings.',
+          sceneEditAlreadyInProgress: 'Pond edit already in progress',
+          contentFilterLoadFailed: 'Fox detector failed to load',
+          cudaRecoveryFailed: 'CUDA honk — recovery failed. Please re-waddle.'
+        },
+        warning: {
+          missingFilename: 'Missing bread crumb name',
+          seedSafetyCheckFailed: "Bread crumb '{{filename}}' failed fox inspection",
+          seedUnsafe: "Bread crumb '{{filename}}' marked as suspicious",
+          seedNotFound: 'Bread crumb not found: {{filename}}',
+          seedIntegrityFailed: 'Bread crumb integrity check failed — please re-inspect',
+          seedLoadFailed: 'Failed to nibble bread crumb',
+          missingModelId: 'Missing goose model ID'
+        }
       }
     },
     stage: {
-      'setup.checking': 'Inspecting the pond...',
-      'setup.uv_check': 'Inspecting the pond...',
-      'setup.uv_download': 'Fetching bread...',
-      'setup.engine': 'Preening the goose...',
-      'setup.server_components': 'Gathering feathers...',
-      'setup.port_scan': 'Scouting for a good pond...',
-      'setup.sync_deps': 'Stashing bread crumbs...',
-      'setup.verify': 'Counting feathers...',
-      'setup.server_start': 'Releasing the goose...',
-      'setup.health_poll': 'Waiting for the goose to wake up...',
-      'setup.connecting': 'Waddling over...',
-      'startup.begin': 'Honking into existence...',
-      'startup.world_engine_manager': 'Assembling the flock...',
-      'startup.safety_checker': 'Training the fox detector...',
-      'startup.safety_warmup': 'Test-hissing at shadows...',
-      'startup.safety_ready': 'Fox detector operational.',
-      'startup.seed_storage': 'Organizing the bread stash...',
-      'startup.seed_validation': 'Inspecting each crumb...',
-      'startup.ready': 'Ready to unleash the goose.',
-      'session.waiting_for_seed': 'Choosing a pond...',
-      'session.loading_model.import': 'Importing goose genetics...',
-      'session.loading_model.load': 'Hatching the goose...',
-      'session.loading_model.instantiate': 'Loading goose into pond...',
-      'session.loading_model.done': 'The goose has landed!',
-      'session.warmup.reset': 'Stretching wings...',
-      'session.warmup.seed': 'Test waddle...',
-      'session.warmup.prompt': 'Practice honk...',
-      'session.warmup.compile': 'Optimizing honk frequency for your hardware...',
-      'session.init.reset': 'Filling the pond...',
-      'session.init.seed': 'Placing the goose...',
-      'session.init.frame': 'First honk...',
-      'session.reset': 'Recovering from a bad honk...',
-      'session.ready': 'HONK!'
+      setup: {
+        checking: 'Inspecting the pond...',
+        uv_check: 'Inspecting the pond...',
+        uv_download: 'Fetching bread...',
+        engine: 'Preening the goose...',
+        server_components: 'Gathering feathers...',
+        port_scan: 'Scouting for a good pond...',
+        sync_deps: 'Stashing bread crumbs...',
+        verify: 'Counting feathers...',
+        server_start: 'Releasing the goose...',
+        health_poll: 'Waiting for the goose to wake up...',
+        connecting: 'Waddling over...'
+      },
+      startup: {
+        begin: 'Honking into existence...',
+        world_engine_manager: 'Assembling the flock...',
+        safety_checker: 'Training the fox detector...',
+        safety_warmup: 'Test-hissing at shadows...',
+        safety_ready: 'Fox detector operational.',
+        seed_storage: 'Organizing the bread stash...',
+        seed_validation: 'Inspecting each crumb...',
+        ready: 'Ready to unleash the goose.'
+      },
+      session: {
+        waiting_for_seed: 'Choosing a pond...',
+        loading_model: {
+          import: 'Importing goose genetics...',
+          load: 'Hatching the goose...',
+          instantiate: 'Loading goose into pond...',
+          done: 'The goose has landed!'
+        },
+        inpainting: {
+          load: 'Loading pond editor...',
+          ready: 'Pond editor ready.'
+        },
+        safety: {
+          load: 'Loading fox detector...',
+          ready: 'Fox detector ready.'
+        },
+        warmup: {
+          reset: 'Stretching wings...',
+          seed: 'Test waddle...',
+          prompt: 'Practice honk...',
+          compile: 'Optimizing honk frequency for your hardware...'
+        },
+        init: {
+          reset: 'Filling the pond...',
+          seed: 'Placing the goose...',
+          frame: 'First honk...'
+        },
+        reset: 'Recovering from a bad honk...',
+        ready: 'HONK!'
+      }
     }
   }
 } as const

@@ -1,4 +1,5 @@
 import { PORTAL_STATES, type PortalState } from './portalStateMachine'
+import type { TranslatableError, TranslationKey } from '../i18n'
 
 const ACTIVE_CONNECTION_STATES = new Set(['connecting', 'connected'])
 const FAILURE_CONNECTION_STATES = new Set(['disconnected', 'error'])
@@ -8,7 +9,7 @@ export const STREAMING_LIFECYCLE_EVENT = {
 } as const
 
 export type StreamingLifecycleEffects = {
-  loadingFailureError: string | null
+  loadingFailureError: { transportError: string } | { key: TranslationKey } | null
   connectionLost: boolean
   clearConnectionLost: boolean
   engineErrorDismissed: boolean
@@ -75,7 +76,7 @@ export type StreamingLifecycleSyncPayload = {
   transportError: string | null
   selectedModel: string
   lastAppliedModel: string | null
-  engineError: string | null
+  engineError: TranslatableError | null
   hasReceivedFrame: boolean
   socketReady: boolean
   isPointerLocked: boolean
@@ -182,9 +183,9 @@ export const streamingLifecycleReducer = (
       next.effects.suppressedIntentionalWarmError = true
     } else {
       const isError = connectionState === 'error'
-      next.effects.loadingFailureError =
-        transportError ||
-        (isError ? 'Connection failed - server may have crashed' : 'Connection lost - server may have crashed')
+      next.effects.loadingFailureError = transportError
+        ? { transportError }
+        : { key: isError ? 'app.server.connectionFailed' : 'app.server.connectionLost' }
     }
     next.loadingAttempted = false
   }

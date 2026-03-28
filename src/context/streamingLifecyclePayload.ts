@@ -1,4 +1,5 @@
 import { DEFAULT_WORLD_ENGINE_MODEL } from '../types/settings'
+import type { TranslatableError } from '../i18n'
 import type { PortalState } from './portalStateMachine'
 import type { StreamingLifecycleSyncPayload } from './streamingLifecycleMachine'
 
@@ -8,7 +9,7 @@ type BuildStreamingLifecycleSyncPayloadArgs = {
   transportError: string | null
   engineModel?: string | null
   lastAppliedModel: string | null
-  engineError: string | null
+  engineError: TranslatableError | null
   hasReceivedFrame: boolean
   socketReady: boolean
   isPointerLocked: boolean

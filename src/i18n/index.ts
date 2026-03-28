@@ -5,6 +5,24 @@ import { resources } from './resources'
 
 export type TranslationKey = ParseKeys
 
+/**
+ * Error carrying a translation key + interpolation params.
+ *
+ * `message` is eagerly resolved via the current i18n locale so that
+ * catch sites using `err.message` still get a human-readable string.
+ * Consumers with access to `t()` can re-resolve `translationKey` +
+ * `translationParams` for the freshest locale.
+ */
+export class TranslatableError extends Error {
+  readonly translationKey: TranslationKey
+  readonly translationParams: Record<string, string>
+  constructor(translationKey: TranslationKey, params: Record<string, string> = {}) {
+    super(String(i18n.t(translationKey, { defaultValue: translationKey, ...params })))
+    this.translationKey = translationKey
+    this.translationParams = params
+  }
+}
+
 export const FALLBACK_LOCALE = 'en' as const
 export const SUPPORTED_LOCALES = ['en', 'ja', 'zh', 'goose'] as const
 export type SupportedLocale = (typeof SUPPORTED_LOCALES)[number]

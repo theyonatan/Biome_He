@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react'
 import { invoke } from '../bridge'
 import { createLogger } from '../utils/logger'
+import { TranslatableError } from '../i18n'
 import type { SeedRecord } from '../types/app'
 
 const log = createLogger('Seeds')
@@ -100,7 +101,7 @@ export const useSeeds = (): UseSeedsResult => {
         }
 
         if (!seedList.some((s) => s.filename === 'default.jpg')) {
-          throw new Error('Required seed file "default.jpg" not found in seeds folder')
+          throw new TranslatableError('app.server.defaultSeedNotFound')
         }
 
         const result = await wsRequest<{ blob: Blob }>('seeds_image', { filename: 'default.jpg' })

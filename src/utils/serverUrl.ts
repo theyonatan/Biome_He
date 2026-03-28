@@ -1,3 +1,5 @@
+import { TranslatableError } from '../i18n'
+
 const DEFAULT_PORTS: Record<string, number> = {
   'http:': 80,
   'https:': 443,
@@ -8,7 +10,7 @@ const DEFAULT_PORTS: Record<string, number> = {
 const withDefaultScheme = (value: string): string => {
   const trimmed = value.trim()
   if (!trimmed) {
-    throw new Error('Server URL is empty')
+    throw new TranslatableError('app.server.serverUrlEmpty')
   }
   return /^[a-z]+:\/\//i.test(trimmed) ? trimmed : `http://${trimmed}`
 }

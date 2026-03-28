@@ -32,7 +32,11 @@ const TerminalDisplay = ({ onCancel }: TerminalDisplayProps) => {
   const [exportStatus, setExportStatus] = useState<string | null>(null)
   const logsPanelHeight = '36cqh'
 
-  const errorDetail = engineError || error
+  const errorDetail = engineError
+    ? String(
+        t(engineError.translationKey, { defaultValue: engineError.translationKey, ...engineError.translationParams })
+      )
+    : error
 
   // Extract the first non-empty line from the error for the inline display
   const errorFirstLine = useMemo(() => {
@@ -93,7 +97,7 @@ const TerminalDisplay = ({ onCancel }: TerminalDisplayProps) => {
         status_text: statusText,
         progress_percent: progressPercent,
         active_error: activeError,
-        engine_error: engineError,
+        engine_error: errorDetail,
         websocket_error: error,
         is_server_mode: isServerMode
       },
