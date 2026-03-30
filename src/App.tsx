@@ -264,6 +264,7 @@ const AppShell = () => {
                 sparkGlowRgb={portalGlowRgb}
                 onShrinkComplete={completePortalShrink}
                 onInitialPreviewReady={handleInitialPreviewReady}
+                onMediaReady={triggerPortalEnter}
               />
             </div>
           </div>

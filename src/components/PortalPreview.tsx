@@ -15,6 +15,7 @@ type PortalPreviewProps = {
   sparkGlowRgb: [number, number, number]
   onShrinkComplete: () => void
   onInitialPreviewReady: () => void
+  onMediaReady: () => void
 }
 
 const PortalPreview = ({
@@ -29,10 +30,15 @@ const PortalPreview = ({
   portalSceneGlowRgb,
   sparkGlowRgb,
   onShrinkComplete,
-  onInitialPreviewReady
+  onInitialPreviewReady,
+  onMediaReady
 }: PortalPreviewProps) => {
   const coreRef = useRef<HTMLDivElement>(null)
-  const { portalVideoRef, isPortalMediaReady } = usePortalMediaMount(videoElement, onInitialPreviewReady)
+  const { portalVideoRef, isPortalMediaReady, hasHadInitialReady } = usePortalMediaMount(
+    videoElement,
+    onInitialPreviewReady,
+    onMediaReady
+  )
 
   if (!visible || (!videoElement && !hoverContent)) return null
 
@@ -41,7 +47,10 @@ const PortalPreview = ({
     ['--portal-border-rgb' as string]: glowRgb.join(', '),
     ['--portal-enter-duration-ms' as string]: '1050',
     opacity: isPortalMediaReady ? 1 : 0,
-    visibility: isPortalMediaReady ? 'visible' : 'hidden'
+    visibility: isPortalMediaReady ? 'visible' : 'hidden',
+    // Skip the CSS opacity transition for the very first appearance so the
+    // portal is fully visible the instant the window opens.
+    ...(!hasHadInitialReady && { transition: 'none' })
   }
 
   return (
