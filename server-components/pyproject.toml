@@ -34,7 +34,10 @@ index-strategy = "unsafe-best-match"
 [tool.uv.sources]
 torch = { index = "pytorch-cu128" }
 torchvision = { index = "pytorch-cu128" }
-llama-cpp-python = { url = "https://github.com/JamePeng/llama-cpp-python/releases/download/v0.3.33-cu128-Basic-linux-20260315/llama_cpp_python-0.3.33%2Bcu128.basic-cp312-cp312-linux_x86_64.whl" }
+llama-cpp-python = [
+  { url = "https://github.com/JamePeng/llama-cpp-python/releases/download/v0.3.33-cu128-Basic-linux-20260315/llama_cpp_python-0.3.33%2Bcu128.basic-cp312-cp312-linux_x86_64.whl", marker = "sys_platform == 'linux'" },
+  { url = "https://github.com/JamePeng/llama-cpp-python/releases/download/v0.3.33-cu128-Basic-win-20260315/llama_cpp_python-0.3.33%2Bcu128.basic-cp312-cp312-win_amd64.whl", marker = "sys_platform == 'win32'" },
+]
 
 [[tool.uv.index]]
 name = "pytorch-cu128"
