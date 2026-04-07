@@ -220,7 +220,8 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
       })
       .catch(() => null)
     sendModel(selectedModel, seed, {
-      sceneEdit: settings.experimental?.scene_edit_enabled ?? false
+      sceneEdit: settings.experimental?.scene_edit_enabled ?? false,
+      actionLogging: settings.debug_overlays?.action_logging ?? false
     })
     lastAppliedModelRef.current = settings.experimental?.scene_edit_enabled
       ? `${selectedModel}+scene_edit`
@@ -232,6 +233,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     isConnected,
     settings?.engine_model,
     settings.experimental?.scene_edit_enabled,
+    settings.debug_overlays?.action_logging,
     sendModel,
     setPlaceholderFrame,
     wsRequest

@@ -218,7 +218,9 @@ const en = {
           description: "want to see what's happening under the hood?",
           performanceStats: 'Performance Stats',
           inputOverlay: 'Input Overlay',
-          frameTimeline: 'Frame Timeline'
+          frameTimeline: 'Frame Timeline',
+          actionLogging: 'Action Logging',
+          actionLoggingDescription: 'Record all inputs to a file on the server for replay. Written to /tmp.'
         },
         credits: {
           title: 'Credits'

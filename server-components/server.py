@@ -33,6 +33,8 @@ from pathlib import Path
 from queue import Empty, Queue
 from typing import Optional
 
+from action_logger import ActionLogger
+
 # ---------------------------------------------------------------------------
 
 from huggingface_hub import model_info as hf_model_info
@@ -1376,6 +1378,8 @@ async def websocket_endpoint(websocket: WebSocket):
 
         world_engine.seed_frame = loaded_frame
         world_engine.original_seed_frame = loaded_frame
+        nonlocal current_seed_filename
+        current_seed_filename = filename
         logger.info(f"[{client_host}] Initial seed loaded successfully")
         return True
 
@@ -1414,6 +1418,9 @@ async def websocket_endpoint(websocket: WebSocket):
         logger.info(f"[{client_host}] Model loaded: {world_engine.model_uri}")
 
     scene_edit_requested = False
+    action_logging_requested = False
+    action_logger: ActionLogger | None = None
+    current_seed_filename: str | None = None
 
     try:
         # Wait for initial seed from client
@@ -1446,6 +1453,8 @@ async def websocket_endpoint(websocket: WebSocket):
                 if msg_type == "set_model":
                     if msg.get("scene_edit"):
                         scene_edit_requested = True
+                    if msg.get("action_logging"):
+                        action_logging_requested = True
                     await handle_model_request(
                         msg.get("model"),
                         live_switch=False,
@@ -1531,6 +1540,25 @@ async def websocket_endpoint(websocket: WebSocket):
         world_engine.set_progress_callback(None)
         await send_stage(SESSION_READY)
         logger.info(f"[{client_host}] Ready for game loop")
+
+        action_logger = ActionLogger(client_host) if action_logging_requested else None
+
+        def _action_logger_new_segment() -> None:
+            if action_logger is not None:
+                action_logger.new_segment(
+                    model=getattr(world_engine, "model_uri", None),
+                    seed=current_seed_filename,
+                    n_frames=world_engine.n_frames,
+                    seed_target_size=world_engine.seed_target_size,
+                    has_prompt_conditioning=getattr(world_engine, "has_prompt_conditioning", False),
+                )
+
+        def _action_logger_end_segment() -> None:
+            if action_logger is not None:
+                action_logger.end_segment()
+
+        _action_logger_new_segment()
+
         running = True
         paused = False
         reset_flag = False
@@ -1651,6 +1679,8 @@ async def websocket_endpoint(websocket: WebSocket):
                         # the next clean frame boundary — post a request and
                         # await the future.
                         if msg.get("type") == "scene_edit":
+                            if action_logger is not None:
+                                action_logger.scene_edit(msg.get("prompt", "").strip())
                             prompt = msg.get("prompt", "").strip()
                             if not prompt:
                                 result = {"success": False, "error_id": "app.server.error.sceneEditEmptyPrompt"}
@@ -1820,12 +1850,20 @@ async def websocket_endpoint(websocket: WebSocket):
                     )
 
             _flush_pending.work = None
+            _gen_was_paused = False
 
             while running:
                 if paused:
                     _flush_pending()
+                    if not _gen_was_paused:
+                        _action_logger_end_segment()
+                        _gen_was_paused = True
                     time.sleep(0.01)
                     continue
+
+                if _gen_was_paused:
+                    _gen_was_paused = False
+                    _action_logger_new_segment()
 
                 try:
                     if prompt_pending is not None:
@@ -1833,6 +1871,7 @@ async def websocket_endpoint(websocket: WebSocket):
                         world_engine.current_prompt = prompt_pending
                         prompt_pending = None
                         run_coro(reset_engine())
+                        _action_logger_new_segment()
 
                     if reset_flag or session.frame_count >= session.max_frames:
                         _flush_pending()
@@ -1840,6 +1879,7 @@ async def websocket_endpoint(websocket: WebSocket):
                             logger.info(f"[{client_host}] Auto-reset at frame limit")
                         run_coro(reset_engine())
                         reset_flag = False
+                        _action_logger_new_segment()
 
                     # Handle pending scene edit — runs inpainting on the last
                     # subframe from the most recent gen_frame, then appends.
@@ -1875,6 +1915,14 @@ async def websocket_endpoint(websocket: WebSocket):
                         continue
 
                     ctrl = world_engine.CtrlInput(button=buttons, mouse=(mouse_dx, mouse_dy))
+
+                    if action_logger is not None:
+                        action_logger.frame_input(
+                            buttons=buttons,
+                            mouse_dx=mouse_dx,
+                            mouse_dy=mouse_dy,
+                            client_ts=client_ts,
+                        )
 
                     # client_ts is a performance.now() timestamp from the browser;
                     # we can't compare clocks, but we CAN forward it so the client
@@ -1996,6 +2044,8 @@ async def websocket_endpoint(websocket: WebSocket):
         TeeStream.unregister_client(log_queue)
         progress_drain_task.cancel()
         world_engine.set_progress_callback(None)
+        if action_logger is not None:
+            action_logger.end_segment()
         logger.info(f"[{client_host}] Disconnected (frames: {session.frame_count})")
 
 

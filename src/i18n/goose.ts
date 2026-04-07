@@ -219,7 +219,10 @@ const goose = {
           description: 'want to see what the goose is thinking?',
           performanceStats: 'Waddle stats',
           inputOverlay: 'Peck overlay',
-          frameTimeline: 'Feather timeline'
+          frameTimeline: 'Feather timeline',
+          actionLogging: 'Migration log',
+          actionLoggingDescription:
+            'Record all pecks and waddles to a file on the pond server for replay. Honked to /tmp.'
         },
         credits: {
           title: 'The flock'

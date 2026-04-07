@@ -217,7 +217,9 @@ const ja = {
           description: '内部で何が起きているか見ますか？',
           performanceStats: '性能統計',
           inputOverlay: '入力オーバーレイ',
-          frameTimeline: 'フレームタイムライン'
+          frameTimeline: 'フレームタイムライン',
+          actionLogging: 'アクションログ',
+          actionLoggingDescription: 'リプレイ用に全入力をサーバー上のファイルに記録します。/tmpに書き込まれます。'
         },
         credits: {
           title: 'クレジット'

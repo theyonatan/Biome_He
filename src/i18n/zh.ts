@@ -211,7 +211,9 @@ const zh = {
           description: '想看看底层正在发生什么吗？',
           performanceStats: '性能统计',
           inputOverlay: '输入叠层',
-          frameTimeline: '帧时间线'
+          frameTimeline: '帧时间线',
+          actionLogging: '操作日志',
+          actionLoggingDescription: '将所有输入记录到服务器上的文件以供回放。写入 /tmp。'
         },
         credits: {
           title: '鸣谢'
