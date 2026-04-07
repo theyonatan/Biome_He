@@ -102,7 +102,7 @@ const EngineInstallModal = ({ onClose }: EngineInstallModalProps) => {
           showExportAction={!engineSetupInProgress && !!engineSetupError}
           onExportAction={() => void handleExportInstallDiagnostics()}
           isExportingAction={isExportingInstallDiagnostics}
-          exportActionLabel="app.buttons.exportLogs"
+          exportActionLabel="app.buttons.saveReport"
           actionStatus={installExportStatus}
           headerAction={
             engineSetupInProgress ? (
