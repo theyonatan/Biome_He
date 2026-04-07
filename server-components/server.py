@@ -10,22 +10,20 @@ Usage:
 Client connects via WebSocket to ws://localhost:7987/ws
 """
 
-# Immediate startup logging before any imports that could fail
+from server_logging import TeeStream, SERVER_LOG_FILE, logger  # noqa: E402 — must be first
+
 import sys
 
-print(f"[BIOME] Python {sys.version}", flush=True)
-print(f"[BIOME] Starting server...", flush=True)
+logger.info(f"Python {sys.version}")
+logger.info("Starting server...")
 
 import asyncio
 import base64
-import faulthandler
 import hashlib
 import json
-import logging
 import os
 import pickle
 import shutil
-import signal
 import struct
 import threading
 import time
@@ -34,6 +32,8 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from queue import Empty, Queue
 from typing import Optional
+
+# ---------------------------------------------------------------------------
 
 from huggingface_hub import model_info as hf_model_info
 from huggingface_hub.utils import GatedRepoError, RepositoryNotFoundError
@@ -88,116 +88,14 @@ def resolve_hf_token() -> Optional[str]:
 _resolved_token = resolve_hf_token()
 if _resolved_token:
     os.environ["HF_TOKEN"] = _resolved_token
-    print(f"[BIOME] HF token resolved and set", flush=True)
+    logger.info("HF token resolved and set")
 else:
-    print("[BIOME] Warning: No HuggingFace token found (set HF_TOKEN or run `huggingface-cli login`)", flush=True)
+    logger.warning("No HuggingFace token found (set HF_TOKEN or run `huggingface-cli login`)")
 
 # Reduce CUDA allocator fragmentation during repeated model loads/switches.
 os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    datefmt="%H:%M:%S",
-    stream=sys.stdout,
-)
-logger = logging.getLogger("biome_server")
-
-SERVER_LOG_FILE = Path(
-    os.environ.get("BIOME_SERVER_LOG_PATH", str(Path(__file__).with_name("server.log")))
-)
-_log_file_lock = threading.Lock()
-
-
-class TeeStream:
-    """Mirror stdout/stderr to a file while preserving console output."""
-
-    def __init__(self, stream, log_fp):
-        self._stream = stream
-        self._log_fp = log_fp
-
-    def write(self, data):
-        written = self._stream.write(data)
-        if data:
-            with _log_file_lock:
-                self._log_fp.write(data)
-                self._log_fp.flush()
-        return written
-
-    def flush(self):
-        self._stream.flush()
-        with _log_file_lock:
-            self._log_fp.flush()
-
-    def isatty(self):
-        return self._stream.isatty()
-
-    def fileno(self):
-        return self._stream.fileno()
-
-    @property
-    def encoding(self):
-        return getattr(self._stream, "encoding", "utf-8")
-
-
-# Log file receives both logger output and direct stdout/stderr writes.
-SERVER_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
-_hosted_log_fp = open(SERVER_LOG_FILE, "w", encoding="utf-8", buffering=1)
-sys.stdout = TeeStream(sys.stdout, _hosted_log_fp)
-sys.stderr = TeeStream(sys.stderr, _hosted_log_fp)
-
-_file_log_handler = logging.FileHandler(SERVER_LOG_FILE, mode="w", encoding="utf-8")
-_file_log_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S"))
-logging.getLogger().addHandler(_file_log_handler)
-
-
-def _install_crash_logging_hooks() -> None:
-    """Force uncaught exceptions and fatal interpreter crashes into server.log."""
-    try:
-        faulthandler.enable(file=_hosted_log_fp, all_threads=True)
-    except Exception as e:
-        print(f"[BIOME] Failed to enable faulthandler: {e}", file=sys.stderr, flush=True)
-
-    try:
-        if hasattr(signal, "SIGTERM") and hasattr(faulthandler, "register"):
-            faulthandler.register(signal.SIGTERM, file=_hosted_log_fp, all_threads=True, chain=True)
-    except Exception as e:
-        print(f"[BIOME] Failed to register SIGTERM faulthandler hook: {e}", file=sys.stderr, flush=True)
-
-    def _log_uncaught_exception(exc_type, exc_value, exc_tb):
-        print("[BIOME] Uncaught exception:", file=sys.stderr, flush=True)
-        traceback.print_exception(exc_type, exc_value, exc_tb, file=sys.stderr)
-        sys.stderr.flush()
-        _hosted_log_fp.flush()
-
-    def _log_thread_exception(args):
-        print(f"[BIOME] Uncaught thread exception in {args.thread.name}:", file=sys.stderr, flush=True)
-        traceback.print_exception(args.exc_type, args.exc_value, args.exc_traceback, file=sys.stderr)
-        sys.stderr.flush()
-        _hosted_log_fp.flush()
-
-    def _log_unraisable(unraisable):
-        print("[BIOME] Unraisable exception:", file=sys.stderr, flush=True)
-        traceback.print_exception(
-            unraisable.exc_type,
-            unraisable.exc_value,
-            unraisable.exc_traceback,
-            file=sys.stderr,
-        )
-        if unraisable.err_msg:
-            print(f"[BIOME] Unraisable context: {unraisable.err_msg}", file=sys.stderr, flush=True)
-        sys.stderr.flush()
-        _hosted_log_fp.flush()
-
-    sys.excepthook = _log_uncaught_exception
-    threading.excepthook = _log_thread_exception
-    sys.unraisablehook = _log_unraisable
-
-
-_install_crash_logging_hooks()
-
-
-print("[BIOME] Basic imports done", flush=True)
+logger.info("Basic imports done")
 
 # If launched with --parent-pid, ask the OS to kill us when the parent dies (Linux only),
 # and start a background thread to poll the parent PID as a cross-platform fallback.
@@ -211,7 +109,7 @@ def _check_parent_alive() -> None:
     try:
         os.kill(_parent_pid, 0)
     except OSError:
-        print(f"[BIOME] Parent process (PID {_parent_pid}) is already gone, shutting down", flush=True)
+        logger.error(f"Parent process (PID {_parent_pid}) is already gone, shutting down")
         os._exit(1)
 
 
@@ -224,38 +122,38 @@ async def _watch_parent_pid() -> None:
         try:
             os.kill(_parent_pid, 0)  # Signal 0 = check if process exists
         except OSError:
-            print(f"[BIOME] Parent process (PID {_parent_pid}) is gone, shutting down", flush=True)
+            logger.error(f"Parent process (PID {_parent_pid}) is gone, shutting down")
             os._exit(1)
 
 try:
-    print("[BIOME] Importing torch...", flush=True)
+    logger.info("Importing torch...")
     import torch
 
-    print(f"[BIOME] torch {torch.__version__} imported", flush=True)
+    logger.info(f"torch {torch.__version__} imported")
 
-    print("[BIOME] Importing torchvision...", flush=True)
+    logger.info("Importing torchvision...")
     import torchvision
 
-    print(f"[BIOME] torchvision {torchvision.__version__} imported", flush=True)
+    logger.info(f"torchvision {torchvision.__version__} imported")
 
-    print("[BIOME] Importing PIL...", flush=True)
+    logger.info("Importing PIL...")
     from PIL import Image
 
-    print("[BIOME] PIL imported", flush=True)
+    logger.info("PIL imported")
 
-    print("[BIOME] Importing FastAPI...", flush=True)
+    logger.info("Importing FastAPI...")
     import uvicorn
     from fastapi import FastAPI, WebSocket, WebSocketDisconnect
     from fastapi.responses import JSONResponse
 
-    print("[BIOME] FastAPI imported", flush=True)
+    logger.info("FastAPI imported")
 
-    print("[BIOME] Importing Engine Manager module...", flush=True)
+    logger.info("Importing Engine Manager module...")
     from engine_manager import WorldEngineManager, Session, BUTTON_CODES
 
-    print("[BIOME] Engine Manager module imported", flush=True)
+    logger.info("Engine Manager module imported")
 
-    print("[BIOME] Importing progress stages...", flush=True)
+    logger.info("Importing progress stages...")
     from progress_stages import (
         STARTUP_BEGIN,
         STARTUP_ENGINE_MANAGER,
@@ -270,18 +168,15 @@ try:
         Stage,
     )
 
-    print("[BIOME] Progress stages imported", flush=True)
+    logger.info("Progress stages imported")
 
-    print("[BIOME] Importing Safety module...", flush=True)
+    logger.info("Importing Safety module...")
     from safety import SafetyChecker
 
-    print("[BIOME] Safety module imported", flush=True)
+    logger.info("Safety module imported")
 
 except Exception as e:
-    print(f"[BIOME] FATAL: Import failed: {e}", flush=True)
-    import traceback
-
-    traceback.print_exc()
+    logger.fatal(f"Import failed: {e}", exc_info=True)
     sys.exit(1)
 
 # ============================================================================
@@ -305,7 +200,6 @@ startup_stages: list[dict] = []  # accumulated stage messages
 ws_startup_waiters: list[asyncio.Queue] = []
 
 LOG_TAIL_INITIAL_LINES = 220
-LOG_TAIL_POLL_INTERVAL_SECONDS = 0.25
 
 
 def _read_log_tail_lines(max_lines: int) -> list[str]:
@@ -1324,45 +1218,32 @@ async def websocket_endpoint(websocket: WebSocket):
 
     await websocket.accept()
 
-    # Background task: stream canonical server.log content to the client.
-    async def _stream_server_log_file():
-        cursor = 0
+    # Stream log lines to the client. TeeStream captures all stdout/stderr
+    # output (including logger output) and pushes complete lines into per-client
+    # queues, so logs arrive immediately without file polling.
+    log_queue: asyncio.Queue = asyncio.Queue(maxsize=1000)
+    loop = asyncio.get_running_loop()
+
+    async def _stream_logs_to_client():
         try:
+            # Replay recent log history so the client sees what happened before it connected.
+            # Register for live lines only AFTER reading the tail to avoid duplicates.
             initial_lines = _read_log_tail_lines(LOG_TAIL_INITIAL_LINES)
             for line in initial_lines:
                 await websocket.send_text(json.dumps({"type": "log", "line": line, "level": "info"}))
+            TeeStream.register_client(log_queue, loop)
 
-            if SERVER_LOG_FILE.exists():
-                cursor = SERVER_LOG_FILE.stat().st_size
-
+            # Stream new log lines as they arrive from TeeStream.
             while True:
-                await asyncio.sleep(LOG_TAIL_POLL_INTERVAL_SECONDS)
-                if not SERVER_LOG_FILE.exists():
-                    continue
-
-                file_size = SERVER_LOG_FILE.stat().st_size
-                if file_size < cursor:
-                    cursor = 0
-
-                chunk = ""
-                with open(SERVER_LOG_FILE, "r", encoding="utf-8", errors="replace") as fp:
-                    fp.seek(cursor)
-                    chunk = fp.read()
-                    cursor = fp.tell()
-
-                if not chunk:
-                    continue
-
-                for line in chunk.splitlines():
-                    if not line.strip():
-                        continue
-                    await websocket.send_text(json.dumps({"type": "log", "line": line, "level": "info"}))
+                line = await log_queue.get()
+                await websocket.send_text(json.dumps({"type": "log", "line": line, "level": "info"}))
         except asyncio.CancelledError:
             pass
         except Exception as e:
-            logger.warning(f"[{client_host}] Log tail stream stopped: {e}")
+            # Avoid recursion — don't use logger here.
+            print(f"[{client_host}] Log stream stopped: {e}", flush=True)
 
-    log_tail_task = asyncio.create_task(_stream_server_log_file())
+    log_tail_task = asyncio.create_task(_stream_logs_to_client())
 
     # If startup is not yet complete, replay accumulated stages and stream new ones
     startup_queue: asyncio.Queue | None = None
@@ -1386,6 +1267,7 @@ async def websocket_endpoint(websocket: WebSocket):
     if startup_error:
         await websocket.send_text(json.dumps({"type": "error", "message_id": "app.server.error.serverStartupFailed", "message": str(startup_error)}))
         log_tail_task.cancel()
+        TeeStream.unregister_client(log_queue)
         await websocket.close()
         return
 
@@ -1451,6 +1333,7 @@ async def websocket_endpoint(websocket: WebSocket):
     async def load_initial_seed(filename: str | None) -> bool:
         """Validate and load seed into world_engine.seed_frame."""
         if not filename:
+            logger.warning(f"[{client_host}] Missing seed filename")
             await send_warning("app.server.warning.missingFilename")
             return False
 
@@ -1487,6 +1370,7 @@ async def websocket_endpoint(websocket: WebSocket):
         logger.info(f"[{client_host}] Loading initial seed '{filename}'")
         loaded_frame = await world_engine.load_seed_from_file(file_path)
         if loaded_frame is None:
+            logger.error(f"[{client_host}] Failed to load seed '{filename}'")
             await send_warning("app.server.warning.seedLoadFailed")
             return False
 
@@ -1501,6 +1385,7 @@ async def websocket_endpoint(websocket: WebSocket):
         """Load/switch model and transition back to waiting-for-seed state."""
         model_uri = (model_uri or "").strip()
         if not model_uri:
+            logger.warning(f"[{client_host}] Missing model ID in set_model request")
             await send_warning("app.server.warning.missingModelId")
             return
 
@@ -1575,6 +1460,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     )
 
             except asyncio.TimeoutError:
+                logger.error(f"[{client_host}] Timeout waiting for initial seed")
                 await send_json(
                     {"type": "error", "message_id": "app.server.error.timeoutWaitingForSeed"}
                 )
@@ -1837,6 +1723,7 @@ async def websocket_endpoint(websocket: WebSocket):
                             filename = msg.get("filename")
                             logger.info(f"[RECV] prompt_with_seed: filename={filename}")
                             if not filename:
+                                logger.warning(f"[{client_host}] Missing filename in prompt_with_seed")
                                 queue_send({"type": "warning", "message_id": "app.server.warning.missingFilename"})
                                 continue
                             if await load_initial_seed(filename):
@@ -2104,6 +1991,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 pass
     finally:
         log_tail_task.cancel()
+        TeeStream.unregister_client(log_queue)
         progress_drain_task.cancel()
         world_engine.set_progress_callback(None)
         logger.info(f"[{client_host}] Disconnected (frames: {session.frame_count})")
@@ -2124,7 +2012,7 @@ if __name__ == "__main__":
 
     if args.parent_pid is not None:
         _parent_pid = args.parent_pid
-        print(f"[BIOME] Monitoring parent process PID {_parent_pid}", flush=True)
+        logger.info(f"Monitoring parent process PID {_parent_pid}")
         _check_parent_alive()
 
     try:
@@ -2134,10 +2022,8 @@ if __name__ == "__main__":
             port=args.port,
             ws_ping_interval=300,
             ws_ping_timeout=300,
+            log_config=None,
         )
     except BaseException:
-        print("[BIOME] Fatal exception at server entrypoint", file=sys.stderr, flush=True)
-        traceback.print_exc(file=sys.stderr)
-        sys.stderr.flush()
-        _hosted_log_fp.flush()
+        logger.fatal("Fatal exception at server entrypoint", exc_info=True)
         raise

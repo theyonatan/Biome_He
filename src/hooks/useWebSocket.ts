@@ -36,7 +36,6 @@ type WebSocketHook = {
   connectionState: ConnectionState
   statusStage: StageId | null
   error: string | null
-  warning: string | null
   frame: Blob | string | null
   hasRealFrame: boolean
   frameId: number
@@ -73,7 +72,6 @@ export const useWebSocket = (): WebSocketHook => {
   const [frame, setFrame] = useState<Blob | string | null>(null)
   const [frameId, setFrameId] = useState(0)
   const [error, setError] = useState<string | null>(null)
-  const [warning, setWarning] = useState<string | null>(null)
   const [genTime, setGenTime] = useState<number | null>(null)
   const [latentGenMs, setLatentGenMs] = useState<number | null>(null)
   const [isReady, setIsReady] = useState(false)
@@ -98,8 +96,6 @@ export const useWebSocket = (): WebSocketHook => {
     model: ''
   })
   const rpcRef = useRef(new WsRpcClient())
-  const warningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
   const resolveServerMessage = useCallback(
     (msg: Record<string, unknown>, fallbackKey: TranslationKey): string => {
       const messageId = msg.message_id as string | undefined
@@ -116,24 +112,13 @@ export const useWebSocket = (): WebSocketHook => {
     [t]
   )
 
-  const clearWarningTimer = useCallback(() => {
-    if (warningTimerRef.current) {
-      clearTimeout(warningTimerRef.current)
-      warningTimerRef.current = null
-    }
+  const appendLog = useCallback((line: string) => {
+    allLogsRef.current = [...allLogsRef.current, line]
+    setLogs((prev) => {
+      const next = [...prev, line]
+      return next.length > MAX_VISIBLE_LOG_LINES ? next.slice(-MAX_VISIBLE_LOG_LINES) : next
+    })
   }, [])
-
-  const pushWarning = useCallback(
-    (message: string) => {
-      setWarning(message)
-      clearWarningTimer()
-      warningTimerRef.current = setTimeout(() => {
-        setWarning(null)
-        warningTimerRef.current = null
-      }, 3500)
-    },
-    [clearWarningTimer]
-  )
 
   const clearLogs = useCallback(() => {
     allLogsRef.current = []
@@ -153,8 +138,6 @@ export const useWebSocket = (): WebSocketHook => {
     isConnectingRef.current = true
     setConnectionState('connecting')
     setError(null)
-    setWarning(null)
-    clearWarningTimer()
     setStatusStage(null)
     setHasRealFrame(false)
     allLogsRef.current = []
@@ -299,25 +282,16 @@ export const useWebSocket = (): WebSocketHook => {
             break
           }
           case 'log': {
-            const line = stripAnsi(String(msg.line ?? ''))
-            allLogsRef.current = [...allLogsRef.current, line]
-            setLogs((prev) => {
-              const next = [...prev, line]
-              return next.length > MAX_VISIBLE_LOG_LINES ? next.slice(-MAX_VISIBLE_LOG_LINES) : next
-            })
+            appendLog(stripAnsi(String(msg.line ?? '')))
             break
           }
           case 'error': {
             setError(resolveServerMessage(msg, 'app.server.fallbackError'))
-            setWarning(null)
-            clearWarningTimer()
             setConnectionState('error')
             break
           }
-          case 'warning': {
-            pushWarning(resolveServerMessage(msg, 'app.server.fallbackWarning'))
+          case 'warning':
             break
-          }
           default:
             log.debug('Message:', msg.type, msg)
         }
@@ -340,8 +314,6 @@ export const useWebSocket = (): WebSocketHook => {
       wsRef.current = null
       setConnectionState('disconnected')
       setIsReady(false)
-      setWarning(null)
-      clearWarningTimer()
       setStatusStage(null)
       setFrame(null)
       setHasRealFrame(false)
@@ -363,8 +335,6 @@ export const useWebSocket = (): WebSocketHook => {
     }
     setConnectionState('disconnected')
     setIsReady(false)
-    setWarning(null)
-    clearWarningTimer()
     setFrame(null)
     setFrameId(0)
     setError(null)
@@ -373,7 +343,7 @@ export const useWebSocket = (): WebSocketHook => {
     setInputLatency(null)
     setStatusStage(null)
     setHasRealFrame(false)
-  }, [clearWarningTimer])
+  }, [])
 
   const sendControl = useCallback((buttons: string[] = [], mouseDx = 0, mouseDy = 0) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
@@ -452,15 +422,13 @@ export const useWebSocket = (): WebSocketHook => {
   useEffect(() => {
     return () => {
       disconnect()
-      clearWarningTimer()
     }
-  }, [disconnect, clearWarningTimer])
+  }, [disconnect])
 
   return {
     connectionState,
     statusStage,
     error,
-    warning,
     frame,
     hasRealFrame,
     frameId,

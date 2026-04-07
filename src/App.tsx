@@ -71,7 +71,6 @@ const AppShell = () => {
     isStreaming,
     isPaused,
     connectionState,
-    warning,
     connectionLost,
     statusStage,
     prepareReturnToMainMenu,
@@ -390,16 +389,6 @@ const AppShell = () => {
                     alt="After inpainting"
                     className="h-[18cqh] border border-white/30 shadow-lg"
                   />
-                </div>
-              </div>
-            )}
-            {warning && !connectionLost && (
-              <div
-                key={warning}
-                className="absolute top-[3.2cqh] left-1/2 -translate-x-1/2 z-[180] pointer-events-none"
-              >
-                <div className="animate-[streamingWarningToast_3500ms_ease_forwards] border border-[rgba(255,210,132,0.82)] bg-[rgba(36,22,0,0.82)] text-[rgba(255,233,188,0.98)] px-[2.1cqh] py-[0.9cqh] font-serif text-[2.2cqh] tracking-[0.01em] shadow-[0_0_14px_rgba(255,180,64,0.22)]">
-                  {warning}
                 </div>
               </div>
             )}
