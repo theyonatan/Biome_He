@@ -299,11 +299,10 @@ const en = {
           cudaRecoveryFailed: 'CUDA error — recovery failed. Please reconnect.'
         },
         warning: {
-          missingFilename: 'Missing filename',
-          seedSafetyCheckFailed: "Seed '{{filename}}' failed safety check",
-          seedUnsafe: "Seed '{{filename}}' marked as unsafe",
-          seedNotFound: 'Seed file not found: {{filename}}',
-          seedIntegrityFailed: 'File integrity verification failed — please rescan seeds',
+          missingSeedData: 'Missing seed image data',
+          invalidSeedData: 'Invalid seed image data',
+          seedSafetyCheckFailed: 'Seed failed safety check',
+          seedUnsafe: 'Seed marked as unsafe',
           seedLoadFailed: 'Failed to load seed image',
           missingModelId: 'Missing model ID'
         }
@@ -326,11 +325,8 @@ const en = {
       startup: {
         begin: 'Initializing...',
         world_engine_manager: 'Preparing world engine...',
-        safety_checker: 'Setting up content filters...',
-        safety_warmup: 'Warming up content filters...',
+        safety_checker: 'Loading content filter...',
         safety_ready: 'Content filters ready.',
-        seed_storage: 'Organizing scenes...',
-        seed_validation: 'Verifying scenes...',
         ready: 'Ready to load model.'
       },
       session: {

@@ -1,11 +1,15 @@
-export type SeedRecord = {
+/** Seed file record returned by the Electron main process (IPC) */
+export type SeedFileRecord = {
   filename: string
-  is_safe: boolean
   is_default: boolean
+  modifiedAt: number
 }
 
-export type SeedRecordWithThumbnail = SeedRecord & {
-  thumbnail_base64: string | null
+/** Seed record used in the renderer with client-side safety status */
+export type SeedRecord = {
+  filename: string
+  is_safe: boolean | null // null = not yet checked
+  is_default: boolean
 }
 
 export type EngineStatus = {

@@ -26,6 +26,7 @@ import { useSettings } from '../hooks/useSettings'
 import { ENGINE_MODES, DEFAULT_WORLD_ENGINE_MODEL } from '../types/settings'
 import useEngine from '../hooks/useEngine'
 import useSeeds from '../hooks/useSeeds'
+import { invoke } from '../bridge'
 import { createLogger } from '../utils/logger'
 import type { StreamingContextValue } from './streamingContextTypes'
 import { initialSceneEditState, sceneEditReducer } from './sceneEditMachine'
@@ -91,10 +92,8 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     disconnect,
     sendControl,
     sendPause,
-    sendPrompt,
-    sendPromptWithSeed,
-    sendInitialSeed,
-    sendModel,
+    sendInit,
+    setInitMetrics,
     setPlaceholderFrame,
     reset,
     request: wsRequest,
@@ -132,7 +131,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
   const lastFpsUpdateRef = useRef(performance.now())
   const inputLoopRef = useRef<number | null>(null)
   const lastAppliedModelRef = useRef<string | null>(null)
-  const lastSeedRef = useRef<string>('default.jpg')
+  const lastSeedRef = useRef<{ filename: string; imageData: string } | null>(null)
   const warmBootstrapSentRef = useRef(false)
   const warmFlowCancelledRef = useRef(false)
   const loadingFailureStopHandledRef = useRef(false)
@@ -207,26 +206,48 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     if (state !== states.LOADING) return
     if (!isConnected) return
     if (warmBootstrapSentRef.current) return
+    warmBootstrapSentRef.current = true
 
     const selectedModel = settings?.engine_model || DEFAULT_WORLD_ENGINE_MODEL
-    const seed = lastSeedRef.current
-    log.info('Loading connected - bootstrapping session with model+seed:', selectedModel, seed)
-    // Use the last seed image as the immediate placeholder frame so transition
-    // to streaming never shows a blank frame while waiting for server output.
-    wsRequest<{ blob: Blob }>('seeds_image', { filename: seed })
-      .then((result) => {
-        if (!result?.blob) return
-        setPlaceholderFrame(result.blob)
+    const seedFilename = lastSeedRef.current?.filename ?? 'default.jpg'
+    log.info('Loading connected - bootstrapping session with model+seed:', selectedModel, seedFilename)
+
+    const bootstrap = async () => {
+      // Load seed image data via IPC (or reuse cached)
+      let imageData = lastSeedRef.current?.imageData
+      if (!imageData) {
+        const result = await invoke('get-seed-image-base64', seedFilename)
+        if (result) {
+          imageData = result.base64
+          lastSeedRef.current = { filename: seedFilename, imageData }
+        }
+      }
+
+      // Use the seed image as placeholder frame
+      if (imageData) {
+        const binary = atob(imageData)
+        const bytes = new Uint8Array(binary.length)
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+        setPlaceholderFrame(new Blob([bytes], { type: 'image/jpeg' }))
+      }
+
+      // Set lastAppliedModel before await to prevent the lifecycle machine from
+      // seeing a model mismatch during the re-render triggered by setInitMetrics.
+      lastAppliedModelRef.current = settings.experimental?.scene_edit_enabled
+        ? `${selectedModel}+scene_edit`
+        : selectedModel
+
+      const metrics = await sendInit({
+        model: selectedModel,
+        seed_image_data: imageData,
+        seed_filename: seedFilename,
+        scene_edit: settings.experimental?.scene_edit_enabled ?? false,
+        action_logging: settings.debug_overlays?.action_logging ?? false
       })
-      .catch(() => null)
-    sendModel(selectedModel, seed, {
-      sceneEdit: settings.experimental?.scene_edit_enabled ?? false,
-      actionLogging: settings.debug_overlays?.action_logging ?? false
-    })
-    lastAppliedModelRef.current = settings.experimental?.scene_edit_enabled
-      ? `${selectedModel}+scene_edit`
-      : selectedModel
-    warmBootstrapSentRef.current = true
+      setInitMetrics(metrics)
+    }
+
+    bootstrap().catch((err) => log.error('Bootstrap failed:', err))
   }, [
     state,
     states.LOADING,
@@ -234,9 +255,9 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     settings?.engine_model,
     settings.experimental?.scene_edit_enabled,
     settings.debug_overlays?.action_logging,
-    sendModel,
-    setPlaceholderFrame,
-    wsRequest
+    sendInit,
+    setInitMetrics,
+    setPlaceholderFrame
   ])
 
   useEffect(() => {
@@ -635,6 +656,17 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     await stopServerIfRunning()
   }, [cleanupState, stopServerIfRunning])
 
+  const selectSeed = useCallback(
+    async (filename: string) => {
+      const result = await invoke('get-seed-image-base64', filename)
+      if (!result) return
+      lastSeedRef.current = { filename, imageData: result.base64 }
+      const metrics = await sendInit({ seed_image_data: result.base64, seed_filename: filename })
+      setInitMetrics(metrics)
+    },
+    [sendInit, setInitMetrics]
+  )
+
   const value: StreamingContextValue = {
     // Connection state
     connectionState,
@@ -697,6 +729,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     // Seeds
     openSeedsDir,
     seedsDir,
+    selectSeed,
 
     // WS RPC
     wsRequest,
@@ -724,13 +757,6 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     cancelConnection,
     prepareReturnToMainMenu,
     reset,
-    sendPrompt,
-    sendPromptWithSeed: (promptOrFilename: string, maybeSeedUrl?: string) => {
-      // Track the last seed filename so model switches can resume from it
-      if (!maybeSeedUrl) lastSeedRef.current = promptOrFilename
-      sendPromptWithSeed(promptOrFilename, maybeSeedUrl)
-    },
-    sendInitialSeed,
     requestPointerLock,
     exitPointerLock,
     registerContainerRef,

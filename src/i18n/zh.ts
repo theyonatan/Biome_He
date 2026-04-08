@@ -292,11 +292,10 @@ const zh = {
           cudaRecoveryFailed: 'CUDA 错误 - 恢复失败。请重新连接。'
         },
         warning: {
-          missingFilename: '缺少文件名',
-          seedSafetyCheckFailed: "种子 '{{filename}}' 安全检查失败",
-          seedUnsafe: "种子 '{{filename}}' 被标记为不安全",
-          seedNotFound: '未找到种子文件：{{filename}}',
-          seedIntegrityFailed: '文件完整性验证失败 - 请重新扫描种子',
+          missingSeedData: '缺少种子图片数据',
+          invalidSeedData: '种子图片数据无效',
+          seedSafetyCheckFailed: '种子安全检查失败',
+          seedUnsafe: '种子被标记为不安全',
           seedLoadFailed: '无法加载种子图片',
           missingModelId: '缺少模型 ID'
         }
@@ -319,11 +318,8 @@ const zh = {
       startup: {
         begin: '正在初始化...',
         world_engine_manager: '正在准备世界引擎...',
-        safety_checker: '正在设置内容过滤器...',
-        safety_warmup: '正在预热内容过滤器...',
+        safety_checker: '正在加载内容过滤器...',
         safety_ready: '内容过滤器已就绪。',
-        seed_storage: '正在整理场景...',
-        seed_validation: '正在验证场景...',
         ready: '已准备好加载模型。'
       },
       session: {

@@ -11,7 +11,7 @@ import { usePinnedScenes } from '../hooks/usePinnedScenes'
 import { usePointerLockFeedback } from '../hooks/usePointerLockFeedback'
 
 const PauseOverlay = ({ isActive }: { isActive: boolean }) => {
-  const { requestPointerLock, reset, sendPromptWithSeed, wsRequest } = useStreaming()
+  const { requestPointerLock, reset, selectSeed } = useStreaming()
   const [view, setView] = useState<PauseViewKey>(PAUSE_VIEW.MAIN)
   const { showUnlockHint, showPauseLockoutTimer, pauseLockoutSecondsText, selectCooldown } =
     usePointerLockFeedback(isActive)
@@ -28,7 +28,6 @@ const PauseOverlay = ({ isActive }: { isActive: boolean }) => {
     handleImageDrop,
     handleClipboardUpload
   } = useSeedManager({
-    wsRequest,
     isActive,
     onPinnedSceneRemoved: removePinnedScene
   })
@@ -56,15 +55,15 @@ const PauseOverlay = ({ isActive }: { isActive: boolean }) => {
 
   const pinnedScenes = useMemo(() => seeds.filter((s) => pinnedSceneIds.includes(s.filename)), [seeds, pinnedSceneIds])
 
-  const handleSceneSelect = (filename: string) => {
-    sendPromptWithSeed(filename)
+  const handleSceneSelect = async (filename: string) => {
+    await selectSeed(filename)
     requestPointerLock()
   }
 
   const handleClipboardUploadAndSelect = async () => {
     const uploaded = await handleClipboardUpload()
     if (uploaded.length === 1) {
-      handleSceneSelect(uploaded[0])
+      await handleSceneSelect(uploaded[0])
     }
   }
 

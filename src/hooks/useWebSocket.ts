@@ -6,6 +6,7 @@ import { WsRpcClient } from '../lib/wsRpc'
 import type { StageId } from '../stages'
 import { toWebSocketUrl } from '../utils/serverUrl'
 import type { TranslationKey } from '../i18n'
+import type { InitMessage, InitResponse } from '../types/ws'
 
 const log = createLogger('WebSocket')
 const MAX_VISIBLE_LOG_LINES = 500
@@ -54,10 +55,8 @@ type WebSocketHook = {
   disconnect: () => void
   sendControl: (buttons?: string[], mouseDx?: number, mouseDy?: number) => boolean
   sendPause: (paused: boolean) => void
-  sendPrompt: (prompt: string) => void
-  sendPromptWithSeed: (promptOrFilename: string, seedUrl?: string) => void
-  sendInitialSeed: (filename: string) => void
-  sendModel: (model: string, seed?: string | null, options?: { sceneEdit?: boolean; actionLogging?: boolean }) => void
+  sendInit: (params: Omit<InitMessage, 'type' | 'req_id'>) => Promise<InitResponse>
+  setInitMetrics: (metrics: InitResponse) => void
   setPlaceholderFrame: (frame: Blob | string | null) => void
   reset: () => void
   request: <T = unknown>(type: string, params?: Record<string, unknown>, timeoutMs?: number) => Promise<T>
@@ -194,7 +193,7 @@ export const useWebSocket = (): WebSocketHook => {
         const header = JSON.parse(new TextDecoder().decode(headerBytes)) as Record<string, unknown>
         const imageBlob = new Blob([new Uint8Array(event.data, 4 + headerLen)], { type: 'image/jpeg' })
 
-        // Binary RPC response (e.g. seeds_image, seeds_thumbnail)
+        // Binary RPC response
         if (header.req_id != null) {
           rpc.handleBinaryResponse(header, imageBlob)
           return
@@ -268,25 +267,6 @@ export const useWebSocket = (): WebSocketHook => {
             if (typeof msg.frame === 'number') {
               setFrameId(msg.frame)
             }
-            break
-          }
-          case 'metrics': {
-            // Initial static session info sent once at connection start
-            staticMetricsRef.current = {
-              gpuName: (msg.gpu_name as string | null) ?? null,
-              cpuName: (msg.cpu_name as string | null) ?? null,
-              model: (msg.model as string) ?? '',
-              inferenceFps: (msg.inference_fps as number) ?? 60
-            }
-            setServerMetrics({
-              ...staticMetricsRef.current,
-              isMultiframe: !!msg.is_multiframe,
-              vramUsedMb: (msg.vram_used_mb as number) ?? -1,
-              vramTotalMb: (msg.vram_total_mb as number) ?? -1,
-              vramPercent: (msg.vram_percent as number) ?? -1,
-              gpuUtilPercent: (msg.gpu_util_percent as number) ?? -1,
-              profile: null
-            })
             break
           }
           case 'log': {
@@ -369,56 +349,29 @@ export const useWebSocket = (): WebSocketHook => {
     }
   }, [])
 
-  const sendPrompt = useCallback((prompt: string) => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: 'prompt', prompt }))
-    }
+  const sendInit = useCallback((params: Omit<InitMessage, 'type' | 'req_id'>): Promise<InitResponse> => {
+    // No timeout — init can take minutes (model download, warmup, CUDA compilation).
+    // The WebSocket close event will reject the promise if the connection drops.
+    return rpcRef.current.request<InitResponse>('init', params, 0)
   }, [])
 
-  const sendPromptWithSeed = useCallback((promptOrFilename: string, seedUrl?: string) => {
-    if (!(wsRef.current && wsRef.current.readyState === WebSocket.OPEN)) return
-
-    if (seedUrl) {
-      wsRef.current.send(
-        JSON.stringify({
-          type: 'prompt_with_seed',
-          prompt: promptOrFilename,
-          seed_image_url: seedUrl
-        })
-      )
-      return
+  const setInitMetrics = useCallback((metrics: InitResponse) => {
+    staticMetricsRef.current = {
+      gpuName: metrics.gpu_name ?? null,
+      cpuName: metrics.cpu_name ?? null,
+      model: metrics.model ?? '',
+      inferenceFps: metrics.inference_fps ?? 60
     }
-
-    wsRef.current.send(JSON.stringify({ type: 'prompt_with_seed', filename: promptOrFilename }))
+    setServerMetrics({
+      ...staticMetricsRef.current,
+      isMultiframe: false,
+      vramUsedMb: -1,
+      vramTotalMb: -1,
+      vramPercent: -1,
+      gpuUtilPercent: -1,
+      profile: null
+    })
   }, [])
-
-  const sendInitialSeed = useCallback((filename: string) => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: 'set_initial_seed', filename }))
-    }
-  }, [])
-
-  const sendModel = useCallback(
-    (model: string, seed: string | null = null, options?: { sceneEdit?: boolean; actionLogging?: boolean }) => {
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && model) {
-        const payload: {
-          type: 'set_model'
-          model: string
-          seed?: string
-          scene_edit?: boolean
-          action_logging?: boolean
-        } = {
-          type: 'set_model',
-          model
-        }
-        if (seed) payload.seed = seed
-        if (options?.sceneEdit) payload.scene_edit = true
-        if (options?.actionLogging) payload.action_logging = true
-        wsRef.current.send(JSON.stringify(payload))
-      }
-    },
-    []
-  )
 
   const setPlaceholderFrame = useCallback((frame: Blob | string | null) => {
     setFrame(frame)
@@ -464,10 +417,8 @@ export const useWebSocket = (): WebSocketHook => {
     disconnect,
     sendControl,
     sendPause,
-    sendPrompt,
-    sendPromptWithSeed,
-    sendInitialSeed,
-    sendModel,
+    sendInit,
+    setInitMetrics,
     setPlaceholderFrame,
     reset,
     request,

@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import { invoke } from '../bridge'
 import { createLogger } from '../utils/logger'
 import { TranslatableError } from '../i18n'
-import type { SeedRecord } from '../types/app'
+import type { SeedRecord, SeedFileRecord } from '../types/app'
 
 const log = createLogger('Seeds')
 
@@ -11,31 +11,19 @@ type UseSeedsResult = {
   seedsDir: string | null
   isLoading: boolean
   error: string | null
-  initializeSeeds: (
-    wsRequest: <T = unknown>(type: string, params?: Record<string, unknown>) => Promise<T>
-  ) => Promise<SeedRecord[]>
-  refreshSeeds: (
-    wsRequest: <T = unknown>(type: string, params?: Record<string, unknown>) => Promise<T>
-  ) => Promise<SeedRecord[]>
-  getDefaultSeedBlob: (
-    wsRequest: <T = unknown>(type: string, params?: Record<string, unknown>) => Promise<T>
-  ) => Promise<Blob>
+  initializeSeeds: () => Promise<SeedRecord[]>
+  refreshSeeds: () => Promise<SeedRecord[]>
+  getDefaultSeedBlob: () => Promise<Blob>
   openSeedsDir: () => Promise<void>
   getSeedsDirPath: () => Promise<string>
 }
 
-type SeedsListResponse = {
-  seeds: Record<string, { filename: string; is_safe: boolean; is_default: boolean }>
-  count: number
-}
-
-function parseSeedsResponse(data: SeedsListResponse): SeedRecord[] {
-  const seedsObj = data.seeds ?? {}
-  return Object.entries(seedsObj)
-    .map(([filename, info]) => ({
-      filename,
-      is_safe: Boolean(info.is_safe ?? false),
-      is_default: Boolean(info.is_default ?? true)
+function fileRecordsToSeedRecords(records: SeedFileRecord[]): SeedRecord[] {
+  return records
+    .map((r) => ({
+      filename: r.filename,
+      is_safe: null,
+      is_default: r.is_default
     }))
     .sort((a, b) => a.filename.localeCompare(b.filename))
 }
@@ -46,74 +34,60 @@ export const useSeeds = (): UseSeedsResult => {
   const [error, setError] = useState<string | null>(null)
   const [seedsDir, setSeedsDir] = useState<string | null>(null)
 
-  const initializeSeeds = useCallback(
-    async (wsRequest: <T = unknown>(type: string, params?: Record<string, unknown>) => Promise<T>) => {
-      setIsLoading(true)
-      setError(null)
-      try {
-        const data = await wsRequest<SeedsListResponse>('seeds_list')
-        const seedList = parseSeedsResponse(data)
-        setSeeds(seedList)
-        const path = await invoke('get-seeds-dir-path')
-        setSeedsDir(path)
-        return seedList
-      } catch (err) {
-        log.error('Failed to load seeds:', err)
-        const msg = err instanceof Error ? err.message : String(err)
-        setError(msg)
-        throw err
-      } finally {
-        setIsLoading(false)
+  const initializeSeeds = useCallback(async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const records = await invoke('list-seeds')
+      const seedList = fileRecordsToSeedRecords(records)
+      setSeeds(seedList)
+      const path = await invoke('get-seeds-dir-path')
+      setSeedsDir(path)
+      return seedList
+    } catch (err) {
+      log.error('Failed to load seeds:', err)
+      const msg = err instanceof Error ? err.message : String(err)
+      setError(msg)
+      throw err
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  const refreshSeeds = useCallback(async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const records = await invoke('list-seeds')
+      const seedList = fileRecordsToSeedRecords(records)
+      setSeeds(seedList)
+      return seedList
+    } catch (err) {
+      log.error('Failed to refresh seeds:', err)
+      const msg = err instanceof Error ? err.message : String(err)
+      setError(msg)
+      throw err
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  const getDefaultSeedBlob = useCallback(async () => {
+    try {
+      const result = await invoke('get-seed-image-base64', 'default.jpg')
+      if (!result) {
+        throw new TranslatableError('app.server.defaultSeedNotFound')
       }
-    },
-    []
-  )
-
-  const refreshSeeds = useCallback(
-    async (wsRequest: <T = unknown>(type: string, params?: Record<string, unknown>) => Promise<T>) => {
-      setIsLoading(true)
-      setError(null)
-      try {
-        const data = await wsRequest<SeedsListResponse>('seeds_list')
-        const seedList = parseSeedsResponse(data)
-        setSeeds(seedList)
-        return seedList
-      } catch (err) {
-        log.error('Failed to refresh seeds:', err)
-        const msg = err instanceof Error ? err.message : String(err)
-        setError(msg)
-        throw err
-      } finally {
-        setIsLoading(false)
-      }
-    },
-    []
-  )
-
-  const getDefaultSeedBlob = useCallback(
-    async (wsRequest: <T = unknown>(type: string, params?: Record<string, unknown>) => Promise<T>) => {
-      try {
-        let seedList = seeds
-        if (seedList.length === 0) {
-          const data = await wsRequest<SeedsListResponse>('seeds_list')
-          seedList = parseSeedsResponse(data)
-          setSeeds(seedList)
-        }
-
-        if (!seedList.some((s) => s.filename === 'default.jpg')) {
-          throw new TranslatableError('app.server.defaultSeedNotFound')
-        }
-
-        const result = await wsRequest<{ blob: Blob }>('seeds_image', { filename: 'default.jpg' })
-        return result.blob
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err)
-        setError(msg)
-        throw err
-      }
-    },
-    [seeds]
-  )
+      const binary = atob(result.base64)
+      const bytes = new Uint8Array(binary.length)
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+      return new Blob([bytes], { type: 'image/jpeg' })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      setError(msg)
+      throw err
+    }
+  }, [])
 
   const openSeedsDir = useCallback(async () => {
     try {

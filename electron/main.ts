@@ -3,7 +3,6 @@ import path from 'node:path'
 import fs from 'node:fs'
 import { registerAllIpc } from './ipc/index.js'
 import { stopServerSync } from './lib/serverState.js'
-import { setupBundledSeeds } from './lib/seeds.js'
 import { getBackgroundsDir } from './ipc/backgrounds.js'
 
 // Register biome-bg as a privileged scheme so <video> elements can stream from it.
@@ -128,14 +127,6 @@ const createWindow = () => {
 app
   .whenReady()
   .then(async () => {
-    // Setup bundled seeds before IPC registration.
-    // registerSettingsIpc validates default pinned scenes during registration.
-    try {
-      await setupBundledSeeds()
-    } catch (err) {
-      console.error('[SEEDS] Warning: Failed to setup bundled seeds:', err)
-    }
-
     protocol.handle('biome-bg', (request) => {
       const url = new URL(request.url)
       // With standard scheme, biome-bg://serve/autumn.mp4 → hostname=serve, pathname=/autumn.mp4

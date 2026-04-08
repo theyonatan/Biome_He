@@ -94,7 +94,7 @@ const SceneCard = ({
   const { t } = useTranslation()
   const { playHover, playClick } = useUISound()
   const { play } = useAudio()
-  const isUnsafe = !seed.is_safe
+  const isUnsafe = seed.is_safe === false
 
   return (
     <button

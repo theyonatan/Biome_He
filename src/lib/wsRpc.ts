@@ -17,7 +17,7 @@ export class RpcError extends Error {
 type PendingRequest = {
   resolve: (data: unknown) => void
   reject: (err: Error) => void
-  timer: ReturnType<typeof setTimeout>
+  timer: ReturnType<typeof setTimeout> | undefined
 }
 
 export class WsRpcClient {
@@ -105,10 +105,13 @@ export class WsRpcClient {
     const timeout = timeoutMs ?? DEFAULT_TIMEOUT_MS
 
     return new Promise<T>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.pending.delete(reqId)
-        reject(new TranslatableError('app.server.requestTimeout', { type, timeout: String(timeout) }))
-      }, timeout)
+      const timer =
+        timeout > 0
+          ? setTimeout(() => {
+              this.pending.delete(reqId)
+              reject(new TranslatableError('app.server.requestTimeout', { type, timeout: String(timeout) }))
+            }, timeout)
+          : undefined
 
       this.pending.set(reqId, {
         resolve: resolve as (data: unknown) => void,

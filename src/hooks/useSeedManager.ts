@@ -1,47 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { invoke } from '../bridge'
 import { TranslatableError } from '../i18n'
-import type { SeedRecord, SeedRecordWithThumbnail } from '../types/app'
-
-type SeedsWithThumbsResponse = {
-  seeds: Record<
-    string,
-    {
-      filename: string
-      is_safe: boolean
-      is_default: boolean
-      checked_at?: number
-      uploaded_at?: number
-      thumbnail_base64: string | null
-    }
-  >
-  count: number
-}
-
-type SeedsListResponse = {
-  seeds: Record<
-    string,
-    {
-      filename: string
-      is_safe: boolean
-      is_default: boolean
-      checked_at?: number
-      uploaded_at?: number
-    }
-  >
-  count: number
-}
-
-function sortSeedsByRecency(
-  a: { filename: string; is_default: boolean; uploaded_at?: number; checked_at?: number },
-  b: { filename: string; is_default: boolean; uploaded_at?: number; checked_at?: number }
-) {
-  if (a.is_default !== b.is_default) return a.is_default ? 1 : -1
-  const aTime = Number(a.uploaded_at ?? a.checked_at ?? 0)
-  const bTime = Number(b.uploaded_at ?? b.checked_at ?? 0)
-  if (aTime !== bTime) return bTime - aTime
-  return a.filename.localeCompare(b.filename)
-}
+import type { SeedRecord, SeedFileRecord } from '../types/app'
 
 function readBlobAsBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -66,7 +26,6 @@ function isImageFile(file: File) {
 /** Extract file paths from clipboard items (handles text/uri-list and text/plain with file paths). */
 async function parseClipboardFilePaths(items: ClipboardItems): Promise<string[]> {
   for (const item of items) {
-    // Prefer text/uri-list (standard for copied files on Linux)
     if (item.types.includes('text/uri-list')) {
       const blob = await item.getType('text/uri-list')
       const text = await blob.text()
@@ -85,7 +44,6 @@ async function parseClipboardFilePaths(items: ClipboardItems): Promise<string[]>
         .map((p) => decodeURIComponent(p))
     }
 
-    // Fallback: text/plain with one path per line (Windows Explorer, some Linux DEs)
     if (item.types.includes('text/plain')) {
       const blob = await item.getType('text/plain')
       const text = await blob.text()
@@ -93,7 +51,6 @@ async function parseClipboardFilePaths(items: ClipboardItems): Promise<string[]>
         .split(/[\r\n]+/)
         .map((line) => line.trim())
         .filter(Boolean)
-      // Only treat as paths if every line looks like an absolute path
       const allPaths = lines.every((line) => /^[A-Za-z]:[\\/]/.test(line) || line.startsWith('/'))
       if (allPaths && lines.length > 0) return lines
     }
@@ -101,13 +58,18 @@ async function parseClipboardFilePaths(items: ClipboardItems): Promise<string[]>
   return []
 }
 
+function sortSeeds(a: SeedFileRecord, b: SeedFileRecord) {
+  if (a.is_default !== b.is_default) return a.is_default ? 1 : -1
+  if (a.modifiedAt !== b.modifiedAt) return b.modifiedAt - a.modifiedAt
+  return a.filename.localeCompare(b.filename)
+}
+
 type UseSeedManagerOptions = {
-  wsRequest: <T = unknown>(type: string, params?: Record<string, unknown>, timeoutMs?: number) => Promise<T>
   isActive: boolean
   onPinnedSceneRemoved: (filename: string) => void
 }
 
-export function useSeedManager({ wsRequest, isActive, onPinnedSceneRemoved }: UseSeedManagerOptions) {
+export function useSeedManager({ isActive, onPinnedSceneRemoved }: UseSeedManagerOptions) {
   const [seeds, setSeeds] = useState<SeedRecord[]>([])
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({})
   const [uploadingImage, setUploadingImage] = useState(false)
@@ -123,55 +85,38 @@ export function useSeedManager({ wsRequest, isActive, onPinnedSceneRemoved }: Us
   }, [])
 
   const loadSeedsAndThumbnails = useCallback(async () => {
-    let seedList: SeedRecordWithThumbnail[] = []
+    const records = await invoke('list-seeds')
+    const sorted = [...records].sort(sortSeeds)
 
-    try {
-      const data = await wsRequest<SeedsWithThumbsResponse>('seeds_list_with_thumbnails')
-      const seedsObj = data.seeds ?? {}
-      seedList = Object.entries(seedsObj)
-        .map(([filename, info]) => ({
-          filename,
-          is_safe: Boolean(info.is_safe ?? false),
-          is_default: Boolean(info.is_default ?? true),
-          checked_at: Number(info.checked_at ?? 0),
-          uploaded_at: Number(info.uploaded_at ?? 0),
-          thumbnail_base64: typeof info.thumbnail_base64 === 'string' ? info.thumbnail_base64 : null
-        }))
-        .sort(sortSeedsByRecency)
-    } catch {
-      // ignore
-    }
+    const seedRecords: SeedRecord[] = sorted.map((r) => ({
+      filename: r.filename,
+      is_safe: null,
+      is_default: r.is_default
+    }))
 
-    if (seedList.length === 0) {
-      const data = await wsRequest<SeedsListResponse>('seeds_list')
-      const seedsObj = data.seeds ?? {}
-      seedList = Object.entries(seedsObj)
-        .map(([filename, info]) => ({
-          filename,
-          is_safe: Boolean(info.is_safe ?? false),
-          is_default: Boolean(info.is_default ?? true),
-          checked_at: Number(info.checked_at ?? 0),
-          uploaded_at: Number(info.uploaded_at ?? 0),
-          thumbnail_base64: null
-        }))
-        .sort(sortSeedsByRecency)
-    }
-
-    console.log(`[PauseOverlay] Loaded ${seedList.length} seeds`)
-    setSeeds(seedList.map(({ filename, is_safe, is_default }) => ({ filename, is_safe, is_default })))
+    console.log(`[PauseOverlay] Loaded ${seedRecords.length} seeds`)
+    setSeeds(seedRecords)
 
     if (!isMountedRef.current) return
     setUploadError(null)
 
-    const nextThumbs: Record<string, string> = Object.fromEntries(
-      seedList
-        .filter((seed) => Boolean(seed.thumbnail_base64))
-        .map((seed) => [seed.filename, `data:image/jpeg;base64,${seed.thumbnail_base64}`])
+    // Load thumbnails in parallel
+    const thumbEntries = await Promise.all(
+      sorted.map(async (r) => {
+        try {
+          const thumb = await invoke('get-seed-thumbnail-base64', r.filename)
+          if (thumb) return [r.filename, `data:image/jpeg;base64,${thumb}`] as const
+        } catch (err) {
+          console.error(`[PauseOverlay] Thumbnail failed for ${r.filename}:`, err)
+        }
+        return null
+      })
     )
 
     if (!isMountedRef.current) return
+    const nextThumbs: Record<string, string> = Object.fromEntries(thumbEntries.filter((e) => e !== null))
     setThumbnails(nextThumbs)
-  }, [wsRequest])
+  }, [])
 
   useEffect(() => {
     if (!isActive || loadingRef.current) return
@@ -205,7 +150,7 @@ export function useSeedManager({ wsRequest, isActive, onPinnedSceneRemoved }: Us
   const removeScene = async (seed: SeedRecord) => {
     if (seed.is_default) return
     try {
-      await wsRequest('seeds_delete', { filename: seed.filename })
+      await invoke('delete-seed', seed.filename)
       onPinnedSceneRemoved(seed.filename)
       await refreshSeeds()
     } catch (err) {
@@ -231,7 +176,7 @@ export function useSeedManager({ wsRequest, isActive, onPinnedSceneRemoved }: Us
       for (const file of imageFiles) {
         try {
           const base64Data = await readBlobAsBase64(file)
-          await wsRequest('seeds_upload', { filename: file.name, data: base64Data })
+          await invoke('upload-seed', file.name, base64Data)
           succeeded.push(file.name)
         } catch {
           failed.push(file.name)
@@ -272,7 +217,6 @@ export function useSeedManager({ wsRequest, isActive, onPinnedSceneRemoved }: Us
         'image/webp': 'webp'
       }
 
-      // Try to find image blobs directly
       const files: File[] = []
       for (const item of clipboardItems) {
         const matchingType = item.types.find((type) => type.startsWith('image/'))
@@ -284,7 +228,6 @@ export function useSeedManager({ wsRequest, isActive, onPinnedSceneRemoved }: Us
         }
       }
 
-      // Fallback: check for file paths (e.g. Linux file manager copies)
       if (files.length === 0) {
         const paths = await parseClipboardFilePaths(clipboardItems)
         if (paths.length > 0) {

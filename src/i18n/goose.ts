@@ -301,11 +301,10 @@ const goose = {
           cudaRecoveryFailed: 'CUDA honk — recovery failed. Please re-waddle.'
         },
         warning: {
-          missingFilename: 'Missing bread crumb name',
-          seedSafetyCheckFailed: "Bread crumb '{{filename}}' failed fox inspection",
-          seedUnsafe: "Bread crumb '{{filename}}' marked as suspicious",
-          seedNotFound: 'Bread crumb not found: {{filename}}',
-          seedIntegrityFailed: 'Bread crumb integrity check failed — please re-inspect',
+          missingSeedData: 'The bread crumb has gone missing from the nest',
+          invalidSeedData: 'That bread crumb looks funny — not fit for a goose',
+          seedSafetyCheckFailed: 'Bread crumb failed fox inspection',
+          seedUnsafe: 'Bread crumb marked as suspicious by the flock',
           seedLoadFailed: 'Failed to nibble bread crumb',
           missingModelId: 'Missing goose model ID'
         }
@@ -328,11 +327,8 @@ const goose = {
       startup: {
         begin: 'Honking into existence...',
         world_engine_manager: 'Assembling the flock...',
-        safety_checker: 'Training the fox detector...',
-        safety_warmup: 'Test-hissing at shadows...',
+        safety_checker: 'Summoning the fox detector...',
         safety_ready: 'Fox detector operational.',
-        seed_storage: 'Organizing the bread stash...',
-        seed_validation: 'Inspecting each crumb...',
         ready: 'Ready to unleash the goose.'
       },
       session: {

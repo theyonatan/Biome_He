@@ -23,7 +23,6 @@ import hashlib
 import json
 import os
 import pickle
-import shutil
 import struct
 import threading
 import time
@@ -31,9 +30,21 @@ import traceback
 from contextlib import asynccontextmanager
 from pathlib import Path
 from queue import Empty, Queue
-from typing import Optional
+from typing import Optional, TypedDict
 
 from action_logger import ActionLogger
+from progress_stages import (
+    Stage,
+    STARTUP_BEGIN,
+    STARTUP_ENGINE_MANAGER,
+    STARTUP_SAFETY_CHECKER,
+    STARTUP_SAFETY_READY,
+    STARTUP_READY,
+    SESSION_WAITING_FOR_SEED,
+    SESSION_INPAINTING_LOAD,
+    SESSION_INPAINTING_READY,
+    SESSION_READY,
+)
 
 # ---------------------------------------------------------------------------
 
@@ -155,23 +166,6 @@ try:
 
     logger.info("Engine Manager module imported")
 
-    logger.info("Importing progress stages...")
-    from progress_stages import (
-        STARTUP_BEGIN,
-        STARTUP_ENGINE_MANAGER,
-        STARTUP_SAFETY_CHECKER,
-        STARTUP_SAFETY_WARMUP,
-        STARTUP_SAFETY_READY,
-        STARTUP_SEED_STORAGE,
-        STARTUP_SEED_VALIDATION,
-        STARTUP_READY,
-        SESSION_WAITING_FOR_SEED,
-        SESSION_READY,
-        Stage,
-    )
-
-    logger.info("Progress stages imported")
-
     logger.info("Importing Safety module...")
     from safety import SafetyChecker
 
@@ -188,8 +182,7 @@ except Exception as e:
 world_engine = None
 inpainting_manager = None
 safety_checker = None
-safe_seeds_cache = {}  # Maps filename -> {hash, is_safe, path}
-rescan_lock = None  # Prevent concurrent rescans (initialized in lifespan)
+safety_hash_cache: dict[str, "SafetyCacheEntry"] = {}
 
 # ============================================================================
 # Startup state — shared between lifespan background task and WS clients
@@ -216,289 +209,47 @@ def _read_log_tail_lines(max_lines: int) -> list[str]:
         return []
 
 # ============================================================================
-# Seed Management Configuration
-# ============================================================================
-
-# Server-side seed storage paths
-SEEDS_BASE_DIR = Path(__file__).parent.parent / "world_engine" / "seeds"
-DEFAULT_SEEDS_DIR = SEEDS_BASE_DIR / "default"
-UPLOADS_DIR = SEEDS_BASE_DIR / "uploads"
-DEFAULT_INITIAL_SEED = "default.jpg"
-CACHE_FILE = Path(__file__).parent.parent / "world_engine" / ".seeds_cache.bin"
-
-# Local seeds directory (for dev/standalone usage - relative to project root)
-LOCAL_SEEDS_DIR = Path(__file__).parent.parent / "seeds"
-
-SUPPORTED_IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".webp")
-
-MIME_TYPES = {
-    ".png": "image/png",
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".webp": "image/webp",
-}
-
-
-def glob_seeds(directory: Path) -> list[Path]:
-    """Glob for all supported image formats in a directory."""
-    results = []
-    for ext in SUPPORTED_IMAGE_EXTENSIONS:
-        results.extend(directory.glob(f"*{ext}"))
-    return results
-
-
-# ============================================================================
-# Seed Management Functions
+# Safety Cache
 # ============================================================================
 
 
-def ensure_seed_directories():
-    """Create seed directory structure if it doesn't exist."""
-    DEFAULT_SEEDS_DIR.mkdir(parents=True, exist_ok=True)
-    UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
-    logger.info(f"Seed directories initialized: {SEEDS_BASE_DIR}")
+class SafetyCacheEntry(TypedDict):
+    is_safe: bool
+    scores: dict
+    checked_at: float
 
 
-async def setup_default_seeds():
-    """Setup default seeds from local directory (for dev/standalone usage only)."""
-    # Check if seeds already exist (bundled by Biome on first run, or from previous setup)
-    existing_seeds = glob_seeds(DEFAULT_SEEDS_DIR)
-    if existing_seeds:
-        logger.info(f"Found {len(existing_seeds)} seed(s) in {DEFAULT_SEEDS_DIR}")
-        return
-
-    # For dev/standalone usage: copy from local seeds directory
-    local_seeds = glob_seeds(LOCAL_SEEDS_DIR) if LOCAL_SEEDS_DIR.exists() else []
-    if local_seeds:
-        logger.info(f"Found local seeds directory at {LOCAL_SEEDS_DIR} (development mode)")
-        try:
-            seed_files = local_seeds
-            logger.info(f"Copying {len(seed_files)} local seed files to {DEFAULT_SEEDS_DIR}")
-
-            for seed_file in seed_files:
-                dest = DEFAULT_SEEDS_DIR / seed_file.name
-                shutil.copy2(seed_file, dest)
-                logger.info(f"  Copied {seed_file.name}")
-
-            logger.info("Local seeds copied successfully")
-            return
-        except Exception as e:
-            logger.error(f"Failed to copy local seeds: {e}")
-
-    # No seeds found - error
-    logger.error("No seed images found!")
-    logger.error(f"Expected seeds in:")
-    logger.error(f"  - {DEFAULT_SEEDS_DIR} (bundled by Biome installer)")
-    logger.error(f"  - {LOCAL_SEEDS_DIR} (for development mode)")
-    logger.error("Please ensure seeds are properly bundled or placed in the appropriate directory")
+SAFETY_CACHE_FILE = Path(__file__).parent.parent / "world_engine" / ".safety_cache.bin"
 
 
-def load_seeds_cache() -> dict:
-    """Load seeds cache from binary file."""
-    if not CACHE_FILE.exists():
-        logger.info("No cache file found, will create new one")
-        return {"files": {}, "last_scan": None}
-
+def load_safety_cache() -> dict[str, SafetyCacheEntry]:
+    """Load hash-based safety cache from binary file."""
+    if not SAFETY_CACHE_FILE.exists():
+        return {}
     try:
-        with open(CACHE_FILE, "rb") as f:
+        with open(SAFETY_CACHE_FILE, "rb") as f:
             cache = pickle.load(f)
-        logger.info(f"Loaded cache with {len(cache.get('files', {}))} seeds")
+        logger.info(f"Loaded safety cache with {len(cache)} entries")
         return cache
     except Exception as e:
-        logger.error(f"Failed to load cache: {e}")
-        return {"files": {}, "last_scan": None}
+        logger.error(f"Failed to load safety cache: {e}")
+        return {}
 
 
-def save_seeds_cache(cache: dict):
-    """Save seeds cache to binary file."""
+def save_safety_cache(cache: dict[str, SafetyCacheEntry]) -> None:
+    """Save hash-based safety cache to binary file."""
     try:
-        with open(CACHE_FILE, "wb") as f:
+        SAFETY_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(SAFETY_CACHE_FILE, "wb") as f:
             pickle.dump(cache, f)
-        logger.info(f"Saved cache with {len(cache.get('files', {}))} seeds")
     except Exception as e:
-        logger.error(f"Failed to save cache: {e}")
+        logger.error(f"Failed to save safety cache: {e}")
 
 
-async def rescan_seeds() -> dict:
-    """Scan seed directories and run safety checks on all images."""
-    logger.info("Starting full seed directory scan...")
-    cache = {"files": {}, "last_scan": time.time()}
 
-    # Scan both default and uploads directories
-    all_seeds = glob_seeds(DEFAULT_SEEDS_DIR) + glob_seeds(UPLOADS_DIR)
-    logger.info(f"Found {len(all_seeds)} seed images")
-
-    if not all_seeds:
-        save_seeds_cache(cache)
-        logger.info("Scan complete: 0 seeds processed")
-        return cache
-
-    # Compute hashes for all files
-    logger.info("Computing file hashes...")
-    hash_tasks = [asyncio.to_thread(compute_file_hash, str(p)) for p in all_seeds]
-    file_hashes = await asyncio.gather(*hash_tasks, return_exceptions=True)
-
-    # Run batch safety check (model loads once, processes in batches, then unloads)
-    logger.info("Running batch safety check...")
-    image_paths = [str(p) for p in all_seeds]
-    safety_results = await asyncio.to_thread(safety_checker.check_batch, image_paths)
-
-    # Build cache from results
-    checked_at = time.time()
-    for i, seed_path in enumerate(all_seeds):
-        filename = seed_path.name
-        file_hash = file_hashes[i] if not isinstance(file_hashes[i], Exception) else ""
-        safety_result = safety_results[i]
-
-        if isinstance(file_hashes[i], Exception):
-            logger.error(f"Failed to hash {filename}: {file_hashes[i]}")
-            cache["files"][filename] = {
-                "hash": "",
-                "is_safe": False,
-                "path": str(seed_path),
-                "error": str(file_hashes[i]),
-                "checked_at": checked_at,
-            }
-        else:
-            cache["files"][filename] = {
-                "hash": file_hash,
-                "is_safe": safety_result.get("is_safe", False),
-                "path": str(seed_path),
-                "scores": safety_result.get("scores", {}),
-                "checked_at": checked_at,
-            }
-
-        status = "SAFE" if safety_result.get("is_safe") else "UNSAFE"
-        logger.info(f"  {filename}: {status}")
-
-    save_seeds_cache(cache)
-    logger.info(f"Scan complete: {len(cache['files'])} seeds processed")
-    return cache
-
-
-async def validate_and_update_cache() -> dict:
-    """
-    Validate cached seed data and update as needed.
-
-    Returns:
-        Updated cache dict with structure {"files": {...}, "last_scan": timestamp}
-
-    Behavior:
-        - Checks if all cached files still exist and hashes match
-        - If any hash mismatch detected → triggers full directory rescan
-        - If files are missing → removes them from cache
-        - If new unchecked files found → scans only those and adds to cache
-    """
-    logger.info("Validating seed cache...")
-    cache = load_seeds_cache()
-    cached_files = cache.get("files", {})
-
-    # If cache is empty, do full scan
-    if not cached_files:
-        logger.info("Cache is empty, performing full scan")
-        return await rescan_seeds()
-
-    # Scan directories for all current files
-    all_current_files = glob_seeds(DEFAULT_SEEDS_DIR) + glob_seeds(UPLOADS_DIR)
-    current_file_map = {p.name: str(p) for p in all_current_files}  # filename -> path
-    current_filenames = set(current_file_map.keys())
-
-    # Track validation results
-    missing_files = []
-    hash_mismatches = []
-
-    logger.info(f"Validating {len(cached_files)} cached entries against {len(current_filenames)} files on disk")
-
-    # Validate each cached entry
-    for filename, cached_data in list(cached_files.items()):
-        cached_path = cached_data.get("path", "")
-
-        # Check if file still exists
-        if not os.path.exists(cached_path):
-            logger.info(f"  {filename}: File no longer exists, removing from cache")
-            missing_files.append(filename)
-            continue
-
-        # Check if hash matches
-        cached_hash = cached_data.get("hash", "")
-        if not cached_hash:
-            # Entry had error during hashing, consider it a mismatch
-            logger.info(f"  {filename}: No hash in cache, needs rescan")
-            hash_mismatches.append(filename)
-            continue
-
-        actual_hash = await asyncio.to_thread(compute_file_hash, cached_path)
-
-        if actual_hash != cached_hash:
-            logger.warning(f"  {filename}: Hash mismatch (cached: {cached_hash[:8]}..., actual: {actual_hash[:8]}...)")
-            hash_mismatches.append(filename)
-
-    # Remove missing files from cache
-    for filename in missing_files:
-        del cached_files[filename]
-
-    # If any hash mismatches found, trigger full rescan
-    if hash_mismatches:
-        logger.warning(f"Hash mismatches detected for {len(hash_mismatches)} file(s), triggering full rescan")
-        return await rescan_seeds()
-
-    # Find new unchecked files
-    new_filenames = current_filenames - set(cached_files.keys())
-
-    if new_filenames:
-        logger.info(f"Found {len(new_filenames)} new unchecked file(s), scanning...")
-
-        # Collect paths for new files
-        files_to_scan = [Path(current_file_map[fn]) for fn in new_filenames]
-
-        # Compute hashes
-        logger.info("  Computing file hashes...")
-        hash_tasks = [asyncio.to_thread(compute_file_hash, str(p)) for p in files_to_scan]
-        file_hashes = await asyncio.gather(*hash_tasks, return_exceptions=True)
-
-        # Run batch safety check
-        logger.info("  Running batch safety check...")
-        image_paths = [str(p) for p in files_to_scan]
-        safety_results = await asyncio.to_thread(safety_checker.check_batch, image_paths)
-
-        # Add to cache
-        checked_at = time.time()
-        for i, seed_path in enumerate(files_to_scan):
-            filename = seed_path.name
-            file_hash = file_hashes[i] if not isinstance(file_hashes[i], Exception) else ""
-            safety_result = safety_results[i]
-
-            if isinstance(file_hashes[i], Exception):
-                logger.error(f"  Failed to hash {filename}: {file_hashes[i]}")
-                cached_files[filename] = {
-                    "hash": "",
-                    "is_safe": False,
-                    "path": str(seed_path),
-                    "error": str(file_hashes[i]),
-                    "checked_at": checked_at,
-                }
-            else:
-                cached_files[filename] = {
-                    "hash": file_hash,
-                    "is_safe": safety_result.get("is_safe", False),
-                    "path": str(seed_path),
-                    "scores": safety_result.get("scores", {}),
-                    "checked_at": checked_at,
-                }
-
-            status = "SAFE" if safety_result.get("is_safe") else "UNSAFE"
-            logger.info(f"    {filename}: {status}")
-
-    # Update cache if any changes were made
-    if missing_files or new_filenames:
-        cache["files"] = cached_files
-        cache["last_scan"] = time.time()
-        save_seeds_cache(cache)
-        logger.info(f"Cache updated: {len(missing_files)} removed, {len(new_filenames)} added, {len(cached_files)} total")
-    else:
-        logger.info("Cache validation complete: All entries valid, no changes needed")
-
-    return cache
+def compute_bytes_hash(data: bytes) -> str:
+    """Compute SHA256 hash of raw bytes."""
+    return hashlib.sha256(data).hexdigest()
 
 
 # ============================================================================
@@ -529,7 +280,7 @@ def _broadcast_startup_stage(stage: Stage) -> None:
 
 async def _heavy_init() -> None:
     """Run heavy startup work (safety warmup, seed validation) in background."""
-    global world_engine, inpainting_manager, safety_checker, safe_seeds_cache, startup_complete, startup_error
+    global world_engine, inpainting_manager, safety_checker, safety_hash_cache, startup_complete, startup_error
 
     try:
         _broadcast_startup_stage(STARTUP_BEGIN)
@@ -545,39 +296,16 @@ async def _heavy_init() -> None:
         logger.info("Initializing Safety Checker...")
         _broadcast_startup_stage(STARTUP_SAFETY_CHECKER)
         safety_checker = SafetyChecker()
-
-        # Warmup safety checker
-        logger.info("Warming up Safety Checker (first-time model load)...")
-        _broadcast_startup_stage(STARTUP_SAFETY_WARMUP)
-        warmup_start = time.perf_counter()
-
-        import tempfile
-        dummy_img = Image.new('RGB', (64, 64), color='gray')
-        with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp:
-            dummy_img.save(tmp.name)
-            dummy_path = tmp.name
-
-        await asyncio.to_thread(safety_checker.check_image, dummy_path)
-        os.unlink(dummy_path)
-
-        logger.info(f"Safety Checker warmed up in {time.perf_counter() - warmup_start:.2f}s")
+        await asyncio.to_thread(safety_checker.load_resident, "cuda")
+        logger.info("Safety Checker loaded on GPU")
         _broadcast_startup_stage(STARTUP_SAFETY_READY)
 
-        # Initialize seed management
-        logger.info("Initializing server-side seed storage...")
-        _broadcast_startup_stage(STARTUP_SEED_STORAGE)
-        ensure_seed_directories()
-        await setup_default_seeds()
-
-        async with rescan_lock:
-            _broadcast_startup_stage(STARTUP_SEED_VALIDATION)
-            cache = await validate_and_update_cache()
-
-        safe_seeds_cache = cache.get("files", {})
+        # Load hash-based safety cache
+        safety_hash_cache = load_safety_cache()
 
         logger.info("=" * 60)
         logger.info("[SERVER] Ready - Safety loaded, WorldEngine will load on first client")
-        logger.info(f"[SERVER] {len(safe_seeds_cache)} seeds available")
+        logger.info(f"[SERVER] {len(safety_hash_cache)} safety cache entries")
         logger.info("=" * 60)
         _broadcast_startup_stage(STARTUP_READY)
 
@@ -604,13 +332,9 @@ async def _heavy_init() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup/shutdown lifecycle handler."""
-    global rescan_lock
-
     logger.info("=" * 60)
     logger.info("BIOME SERVER STARTUP")
     logger.info("=" * 60)
-
-    rescan_lock = asyncio.Lock()
 
     # Start heavy init in background so /health responds immediately
     init_task = asyncio.create_task(_heavy_init())
@@ -649,15 +373,6 @@ app.add_middleware(
 # ============================================================================
 
 
-def compute_file_hash(file_path: str) -> str:
-    """Compute SHA256 hash of a file."""
-    sha256 = hashlib.sha256()
-    with open(file_path, "rb") as f:
-        for chunk in iter(lambda: f.read(8192), b""):
-            sha256.update(chunk)
-    return sha256.hexdigest()
-
-
 # ============================================================================
 # HTTP Endpoints
 # ============================================================================
@@ -683,19 +398,22 @@ async def health():
 @app.get("/api/model-info/{model_id:path}")
 async def get_model_info(model_id: str):
     """Fetch model metadata from HuggingFace Hub."""
-    try:
+    def _fetch():
         info = hf_model_info(model_id, files_metadata=True)
         size_bytes = None
         if hasattr(info, "siblings") and info.siblings:
             st_files = [s for s in info.siblings if s.rfilename.endswith(".safetensors") and s.size is not None]
-            # Deduplicate by blob hash to avoid counting symlinked files twice
             seen_blobs = set()
             for s in st_files:
                 blob_key = getattr(s, "blob_id", None) or s.rfilename
                 if blob_key not in seen_blobs:
                     seen_blobs.add(blob_key)
                     size_bytes = (size_bytes or 0) + s.size
-        return JSONResponse({"id": model_id, "size_bytes": size_bytes, "exists": True, "error": None})
+        return {"id": model_id, "size_bytes": size_bytes, "exists": True, "error": None}
+
+    try:
+        data = await asyncio.to_thread(_fetch)
+        return JSONResponse(data)
     except RepositoryNotFoundError:
         return JSONResponse({"id": model_id, "size_bytes": None, "exists": False, "error": "Model not found"})
     except GatedRepoError:
@@ -703,33 +421,6 @@ async def get_model_info(model_id: str):
     except Exception as e:
         logger.warning(f"model-info error for {model_id}: {e}")
         return JSONResponse({"id": model_id, "size_bytes": None, "exists": True, "error": "Could not check model"})
-
-
-# ============================================================================
-# Thumbnail helper
-# ============================================================================
-
-
-def _generate_thumbnail_jpeg_bytes(file_path: str, size: int = 300) -> bytes:
-    """Generate a square JPEG thumbnail and return bytes."""
-    import io
-
-    img = Image.open(file_path)
-    img.thumbnail((size, size))
-
-    # Convert to RGB if needed (JPEG doesn't support alpha/palette modes)
-    if img.mode in ("RGBA", "LA", "P"):
-        background = Image.new("RGB", img.size, (255, 255, 255))
-        if img.mode == "P":
-            img = img.convert("RGBA")
-        background.paste(img, mask=img.split()[-1] if img.mode in ("RGBA", "LA") else None)
-        img = background
-    elif img.mode != "RGB":
-        img = img.convert("RGB")
-
-    buffer = io.BytesIO()
-    img.save(buffer, format="JPEG", quality=85)
-    return buffer.getvalue()
 
 
 # ============================================================================
@@ -753,24 +444,8 @@ async def dispatch_request(msg: dict, websocket: WebSocket) -> dict | BinaryResp
     """
     req_type = msg.get("type", "")
 
-    if req_type == "seeds_list":
-        return await _handle_seeds_list()
-    elif req_type == "seeds_list_with_thumbnails":
-        return await _handle_seeds_list_with_thumbnails(msg)
-    elif req_type == "seeds_image":
-        return await _handle_seeds_image(msg)
-    elif req_type == "seeds_thumbnail":
-        return await _handle_seeds_thumbnail(msg)
-    elif req_type == "seeds_upload":
-        return await _handle_seeds_upload(msg)
-    elif req_type == "seeds_delete":
-        return await _handle_seeds_delete(msg)
-    elif req_type == "seeds_rescan":
-        return await _handle_seeds_rescan(msg)
-    elif req_type == "model_info":
-        return await _handle_model_info(msg)
-    elif req_type == "scene_edit_warmup":
-        return await _handle_scene_edit_warmup(msg)
+    if req_type == "check_seed_safety":
+        return await _handle_check_seed_safety(msg)
     else:
         return {"success": False, "error": f"Unknown request type: {req_type}"}
 
@@ -778,317 +453,45 @@ async def dispatch_request(msg: dict, websocket: WebSocket) -> dict | BinaryResp
 # ---- individual request handlers ----
 
 
-async def _handle_seeds_list() -> dict:
-    async with rescan_lock:
-        pass
-
-    def _uploaded_at(data: dict) -> float:
-        file_path = str(data.get("path", ""))
-        is_default = not file_path.startswith(str(UPLOADS_DIR))
-        if is_default:
-            return 0.0
-        try:
-            if file_path and os.path.exists(file_path):
-                return float(os.path.getmtime(file_path))
-        except Exception:
-            pass
-        return float(data.get("checked_at", 0) or 0)
-
-    all_seeds = {
-        filename: {
-            "filename": filename,
-            "hash": data["hash"],
-            "is_safe": data.get("is_safe", False),
-            "is_default": not str(data.get("path", "")).startswith(str(UPLOADS_DIR)),
-            "checked_at": data.get("checked_at", 0),
-            "uploaded_at": _uploaded_at(data),
-        }
-        for filename, data in safe_seeds_cache.items()
-    }
-    return {"success": True, "data": {"seeds": all_seeds, "count": len(all_seeds)}}
-
-
-async def _handle_seeds_list_with_thumbnails(msg: dict) -> dict:
-    async with rescan_lock:
-        pass
-
-    cache_count = len(safe_seeds_cache)
-    safe_count = sum(1 for data in safe_seeds_cache.values() if data.get("is_safe", False))
-    logger.info(
-        "[SEEDS] seeds_list_with_thumbnails: cache=%d safe=%d",
-        cache_count,
-        safe_count,
-    )
-
-    async def build_seed_entry(
-        filename: str, data: dict
-    ) -> tuple[str, dict]:
-        file_path = str(data.get("path", ""))
-        is_default = not file_path.startswith(str(UPLOADS_DIR))
-        uploaded_at = 0.0
-        if not is_default:
-            try:
-                if file_path and os.path.exists(file_path):
-                    uploaded_at = float(os.path.getmtime(file_path))
-            except Exception:
-                uploaded_at = 0.0
-            if uploaded_at <= 0:
-                uploaded_at = float(data.get("checked_at", 0) or 0)
-        thumbnail_base64: str | None = None
-
-        if file_path and os.path.exists(file_path):
-            try:
-                thumb_bytes = await asyncio.to_thread(_generate_thumbnail_jpeg_bytes, file_path)
-                thumbnail_base64 = base64.b64encode(thumb_bytes).decode("ascii")
-            except Exception as exc:
-                logger.error(f"Failed to generate thumbnail for {filename}: {exc}")
-
-        return (
-            filename,
-            {
-                "filename": filename,
-                "hash": data.get("hash", ""),
-                "is_safe": data.get("is_safe", False),
-                "is_default": is_default,
-                "checked_at": data.get("checked_at", 0),
-                "uploaded_at": uploaded_at,
-                "thumbnail_base64": thumbnail_base64,
-            },
-        )
-
-    ordered_items = sorted(safe_seeds_cache.items(), key=lambda item: item[0].lower())
-    entries = await asyncio.gather(
-        *(
-            build_seed_entry(filename, data)
-            for filename, data in ordered_items
-        )
-    )
-    seeds_with_thumbnails = dict(entries)
-    return {"success": True, "data": {"seeds": seeds_with_thumbnails, "count": len(seeds_with_thumbnails)}}
-
-
-async def _fallback_seed_cache_entry(filename: str, log_prefix: str = "[SEEDS]") -> tuple[bool, str]:
-    """Try to safety-scan and cache a seed that is missing from safety cache."""
-    global safe_seeds_cache
-
-    if filename in safe_seeds_cache:
-        return True, ""
-
-    logger.warning(f"{log_prefix} Seed '{filename}' not in safety cache, running fallback safety check")
-
-    # Build the same filename -> path mapping used by cache validation.
-    all_seed_paths = glob_seeds(DEFAULT_SEEDS_DIR) + glob_seeds(UPLOADS_DIR)
-    file_map = {p.name: str(p) for p in all_seed_paths}
-    file_path = file_map.get(filename)
-
-    if not file_path:
-        return False, f"Seed '{filename}' not in safety cache and not found on disk"
+async def _handle_check_seed_safety(msg: dict) -> dict:
+    """Check if a seed image is safe. Server computes hash, caches result."""
+    image_data_b64 = msg.get("image_data", "")
+    if not image_data_b64:
+        return {"success": False, "error": "image_data is required"}
 
     try:
-        file_hash = await asyncio.to_thread(compute_file_hash, file_path)
-        safety_result = await asyncio.to_thread(safety_checker.check_image, file_path)
-        is_safe = safety_result.get("is_safe", False)
-
-        safe_seeds_cache[filename] = {
-            "hash": file_hash,
-            "is_safe": is_safe,
-            "path": file_path,
-            "scores": safety_result.get("scores", {}),
-            "checked_at": time.time(),
-        }
-
-        cache = load_seeds_cache()
-        cache["files"] = safe_seeds_cache
-        cache["last_scan"] = time.time()
-        save_seeds_cache(cache)
-
-        status = "SAFE" if is_safe else "UNSAFE"
-        logger.info(f"{log_prefix} Fallback safety check complete for '{filename}': {status}")
-        return True, ""
-    except Exception as exc:
-        logger.error(f"{log_prefix} Fallback safety check failed for '{filename}': {exc}")
-        return False, f"Fallback safety check failed for '{filename}': {exc}"
-
-
-async def _handle_seeds_image(msg: dict) -> dict | BinaryResponse:
-    filename = msg.get("filename", "")
-    if filename not in safe_seeds_cache:
-        ok, error = await _fallback_seed_cache_entry(filename, log_prefix="[SEEDS_IMAGE]")
-        if not ok:
-            return {"success": False, "error": error}
-
-    seed_data = safe_seeds_cache[filename]
-    if not seed_data.get("is_safe", False):
-        return {"success": False, "error": "Seed marked unsafe"}
-
-    file_path = seed_data.get("path", "")
-    if not os.path.exists(file_path):
-        return {"success": False, "error": "Seed file not found"}
-
-    image_bytes = await asyncio.to_thread(Path(file_path).read_bytes)
-    return BinaryResponse(image_bytes)
-
-
-async def _handle_seeds_thumbnail(msg: dict) -> dict | BinaryResponse:
-    filename = msg.get("filename", "")
-    if filename not in safe_seeds_cache:
-        ok, error = await _fallback_seed_cache_entry(filename, log_prefix="[SEEDS_THUMBNAIL]")
-        if not ok:
-            return {"success": False, "error": error}
-
-    seed_data = safe_seeds_cache[filename]
-    file_path = seed_data.get("path", "")
-    if not os.path.exists(file_path):
-        return {"success": False, "error": "Seed file not found"}
-
-    try:
-        thumbnail_bytes = await asyncio.to_thread(_generate_thumbnail_jpeg_bytes, file_path)
-        return BinaryResponse(thumbnail_bytes)
-    except Exception as e:
-        logger.error(f"Failed to generate thumbnail for {filename}: {e}")
-        return {"success": False, "error": "Thumbnail generation failed"}
-
-
-async def _handle_seeds_upload(msg: dict) -> dict:
-    global safe_seeds_cache
-
-    filename = msg.get("filename", "")
-    data_b64 = msg.get("data", "")
-
-    if not any(filename.lower().endswith(ext) for ext in SUPPORTED_IMAGE_EXTENSIONS):
-        return {"success": False, "error": f"Unsupported format. Accepted: {', '.join(SUPPORTED_IMAGE_EXTENSIONS)}"}
-
-    try:
-        image_data = base64.b64decode(data_b64)
+        image_bytes = base64.b64decode(image_data_b64)
     except Exception as e:
         return {"success": False, "error": f"Invalid base64 data: {e}"}
 
-    file_path = UPLOADS_DIR / filename
-    await asyncio.to_thread(file_path.write_bytes, image_data)
-    logger.info(f"Uploaded seed saved to {file_path}")
+    img_hash = compute_bytes_hash(image_bytes)
 
-    file_hash = await asyncio.to_thread(compute_file_hash, str(file_path))
+    # Check cache first
+    if img_hash in safety_hash_cache:
+        cached = safety_hash_cache[img_hash]
+        return {"success": True, "data": {"is_safe": cached["is_safe"], "hash": img_hash}}
 
+    # Run safety check (decode + inference off the event loop)
+    import io
     try:
-        safety_result = await asyncio.to_thread(
-            safety_checker.check_image, str(file_path)
-        )
-        is_safe = safety_result.get("is_safe", False)
-
-        safe_seeds_cache[filename] = {
-            "hash": file_hash,
-            "is_safe": is_safe,
-            "path": str(file_path),
-            "scores": safety_result.get("scores", {}),
-            "checked_at": time.time(),
-        }
-
-        cache = load_seeds_cache()
-        cache["files"] = safe_seeds_cache
-        save_seeds_cache(cache)
-
-        status_msg = "SAFE" if is_safe else "UNSAFE"
-        logger.info(f"Uploaded seed {filename}: {status_msg}")
-
-        return {
-            "success": True,
-            "data": {
-                "filename": filename,
-                "hash": file_hash,
-                "is_safe": is_safe,
-                "scores": safety_result.get("scores", {}),
-            },
-        }
-
+        def _check_safety():
+            pil_img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+            return safety_checker.check_pil_image(pil_img)
+        safety_result = await asyncio.to_thread(_check_safety)
     except Exception as e:
-        logger.error(f"Safety check failed for uploaded seed: {e}")
-        if file_path.exists():
-            file_path.unlink()
+        logger.error(f"Safety check failed: {e}")
         return {"success": False, "error": f"Safety check failed: {e}"}
 
+    is_safe = safety_result.get("is_safe", False)
+    safety_hash_cache[img_hash] = {
+        "is_safe": is_safe,
+        "scores": safety_result.get("scores", {}),
+        "checked_at": time.time(),
+    }
+    save_safety_cache(safety_hash_cache)
 
-async def _handle_seeds_delete(msg: dict) -> dict:
-    global safe_seeds_cache
+    return {"success": True, "data": {"is_safe": is_safe, "hash": img_hash}}
 
-    filename = msg.get("filename", "")
-    if filename not in safe_seeds_cache:
-        ok, error = await _fallback_seed_cache_entry(filename, log_prefix="[SEEDS_DELETE]")
-        if not ok:
-            return {"success": False, "error": error}
-
-    seed_data = safe_seeds_cache[filename]
-    file_path = Path(seed_data.get("path", ""))
-
-    if not str(file_path).startswith(str(UPLOADS_DIR)):
-        return {"success": False, "error": "Cannot delete default seeds"}
-
-    try:
-        if file_path.exists():
-            await asyncio.to_thread(file_path.unlink)
-        del safe_seeds_cache[filename]
-
-        cache = load_seeds_cache()
-        cache["files"] = safe_seeds_cache
-        save_seeds_cache(cache)
-
-        logger.info(f"Deleted seed: {filename}")
-        return {"success": True, "data": {}}
-
-    except Exception as e:
-        logger.error(f"Failed to delete seed {filename}: {e}")
-        return {"success": False, "error": str(e)}
-
-
-async def _handle_seeds_rescan(msg: dict) -> dict:
-    global safe_seeds_cache
-    force_full = bool(msg.get("force_full_rescan", False))
-
-    async with rescan_lock:
-        if force_full:
-            logger.info("Manual full rescan triggered")
-            cache = await rescan_seeds()
-        else:
-            logger.info("Manual rescan triggered (smart validation)")
-            cache = await validate_and_update_cache()
-
-        safe_seeds_cache = cache.get("files", {})
-
-        safe_count = sum(1 for data in safe_seeds_cache.values() if data.get("is_safe"))
-        return {
-            "success": True,
-            "data": {
-                "total_seeds": len(safe_seeds_cache),
-                "safe_seeds": safe_count,
-            },
-        }
-
-
-async def _handle_model_info(msg: dict) -> dict:
-    """Fetch model info from HuggingFace Hub via WS RPC."""
-    model_id = msg.get("model_id", "")
-    if not model_id:
-        return {"success": False, "error": "model_id is required"}
-
-    try:
-        info = hf_model_info(model_id, files_metadata=True)
-        size_bytes = None
-        if hasattr(info, "siblings") and info.siblings:
-            st_files = [s for s in info.siblings if s.rfilename.endswith(".safetensors") and s.size is not None]
-            # Deduplicate by blob hash to avoid counting symlinked files twice
-            seen_blobs = set()
-            for s in st_files:
-                blob_key = getattr(s, "blob_id", None) or s.rfilename
-                if blob_key not in seen_blobs:
-                    seen_blobs.add(blob_key)
-                    size_bytes = (size_bytes or 0) + s.size
-        return {"success": True, "data": {"id": model_id, "size_bytes": size_bytes, "exists": True, "error": None}}
-    except RepositoryNotFoundError:
-        return {"success": True, "data": {"id": model_id, "size_bytes": None, "exists": False, "error": "Model not found"}}
-    except GatedRepoError:
-        return {"success": True, "data": {"id": model_id, "size_bytes": None, "exists": True, "error": "Private or gated model"}}
-    except Exception as e:
-        logger.warning(f"model_info WS error for {model_id}: {e}")
-        return {"success": True, "data": {"id": model_id, "size_bytes": None, "exists": True, "error": "Could not check model"}}
 
 
 def _run_scene_edit_on_generator(prompt: str, cpu_frames: list) -> dict:
@@ -1165,20 +568,6 @@ def _run_scene_edit_on_generator(prompt: str, cpu_frames: list) -> dict:
     }
 
 
-async def _handle_scene_edit_warmup(msg: dict) -> dict:
-    """Load the inpainting model to GPU so it's ready for scene editing."""
-    if inpainting_manager is None:
-        return {"success": False, "error": "Inpainting not available"}
-    if inpainting_manager.is_loaded:
-        return {"success": True, "data": {"already_loaded": True}}
-    try:
-        await inpainting_manager.warmup()
-        return {"success": True, "data": {"already_loaded": False}}
-    except Exception as e:
-        logger.error(f"[SCENE_EDIT] Warmup failed: {e}", exc_info=True)
-        return {"success": False, "error": str(e)}
-
-
 # ============================================================================
 # WorldEngine WebSocket
 # ============================================================================
@@ -1202,16 +591,12 @@ async def websocket_endpoint(websocket: WebSocket):
 
         Client -> Server:
             {"type": "control", "buttons": [str], "mouse_dx": float, "mouse_dy": float, "ts": float}
-            {"type": "set_model", "model": str}
+            {"type": "init", "req_id": "...", "model": str, "seed_image_data": str, "seed_filename": str, "scene_edit": bool, "action_logging": bool}
             {"type": "reset"}
-            {"type": "set_initial_seed", "filename": str}
-            {"type": "prompt", "prompt": str}
-            {"type": "prompt_with_seed", "filename": str}
             {"type": "pause"}
             {"type": "resume"}
             # Request/response (includes req_id):
-            {"type": "seeds_list", "req_id": "..."}
-            ...etc
+            {"type": "check_seed_safety", "req_id": "...", "image_data": str}
 
     Status codes: waiting_for_seed, init, loading, ready, reset, warmup, startup
     """
@@ -1332,110 +717,132 @@ async def websocket_endpoint(websocket: WebSocket):
         session.frame_count = 0
         logger.info(f"[{client_host}] Engine Reset")
 
-    async def load_initial_seed(filename: str | None) -> bool:
-        """Validate and load seed into world_engine.seed_frame."""
-        if not filename:
-            logger.warning(f"[{client_host}] Missing seed filename")
-            await send_warning("app.server.warning.missingFilename")
+    async def load_seed_from_data(image_data_b64: str | None, seed_filename: str | None = None) -> bool:
+        """Validate safety and load seed from base64 image data."""
+        nonlocal current_seed_hash, current_seed_filename
+        if not image_data_b64:
+            logger.warning(f"[{client_host}] Missing seed image data")
+            await send_warning("app.server.warning.missingSeedData")
             return False
 
-        if filename not in safe_seeds_cache:
-            ok, error = await _fallback_seed_cache_entry(
-                filename, log_prefix=f"[{client_host}]"
-            )
-            if not ok:
-                logger.warning(f"[{client_host}] {error}")
-                await send_warning("app.server.warning.seedSafetyCheckFailed", {"filename": filename})
+        try:
+            image_bytes = base64.b64decode(image_data_b64)
+        except Exception as e:
+            logger.warning(f"[{client_host}] Invalid base64 seed data: {e}")
+            await send_warning("app.server.warning.invalidSeedData")
+            return False
+
+        img_hash = compute_bytes_hash(image_bytes)
+
+        # Check if same seed is already loaded (dedup by hash)
+        if img_hash == current_seed_hash:
+            logger.info(f"[{client_host}] Seed unchanged (hash match), skipping reload")
+            return True
+
+        # Safety check
+        if img_hash in safety_hash_cache:
+            cached = safety_hash_cache[img_hash]
+            if not cached.get("is_safe", False):
+                logger.warning(f"[{client_host}] Seed marked as unsafe (cached)")
+                await send_warning("app.server.warning.seedUnsafe")
+                return False
+        else:
+            # Run safety check (decode + inference off the event loop)
+            import io
+            try:
+                def _check_safety():
+                    pil_img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+                    return safety_checker.check_pil_image(pil_img)
+                safety_result = await asyncio.to_thread(_check_safety)
+            except Exception as e:
+                logger.warning(f"[{client_host}] Safety check failed: {e}")
+                await send_warning("app.server.warning.seedSafetyCheckFailed")
                 return False
 
-        cached_entry = safe_seeds_cache[filename]
-        if not cached_entry.get("is_safe", False):
-            logger.warning(f"[{client_host}] Seed '{filename}' marked as unsafe")
-            await send_warning("app.server.warning.seedUnsafe", {"filename": filename})
-            return False
+            is_safe = safety_result.get("is_safe", False)
+            safety_hash_cache[img_hash] = {
+                "is_safe": is_safe,
+                "scores": safety_result.get("scores", {}),
+                "checked_at": time.time(),
+            }
+            save_safety_cache(safety_hash_cache)
 
-        cached_hash = cached_entry.get("hash", "")
-        file_path = cached_entry.get("path", "")
-        if not os.path.exists(file_path):
-            logger.error(f"[{client_host}] Seed file not found: {file_path}")
-            await send_warning("app.server.warning.seedNotFound", {"filename": filename})
-            return False
+            if not is_safe:
+                logger.warning(f"[{client_host}] Seed marked as unsafe")
+                await send_warning("app.server.warning.seedUnsafe")
+                return False
 
-        actual_hash = await asyncio.to_thread(compute_file_hash, file_path)
-        if actual_hash != cached_hash:
-            logger.warning(
-                f"[{client_host}] File integrity check failed for '{filename}' - file may have been modified"
-            )
-            await send_warning("app.server.warning.seedIntegrityFailed")
-            return False
-
-        logger.info(f"[{client_host}] Loading initial seed '{filename}'")
-        loaded_frame = await world_engine.load_seed_from_file(file_path)
+        # Load seed
+        display_name = seed_filename or img_hash[:12]
+        logger.info(f"[{client_host}] Loading seed '{display_name}'")
+        loaded_frame = await world_engine.load_seed_from_base64(image_data_b64)
         if loaded_frame is None:
-            logger.error(f"[{client_host}] Failed to load seed '{filename}'")
+            logger.error(f"[{client_host}] Failed to load seed")
             await send_warning("app.server.warning.seedLoadFailed")
             return False
 
         world_engine.seed_frame = loaded_frame
         world_engine.original_seed_frame = loaded_frame
-        nonlocal current_seed_filename
-        current_seed_filename = filename
-        logger.info(f"[{client_host}] Initial seed loaded successfully")
+        current_seed_hash = img_hash
+        current_seed_filename = seed_filename
+        logger.info(f"[{client_host}] Seed loaded successfully")
         return True
 
-    async def handle_model_request(
-        model_uri: str | None, live_switch: bool, seed_filename: str | None = None
-    ) -> None:
-        """Load/switch model and transition back to waiting-for-seed state."""
-        model_uri = (model_uri or "").strip()
-        if not model_uri:
-            logger.warning(f"[{client_host}] Missing model ID in set_model request")
-            await send_warning("app.server.warning.missingModelId")
-            return
+    async def handle_init(msg: dict, is_game_loop: bool = False) -> bool:
+        """Handle unified init message — apply deltas for model, seed, flags."""
+        nonlocal scene_edit_requested, action_logging_requested
 
-        if live_switch:
-            logger.info(f"[{client_host}] Live model switch requested: {model_uri}")
-        else:
-            logger.info(f"[{client_host}] Requested model: {model_uri}")
-        logger.info(f"[{client_host}] set_model seed payload: {seed_filename!r}")
+        model_uri = (msg.get("model") or "").strip()
+        seed_data = msg.get("seed_image_data")
+        seed_filename = msg.get("seed_filename")
 
-        world_engine.set_progress_callback(progress_callback, asyncio.get_running_loop())
-        await world_engine.load_engine(model_uri)
-        world_engine.set_progress_callback(None)
+        # Update flags
+        if "scene_edit" in msg:
+            scene_edit_requested = msg["scene_edit"]
+        if "action_logging" in msg:
+            action_logging_requested = msg["action_logging"]
 
-        world_engine.seed_frame = None
-        session.frame_count = 0
+        # Model delta
+        model_changed = False
+        if model_uri and model_uri != getattr(world_engine, "model_uri", None):
+            logger.info(f"[{client_host}] {'Live model switch' if is_game_loop else 'Requested model'}: {model_uri}")
+            world_engine.set_progress_callback(progress_callback, asyncio.get_running_loop())
+            await world_engine.load_engine(model_uri)
+            world_engine.set_progress_callback(None)
+            world_engine.seed_frame = None
+            session.frame_count = 0
+            model_changed = True
+            logger.info(f"[{client_host}] Model loaded: {world_engine.model_uri}")
+
+        # Seed delta
         seed_loaded = False
-        effective_seed = seed_filename or DEFAULT_INITIAL_SEED
-        seed_loaded = await load_initial_seed(effective_seed)
-        if not seed_loaded and seed_filename:
-            # If an explicit seed fails, still leave room for a manual retry from client.
-            logger.info(
-                f"[{client_host}] Failed to load explicit seed '{seed_filename}', waiting for client seed"
-            )
-        if not seed_loaded:
+        if seed_data:
+            seed_loaded = await load_seed_from_data(seed_data, seed_filename)
+
+        if model_changed and not seed_loaded and not world_engine.seed_frame:
             await send_stage(SESSION_WAITING_FOR_SEED)
-        logger.info(f"[{client_host}] Model loaded: {world_engine.model_uri}")
+
+        return seed_loaded or (world_engine.seed_frame is not None)
 
     scene_edit_requested = False
     action_logging_requested = False
     action_logger: ActionLogger | None = None
+    current_seed_hash: str | None = None
     current_seed_filename: str | None = None
 
-    try:
-        # Wait for initial seed from client
-        await send_stage(SESSION_WAITING_FOR_SEED)
-        logger.info(f"[{client_host}] Waiting for initial seed from client...")
+    init_req_id: str | None = None
 
-        # Wait for model selection + initial seed message
+    try:
+        await send_stage(SESSION_WAITING_FOR_SEED)
+        logger.info(f"[{client_host}] Waiting for init message...")
+
         while world_engine.seed_frame is None:
             try:
                 raw = await asyncio.wait_for(websocket.receive_text(), timeout=60.0)
                 msg = json.loads(raw)
                 msg_type = msg.get("type")
 
-                # Handle request/response messages even during seed wait
-                if "req_id" in msg:
+                if "req_id" in msg and msg_type != "init":
                     result = await dispatch_request(msg, websocket)
                     req_id = msg["req_id"]
                     if isinstance(result, BinaryResponse):
@@ -1450,26 +857,20 @@ async def websocket_endpoint(websocket: WebSocket):
                         await send_json({"type": "response", "req_id": req_id, **result})
                     continue
 
-                if msg_type == "set_model":
-                    if msg.get("scene_edit"):
-                        scene_edit_requested = True
-                    if msg.get("action_logging"):
-                        action_logging_requested = True
-                    await handle_model_request(
-                        msg.get("model"),
-                        live_switch=False,
-                        seed_filename=msg.get("seed"),
-                    )
-
-                elif msg_type == "set_initial_seed":
-                    await load_initial_seed(msg.get("filename"))
+                if msg_type == "init":
+                    # init RPC: response is deferred until after warmup/session init completes
+                    init_req_id = msg.get("req_id")
+                    ready = await handle_init(msg)
+                    if not ready and init_req_id:
+                        await send_json({"type": "response", "req_id": init_req_id, "success": False, "error_id": "app.server.error.initFailed"})
+                        init_req_id = None
                 else:
                     logger.info(
-                        f"[{client_host}] Ignoring message type '{msg_type}' while waiting for seed"
+                        f"[{client_host}] Ignoring message type '{msg_type}' while waiting for init"
                     )
 
             except asyncio.TimeoutError:
-                logger.error(f"[{client_host}] Timeout waiting for initial seed")
+                logger.error(f"[{client_host}] Timeout waiting for init")
                 await send_json(
                     {"type": "error", "message_id": "app.server.error.timeoutWaitingForSeed"}
                 )
@@ -1487,15 +888,18 @@ async def websocket_endpoint(websocket: WebSocket):
                 f"[{client_host}] Seed frame missing before initialization; client likely disconnected/reconnected during model switch"
             )
             world_engine.set_progress_callback(None)
+            if init_req_id:
+                await send_json({"type": "response", "req_id": init_req_id, "success": False, "error_id": "app.server.error.initFailed"})
             return
 
-        # Load inpainting model BEFORE WorldEngine warmup so CUDA graphs
+        # Load or unload inpainting model based on scene_edit flag.
+        # Loading happens BEFORE WorldEngine warmup so CUDA graphs
         # are compiled with the inpainting model's memory already allocated.
+        if not scene_edit_requested and inpainting_manager is not None and inpainting_manager.is_loaded:
+            logger.info(f"[{client_host}] Scene edit disabled — unloading inpainting model")
+            await asyncio.to_thread(inpainting_manager.unload)
+
         if scene_edit_requested and inpainting_manager is not None and not inpainting_manager.is_loaded:
-            from progress_stages import (
-                SESSION_INPAINTING_LOAD, SESSION_INPAINTING_READY,
-                SESSION_SAFETY_LOAD, SESSION_SAFETY_READY,
-            )
             await send_stage(SESSION_INPAINTING_LOAD)
             try:
                 await inpainting_manager.warmup()
@@ -1503,19 +907,9 @@ async def websocket_endpoint(websocket: WebSocket):
             except Exception as e:
                 logger.error(f"[{client_host}] Inpainting warmup failed: {e}", exc_info=True)
                 await send_json({"type": "error", "message_id": "app.server.error.sceneEditModelLoadFailed", "message": str(e)})
+                if init_req_id:
+                    await send_json({"type": "response", "req_id": init_req_id, "success": False, "error_id": "app.server.error.sceneEditModelLoadFailed"})
                 return
-
-            # Load safety checker on GPU and keep it resident for fast
-            # repeated checks on inpainted frames.
-            if not safety_checker.is_resident:
-                await send_stage(SESSION_SAFETY_LOAD)
-                try:
-                    await asyncio.to_thread(safety_checker.load_resident, "cuda")
-                    await send_stage(SESSION_SAFETY_READY)
-                except Exception as e:
-                    logger.error(f"[{client_host}] Safety checker GPU load failed: {e}", exc_info=True)
-                    await send_json({"type": "error", "message_id": "app.server.error.contentFilterLoadFailed", "message": str(e)})
-                    return
 
         # Warmup on first connection AFTER seed is loaded
         if not world_engine.engine_warmed_up:
@@ -1591,17 +985,6 @@ async def websocket_endpoint(websocket: WebSocket):
         except Exception:
             _metrics_gpu_name = None
 
-        def _build_initial_metrics() -> dict:
-            """Static session info sent once at connection start."""
-            from engine_manager import DEFAULT_INFERENCE_FPS
-            return {
-                "type": "metrics",
-                "gpu_name": _metrics_gpu_name,
-                "cpu_name": _metrics_cpu_name,
-                "model": getattr(world_engine, 'model_uri', "") or "",
-                "inference_fps": getattr(world_engine, 'inference_fps', DEFAULT_INFERENCE_FPS),
-            }
-
         def queue_send(payload: dict | bytes) -> None:
             try:
                 frame_queue.put_nowait(payload)
@@ -1664,7 +1047,21 @@ async def websocket_endpoint(websocket: WebSocket):
             header = json.dumps(header_data, separators=(",", ":")).encode("utf-8")
             return struct.pack("<I", len(header)) + header + jpeg
 
-        queue_send(_build_initial_metrics())
+        # Respond to init RPC with session metrics
+        if init_req_id:
+            from engine_manager import DEFAULT_INFERENCE_FPS
+            await send_json({
+                "type": "response",
+                "req_id": init_req_id,
+                "success": True,
+                "data": {
+                    "gpu_name": _metrics_gpu_name,
+                    "cpu_name": _metrics_cpu_name,
+                    "model": getattr(world_engine, 'model_uri', "") or "",
+                    "inference_fps": getattr(world_engine, 'inference_fps', DEFAULT_INFERENCE_FPS),
+                },
+            })
+            init_req_id = None
 
         async def receiver() -> None:
             nonlocal running, paused, reset_flag, prompt_pending, scene_edit_request
@@ -1675,10 +1072,35 @@ async def websocket_endpoint(websocket: WebSocket):
                     msg_type = msg.get("type", "control")
 
                     if "req_id" in msg:
-                        # scene_edit is handled by the generator thread at
-                        # the next clean frame boundary — post a request and
-                        # await the future.
-                        if msg.get("type") == "scene_edit":
+                        if msg_type == "init":
+                            # init RPC: apply deltas and respond with metrics
+                            seed_loaded = await handle_init(msg, is_game_loop=True)
+                            from engine_manager import DEFAULT_INFERENCE_FPS
+                            if seed_loaded or world_engine.seed_frame is not None:
+                                queue_send({
+                                    "type": "response",
+                                    "req_id": msg["req_id"],
+                                    "success": True,
+                                    "data": {
+                                        "gpu_name": _metrics_gpu_name,
+                                        "cpu_name": _metrics_cpu_name,
+                                        "model": getattr(world_engine, 'model_uri', "") or "",
+                                        "inference_fps": getattr(world_engine, 'inference_fps', DEFAULT_INFERENCE_FPS),
+                                    },
+                                })
+                            else:
+                                queue_send({
+                                    "type": "response",
+                                    "req_id": msg["req_id"],
+                                    "success": False,
+                                    "error_id": "app.server.error.initFailed",
+                                })
+                            if seed_loaded:
+                                reset_flag = True
+                        elif msg_type == "scene_edit":
+                            # scene_edit is handled by the generator thread at
+                            # the next clean frame boundary — post a request and
+                            # await the future.
                             if action_logger is not None:
                                 action_logger.scene_edit(msg.get("prompt", "").strip())
                             prompt = msg.get("prompt", "").strip()
@@ -1692,7 +1114,6 @@ async def websocket_endpoint(websocket: WebSocket):
                                 import concurrent.futures
                                 fut = concurrent.futures.Future()
                                 scene_edit_request = {"prompt": prompt, "future": fut}
-                                # Await the future (generator will resolve it)
                                 try:
                                     preview_data = await asyncio.wrap_future(fut)
                                     result = {"success": True, "data": {**preview_data}}
@@ -1702,32 +1123,33 @@ async def websocket_endpoint(websocket: WebSocket):
                                         result = {"success": False, "error_id": error_id}
                                     else:
                                         result = {"success": False, "error": str(e)}
+                            req_id = msg["req_id"]
+                            if isinstance(result, BinaryResponse):
+                                header = json.dumps(
+                                    {"req_id": req_id, "success": True},
+                                    separators=(",", ":"),
+                                ).encode("utf-8")
+                                queue_send(struct.pack("<I", len(header)) + header + result.image_bytes)
+                            else:
+                                if "success" not in result:
+                                    result = {"success": True, "data": result}
+                                queue_send({"type": "response", "req_id": req_id, **result})
                         else:
                             result = await dispatch_request(msg, websocket)
-                        req_id = msg["req_id"]
-                        if isinstance(result, BinaryResponse):
-                            header = json.dumps(
-                                {"req_id": req_id, "success": True},
-                                separators=(",", ":"),
-                            ).encode("utf-8")
-                            queue_send(struct.pack("<I", len(header)) + header + result.image_bytes)
-                        else:
-                            if "success" not in result:
-                                result = {"success": True, "data": result}
-                            queue_send({"type": "response", "req_id": req_id, **result})
+                            req_id = msg["req_id"]
+                            if isinstance(result, BinaryResponse):
+                                header = json.dumps(
+                                    {"req_id": req_id, "success": True},
+                                    separators=(",", ":"),
+                                ).encode("utf-8")
+                                queue_send(struct.pack("<I", len(header)) + header + result.image_bytes)
+                            else:
+                                if "success" not in result:
+                                    result = {"success": True, "data": result}
+                                queue_send({"type": "response", "req_id": req_id, **result})
                         continue
 
                     match msg_type:
-                        case "set_model":
-                            await handle_model_request(msg.get("model"), live_switch=True)
-                            if world_engine.seed_frame is not None:
-                                reset_flag = True
-                            continue
-
-                        case "set_initial_seed":
-                            if await load_initial_seed(msg.get("filename")):
-                                reset_flag = True
-                            continue
 
                         case "reset":
                             logger.info(f"[{client_host}] Reset requested")
@@ -1749,17 +1171,6 @@ async def websocket_endpoint(websocket: WebSocket):
 
                             new_prompt = msg.get("prompt", "").strip()
                             prompt_pending = new_prompt if new_prompt else DEFAULT_PROMPT
-                            continue
-
-                        case "prompt_with_seed":
-                            filename = msg.get("filename")
-                            logger.info(f"[RECV] prompt_with_seed: filename={filename}")
-                            if not filename:
-                                logger.warning(f"[{client_host}] Missing filename in prompt_with_seed")
-                                queue_send({"type": "warning", "message_id": "app.server.warning.missingFilename"})
-                                continue
-                            if await load_initial_seed(filename):
-                                reset_flag = True
                             continue
 
                         case "control":
