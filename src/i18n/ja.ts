@@ -21,8 +21,8 @@ const ja = {
         reset: 'リセット',
         scenes: 'シーン',
         resume: '再開',
-        exportLogs: 'ログをエクスポート',
         copyReport: 'レポートをコピー',
+        saveReport: 'レポートを保存',
         reportOnGithub: 'GitHubで報告',
         askOnDiscord: 'Discordで質問',
         showLogs: 'ログを表示',
@@ -110,7 +110,7 @@ const ja = {
             '完全な診断 JSON はクリップボードにコピーされています。送信前に下へ貼り付けてください。',
           fullDiagnosticsPaste: 'アプリ内の「レポートをコピー」を押し、診断 JSON を下へ貼り付けてください。',
           pasteDiagnosticsJson: '<完全な診断 JSON をここに貼り付けてください>',
-          exportDiagnosticsJson: '診断 JSON をエクスポート',
+          saveDiagnosticsJson: '診断 JSON をファイルに保存',
           copying: 'コピー中...',
           copyDiagnosticsJsonForBugReports: 'バグ報告用に診断 JSON をコピー',
           opening: '開いています...',
@@ -224,7 +224,9 @@ const ja = {
           description: '内部で何が起きているか見ますか？',
           performanceStats: '性能統計',
           inputOverlay: '入力オーバーレイ',
-          frameTimeline: 'フレームタイムライン'
+          frameTimeline: 'フレームタイムライン',
+          actionLogging: 'アクションログ',
+          actionLoggingDescription: 'リプレイ用に全入力をサーバー上のファイルに記録します。/tmpに書き込まれます。'
         },
         credits: {
           title: 'クレジット'
@@ -306,11 +308,10 @@ const ja = {
           cudaRecoveryFailed: 'CUDAエラー — 回復に失敗しました。再接続してください。'
         },
         warning: {
-          missingFilename: 'ファイル名がありません',
-          seedSafetyCheckFailed: "シード '{{filename}}' の安全性チェックに失敗しました",
-          seedUnsafe: "シード '{{filename}}' は安全でないとマークされています",
-          seedNotFound: 'シードファイルが見つかりません: {{filename}}',
-          seedIntegrityFailed: 'ファイル整合性の検証に失敗しました — シードを再スキャンしてください',
+          missingSeedData: 'シード画像データがありません',
+          invalidSeedData: 'シード画像データが無効です',
+          seedSafetyCheckFailed: 'シードの安全性チェックに失敗しました',
+          seedUnsafe: 'シードが安全でないとマークされています',
           seedLoadFailed: 'シード画像の読み込みに失敗しました',
           missingModelId: 'モデルIDがありません'
         }
@@ -333,11 +334,8 @@ const ja = {
       startup: {
         begin: '初期化しています...',
         world_engine_manager: 'ワールドエンジンを準備しています...',
-        safety_checker: 'コンテンツフィルターを設定しています...',
-        safety_warmup: 'コンテンツフィルターをウォームアップしています...',
+        safety_checker: 'コンテンツフィルターを読み込んでいます...',
         safety_ready: 'コンテンツフィルターの準備ができました。',
-        seed_storage: 'シーンを整理しています...',
-        seed_validation: 'シーンを検証しています...',
         ready: 'モデルを読み込む準備ができました。'
       },
       session: {

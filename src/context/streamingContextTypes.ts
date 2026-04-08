@@ -13,7 +13,6 @@ export type StreamingContextValue = {
   connectionState: string
   connectionLost: boolean
   error: string | null
-  warning: string | null
   isConnected: boolean
   isVideoReady: boolean
   isReady: boolean
@@ -64,6 +63,7 @@ export type StreamingContextValue = {
 
   openSeedsDir: () => Promise<void>
   seedsDir: string | null
+  selectSeed: (filename: string) => Promise<void>
   wsRequest: <T = unknown>(type: string, params?: Record<string, unknown>, timeoutMs?: number) => Promise<T>
   wsLogs: string[]
   wsAllLogs: string[]
@@ -85,9 +85,6 @@ export type StreamingContextValue = {
   cancelConnection: () => Promise<void>
   prepareReturnToMainMenu: () => Promise<void>
   reset: () => void
-  sendPrompt: (prompt: string) => void
-  sendPromptWithSeed: (promptOrFilename: string, maybeSeedUrl?: string) => void
-  sendInitialSeed: (filename: string) => void
   requestPointerLock: () => boolean
   exitPointerLock: () => void
   registerContainerRef: (element: HTMLDivElement | null) => void

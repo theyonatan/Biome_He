@@ -21,8 +21,8 @@ const zh = {
         reset: '重置',
         scenes: '场景',
         resume: '继续',
-        exportLogs: '导出日志',
         copyReport: '复制报告',
+        saveReport: '保存报告',
         reportOnGithub: '在 GitHub 上报告',
         askOnDiscord: '去 Discord 求助',
         showLogs: '显示日志',
@@ -105,7 +105,7 @@ const zh = {
           fullDiagnosticsCopied: '完整诊断 JSON 已复制到剪贴板。请在提交前粘贴到下方。',
           fullDiagnosticsPaste: '请先在应用内点击“复制报告”，然后将诊断 JSON 粘贴到下方。',
           pasteDiagnosticsJson: '<请在此粘贴完整诊断 JSON>',
-          exportDiagnosticsJson: '导出诊断 JSON',
+          saveDiagnosticsJson: '将诊断 JSON 保存到文件',
           copying: '复制中...',
           copyDiagnosticsJsonForBugReports: '复制用于错误报告的诊断 JSON',
           opening: '正在打开...',
@@ -218,7 +218,9 @@ const zh = {
           description: '想看看底层正在发生什么吗？',
           performanceStats: '性能统计',
           inputOverlay: '输入叠层',
-          frameTimeline: '帧时间线'
+          frameTimeline: '帧时间线',
+          actionLogging: '操作日志',
+          actionLoggingDescription: '将所有输入记录到服务器上的文件以供回放。写入 /tmp。'
         },
         credits: {
           title: '鸣谢'
@@ -298,11 +300,10 @@ const zh = {
           cudaRecoveryFailed: 'CUDA 错误 - 恢复失败。请重新连接。'
         },
         warning: {
-          missingFilename: '缺少文件名',
-          seedSafetyCheckFailed: "种子 '{{filename}}' 安全检查失败",
-          seedUnsafe: "种子 '{{filename}}' 被标记为不安全",
-          seedNotFound: '未找到种子文件：{{filename}}',
-          seedIntegrityFailed: '文件完整性验证失败 - 请重新扫描种子',
+          missingSeedData: '缺少种子图片数据',
+          invalidSeedData: '种子图片数据无效',
+          seedSafetyCheckFailed: '种子安全检查失败',
+          seedUnsafe: '种子被标记为不安全',
           seedLoadFailed: '无法加载种子图片',
           missingModelId: '缺少模型 ID'
         }
@@ -325,11 +326,8 @@ const zh = {
       startup: {
         begin: '正在初始化...',
         world_engine_manager: '正在准备世界引擎...',
-        safety_checker: '正在设置内容过滤器...',
-        safety_warmup: '正在预热内容过滤器...',
+        safety_checker: '正在加载内容过滤器...',
         safety_ready: '内容过滤器已就绪。',
-        seed_storage: '正在整理场景...',
-        seed_validation: '正在验证场景...',
         ready: '已准备好加载模型。'
       },
       session: {

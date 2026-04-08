@@ -234,17 +234,6 @@ const ServerLogDisplay = ({
         <div className="flex flex-col gap-[0.4cqh] px-[2.13cqh] py-[0.8cqh] bg-white/5 border-t border-white/10">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-[0.8cqh]">
-              {showExportAction && onExportAction && exportActionLabel && (
-                <Button
-                  variant="secondary"
-                  autoShrinkLabel
-                  label={exportActionLabel}
-                  className="text-[2.13cqh] px-[1.4cqh] py-[0.4cqh]"
-                  onClick={onExportAction}
-                  disabled={isExportingAction}
-                  title={t('app.loading.terminal.exportDiagnosticsJson')}
-                />
-              )}
               <Button
                 variant="secondary"
                 autoShrinkLabel
@@ -254,6 +243,17 @@ const ServerLogDisplay = ({
                 disabled={isCopyingReport}
                 title={t('app.loading.terminal.copyDiagnosticsJsonForBugReports')}
               />
+              {showExportAction && onExportAction && exportActionLabel && (
+                <Button
+                  variant="secondary"
+                  autoShrinkLabel
+                  label={exportActionLabel}
+                  className="text-[2.13cqh] px-[1.4cqh] py-[0.4cqh]"
+                  onClick={onExportAction}
+                  disabled={isExportingAction}
+                  title={t('app.loading.terminal.saveDiagnosticsJson')}
+                />
+              )}
               {(reportActionStatus || actionStatus) && (
                 <span className="ml-[0.4cqh] font-serif text-[2.13cqh] text-text-muted whitespace-nowrap">
                   {reportActionStatus || actionStatus}

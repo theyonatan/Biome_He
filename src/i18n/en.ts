@@ -21,8 +21,8 @@ const en = {
         reset: 'Reset',
         scenes: 'Scenes',
         resume: 'Resume',
-        exportLogs: 'Export Logs',
         copyReport: 'Copy Report',
+        saveReport: 'Save Report',
         reportOnGithub: 'Report on GitHub',
         askOnDiscord: 'Ask on Discord',
         showLogs: 'Show Logs',
@@ -109,9 +109,9 @@ const en = {
           fullDiagnostics: 'Full diagnostics',
           fullDiagnosticsCopied:
             'Full diagnostics JSON has been copied to clipboard. Paste it below before submitting.',
-          fullDiagnosticsPaste: 'Click "Copy Report" in-app and paste diagnostics JSON below.',
+          fullDiagnosticsPaste: 'Click "Copy Report" in the app and paste the diagnostics JSON below.',
           pasteDiagnosticsJson: '<paste full diagnostics JSON here>',
-          exportDiagnosticsJson: 'Export diagnostics JSON',
+          saveDiagnosticsJson: 'Save diagnostics JSON to file',
           copying: 'Copying...',
           copyDiagnosticsJsonForBugReports: 'Copy diagnostics JSON for bug reports',
           opening: 'Opening...',
@@ -225,7 +225,9 @@ const en = {
           description: "want to see what's happening under the hood?",
           performanceStats: 'Performance Stats',
           inputOverlay: 'Input Overlay',
-          frameTimeline: 'Frame Timeline'
+          frameTimeline: 'Frame Timeline',
+          actionLogging: 'Action Logging',
+          actionLoggingDescription: 'Record all inputs to a file on the server for replay. Written to /tmp.'
         },
         credits: {
           title: 'Credits'
@@ -306,11 +308,10 @@ const en = {
           cudaRecoveryFailed: 'CUDA error — recovery failed. Please reconnect.'
         },
         warning: {
-          missingFilename: 'Missing filename',
-          seedSafetyCheckFailed: "Seed '{{filename}}' failed safety check",
-          seedUnsafe: "Seed '{{filename}}' marked as unsafe",
-          seedNotFound: 'Seed file not found: {{filename}}',
-          seedIntegrityFailed: 'File integrity verification failed — please rescan seeds',
+          missingSeedData: 'Missing seed image data',
+          invalidSeedData: 'Invalid seed image data',
+          seedSafetyCheckFailed: 'Seed failed safety check',
+          seedUnsafe: 'Seed marked as unsafe',
           seedLoadFailed: 'Failed to load seed image',
           missingModelId: 'Missing model ID'
         }
@@ -333,11 +334,8 @@ const en = {
       startup: {
         begin: 'Initializing...',
         world_engine_manager: 'Preparing world engine...',
-        safety_checker: 'Setting up content filters...',
-        safety_warmup: 'Warming up content filters...',
+        safety_checker: 'Loading content filter...',
         safety_ready: 'Content filters ready.',
-        seed_storage: 'Organizing scenes...',
-        seed_validation: 'Verifying scenes...',
         ready: 'Ready to load model.'
       },
       session: {

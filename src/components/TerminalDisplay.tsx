@@ -177,7 +177,7 @@ const TerminalDisplay = ({ onCancel }: TerminalDisplayProps) => {
               showExportAction={!!errorDetail}
               onExportAction={() => void handleExportDiagnostics()}
               isExportingAction={isExportingDiagnostics}
-              exportActionLabel="app.buttons.exportLogs"
+              exportActionLabel="app.buttons.saveReport"
               actionStatus={exportStatus}
             />
           </div>

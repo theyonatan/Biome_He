@@ -21,8 +21,8 @@ const goose = {
         reset: 'Shake feathers',
         scenes: 'Nesting grounds',
         resume: 'Waddle on',
-        exportLogs: 'Scatter droppings',
         copyReport: 'Copy honk report',
+        saveReport: 'Save honk report',
         reportOnGithub: 'Honk on GitHub',
         askOnDiscord: 'Honk on Discord',
         showLogs: 'Show honks',
@@ -112,7 +112,7 @@ const goose = {
             'Full droppings JSON has been copied to clipboard. Paste below before submitting your honk.',
           fullDiagnosticsPaste: 'Click "Copy honk report" in-app and paste droppings JSON below.',
           pasteDiagnosticsJson: '<paste full droppings JSON here>',
-          exportDiagnosticsJson: 'Export droppings JSON',
+          saveDiagnosticsJson: 'Save droppings JSON to nest',
           copying: 'Pecking...',
           copyDiagnosticsJsonForBugReports: 'Copy droppings JSON for honk reports',
           opening: 'Waddling...',
@@ -226,7 +226,10 @@ const goose = {
           description: 'want to see what the goose is thinking?',
           performanceStats: 'Waddle stats',
           inputOverlay: 'Peck overlay',
-          frameTimeline: 'Feather timeline'
+          frameTimeline: 'Feather timeline',
+          actionLogging: 'Migration log',
+          actionLoggingDescription:
+            'Record all pecks and waddles to a file on the pond server for replay. Honked to /tmp.'
         },
         credits: {
           title: 'The flock'
@@ -306,11 +309,10 @@ const goose = {
           cudaRecoveryFailed: 'CUDA honk — recovery failed. Please re-waddle.'
         },
         warning: {
-          missingFilename: 'Missing bread crumb name',
-          seedSafetyCheckFailed: "Bread crumb '{{filename}}' failed fox inspection",
-          seedUnsafe: "Bread crumb '{{filename}}' marked as suspicious",
-          seedNotFound: 'Bread crumb not found: {{filename}}',
-          seedIntegrityFailed: 'Bread crumb integrity check failed — please re-inspect',
+          missingSeedData: 'The bread crumb has gone missing from the nest',
+          invalidSeedData: 'That bread crumb looks funny — not fit for a goose',
+          seedSafetyCheckFailed: 'Bread crumb failed fox inspection',
+          seedUnsafe: 'Bread crumb marked as suspicious by the flock',
           seedLoadFailed: 'Failed to nibble bread crumb',
           missingModelId: 'Missing goose model ID'
         }
@@ -333,11 +335,8 @@ const goose = {
       startup: {
         begin: 'Honking into existence...',
         world_engine_manager: 'Assembling the flock...',
-        safety_checker: 'Training the fox detector...',
-        safety_warmup: 'Test-hissing at shadows...',
+        safety_checker: 'Summoning the fox detector...',
         safety_ready: 'Fox detector operational.',
-        seed_storage: 'Organizing the bread stash...',
-        seed_validation: 'Inspecting each crumb...',
         ready: 'Ready to unleash the goose.'
       },
       session: {

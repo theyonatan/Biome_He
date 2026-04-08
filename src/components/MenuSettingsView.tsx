@@ -120,6 +120,7 @@ const MenuSettingsView = ({ onBack, wide }: MenuSettingsViewProps) => {
   const [menuPerformanceStats, setMenuPerformanceStats] = useState(() => settings.debug_overlays.performance_stats)
   const [menuInputOverlay, setMenuInputOverlay] = useState(() => settings.debug_overlays.input)
   const [menuFrameTimeline, setMenuFrameTimeline] = useState(() => settings.debug_overlays.frame_timeline)
+  const [menuActionLogging, setMenuActionLogging] = useState(() => settings.debug_overlays.action_logging)
 
   const configServerUrl = settings.server_url
   const [menuServerUrl, setMenuServerUrl] = useState(configServerUrl)
@@ -245,6 +246,7 @@ const MenuSettingsView = ({ onBack, wide }: MenuSettingsViewProps) => {
     setMenuPerformanceStats(settings.debug_overlays.performance_stats)
     setMenuInputOverlay(settings.debug_overlays.input)
     setMenuFrameTimeline(settings.debug_overlays.frame_timeline)
+    setMenuActionLogging(settings.debug_overlays.action_logging)
   }, [
     settings.locale,
     configEngineMode,
@@ -255,7 +257,8 @@ const MenuSettingsView = ({ onBack, wide }: MenuSettingsViewProps) => {
     settings.keybindings,
     settings.debug_overlays.performance_stats,
     settings.debug_overlays.input,
-    settings.debug_overlays.frame_timeline
+    settings.debug_overlays.frame_timeline,
+    settings.debug_overlays.action_logging
   ])
 
   const handleServerUrlBlur = useCallback(async () => {
@@ -376,7 +379,8 @@ const MenuSettingsView = ({ onBack, wide }: MenuSettingsViewProps) => {
       debug_overlays: {
         performance_stats: menuPerformanceStats,
         input: menuInputOverlay,
-        frame_timeline: menuFrameTimeline
+        frame_timeline: menuFrameTimeline,
+        action_logging: menuActionLogging
       }
     })
     setMouseSensitivity(streamingValue)
@@ -394,6 +398,7 @@ const MenuSettingsView = ({ onBack, wide }: MenuSettingsViewProps) => {
     menuPerformanceStats,
     menuInputOverlay,
     menuFrameTimeline,
+    menuActionLogging,
     volume.getAudioSettings,
     saveSettings,
     setMouseSensitivity
@@ -699,6 +704,12 @@ const MenuSettingsView = ({ onBack, wide }: MenuSettingsViewProps) => {
                 label="app.settings.debugMetrics.frameTimeline"
                 checked={menuFrameTimeline}
                 onChange={setMenuFrameTimeline}
+              />
+              <SettingsCheckbox
+                label="app.settings.debugMetrics.actionLogging"
+                description="app.settings.debugMetrics.actionLoggingDescription"
+                checked={menuActionLogging}
+                onChange={setMenuActionLogging}
               />
             </div>
           </SettingsSection>

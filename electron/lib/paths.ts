@@ -35,19 +35,19 @@ export function getUvDir(): string {
   return path.join(getExeDir(), '.uv')
 }
 
-/** Get the base seeds directory (inside engine dir) */
-function getSeedsBaseDir(): string {
-  return path.join(getEngineDir(), 'seeds')
-}
-
-/** Get the default (bundled) seeds directory */
+/** Get the default (bundled) seeds directory — read directly from app resources */
 export function getSeedsDefaultDir(): string {
-  return path.join(getSeedsBaseDir(), 'default')
+  return getResourcePath('seeds')
 }
 
-/** Get the uploads (user) seeds directory */
+/** Get the uploads (user) seeds directory — in user config dir */
 export function getSeedsUploadsDir(): string {
-  return path.join(getSeedsBaseDir(), 'uploads')
+  return path.join(getConfigDir(), 'seeds', 'uploads')
+}
+
+/** Get the thumbnail cache directory — in user config dir */
+export function getSeedsThumbnailDir(): string {
+  return path.join(getConfigDir(), 'seeds', 'thumbnails')
 }
 
 /** Get the config directory (uses Electron's userData) */

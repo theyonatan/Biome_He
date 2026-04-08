@@ -22,10 +22,7 @@ class Stage:
 STARTUP_BEGIN = Stage("startup.begin")
 STARTUP_ENGINE_MANAGER = Stage("startup.world_engine_manager")
 STARTUP_SAFETY_CHECKER = Stage("startup.safety_checker")
-STARTUP_SAFETY_WARMUP = Stage("startup.safety_warmup")
 STARTUP_SAFETY_READY = Stage("startup.safety_ready")
-STARTUP_SEED_STORAGE = Stage("startup.seed_storage")
-STARTUP_SEED_VALIDATION = Stage("startup.seed_validation")
 STARTUP_READY = Stage("startup.ready")
 
 # ── Session — per-client connection lifecycle ──────────────────────────
@@ -45,8 +42,6 @@ SESSION_WARMUP_COMPILE = Stage("session.warmup.compile")
 SESSION_INPAINTING_LOAD = Stage("session.inpainting.load")
 SESSION_INPAINTING_READY = Stage("session.inpainting.ready")
 
-SESSION_SAFETY_LOAD = Stage("session.safety.load")
-SESSION_SAFETY_READY = Stage("session.safety.ready")
 
 SESSION_INIT_RESET = Stage("session.init.reset")
 SESSION_INIT_SEED = Stage("session.init.seed")

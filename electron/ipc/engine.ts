@@ -9,7 +9,6 @@ import { getServerState, stopServerSync } from '../lib/serverState.js'
 import { runUvSyncWithMirroredLogs } from '../lib/uvSync.js'
 import { copyServerComponentFiles } from '../lib/serverFiles.js'
 import { emitToAllWindows } from '../lib/ipcUtils.js'
-import { setupBundledSeeds } from '../lib/seeds.js'
 
 const UV_VERSION = '0.10.9'
 let engineInstallAbortController: AbortController | null = null
@@ -107,9 +106,6 @@ async function reinstallEngine(signal?: AbortSignal): Promise<void> {
     is_stderr: false
   })
   await syncEngineDependencies(signal)
-
-  emitToAllWindows('engine-log', { line: '[ENGINE] Restoring bundled seeds...', is_stderr: false })
-  await setupBundledSeeds()
 
   emitToAllWindows('engine-log', { line: '[ENGINE] Setup complete.', is_stderr: false })
 }

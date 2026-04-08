@@ -102,38 +102,16 @@ class SafetyChecker:
         """Return True if the model should be unloaded after a check."""
         return not self._resident
 
-    def check_image(self, image_path: str) -> Dict[str, any]:
-        """
-        Check single image for NSFW content.
-
-        Args:
-            image_path: Path to image file
-
-        Returns:
-            Same format as check_pil_image(): {'is_safe': bool, 'scores': {...}}
-        """
-        try:
-            img = Image.open(image_path)
-            if img.mode != "RGB":
-                img = img.convert("RGB")
-        except Exception as e:
-            logger.error(f"Failed to load image {image_path}: {e}")
-            return {
-                "is_safe": False,
-                "scores": {"neutral": 0.0, "low": 1.0, "medium": 0.0, "high": 0.0},
-            }
-        return self.check_pil_image(img)
-
     def check_pil_image(self, image: Image.Image) -> Dict[str, any]:
         """
-        Check a PIL image for NSFW content (no file I/O).
+        Check a PIL image for NSFW content.
         Uses the resident device if loaded, otherwise CPU.
 
         Args:
             image: PIL Image to check
 
         Returns:
-            Same format as check_image(): {'is_safe': bool, 'scores': {...}}
+            {'is_safe': bool, 'scores': {'neutral': float, 'low': float, 'medium': float, 'high': float}}
         """
         with self._lock:
             device = self.current_device if self._resident else "cpu"
@@ -152,88 +130,6 @@ class SafetyChecker:
                     "is_safe": False,
                     "scores": {"neutral": 0.0, "low": 1.0, "medium": 0.0, "high": 0.0},
                 }
-            finally:
-                if self._should_unload():
-                    self.unload_model()
-
-    def check_batch(
-        self, image_paths: List[str], batch_size: int = 8
-    ) -> List[Dict[str, any]]:
-        """
-        Check multiple images efficiently with proper batching.
-        Uses GPU for efficient parallel processing.
-
-        Args:
-            image_paths: List of paths to image files
-            batch_size: Number of images to process at once (default 8 to avoid GPU OOM)
-
-        Returns:
-            List of results matching check_image() format
-        """
-        if not image_paths:
-            return []
-
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-
-        with self._lock:
-            self._load_model(device=device)
-
-            try:
-                # First pass: load all images and track which ones failed
-                images = []
-                for path in image_paths:
-                    try:
-                        img = Image.open(path)
-                        # Convert to RGB to handle RGBA/RGB mode differences
-                        if img.mode != "RGB":
-                            img = img.convert("RGB")
-                        images.append(img)
-                    except Exception as e:
-                        logger.error(f"Failed to load image {path}: {e}")
-                        images.append(None)
-
-                # Process valid images in batches
-                valid_images = [img for img in images if img is not None]
-                all_scores = []
-
-                for i in range(0, len(valid_images), batch_size):
-                    batch = valid_images[i : i + batch_size]
-                    batch_scores = self.predict_batch_values(batch, device=device)
-                    all_scores.extend(batch_scores)
-
-                # Build results, matching order of input paths
-                results = []
-                score_idx = 0
-                for img in images:
-                    if img is None:
-                        # Failed to load - mark as unsafe
-                        results.append(
-                            {
-                                "is_safe": False,
-                                "scores": {
-                                    "neutral": 0.0,
-                                    "low": 1.0,
-                                    "medium": 0.0,
-                                    "high": 0.0,
-                                },
-                            }
-                        )
-                    else:
-                        scores = all_scores[score_idx]
-                        results.append({"is_safe": scores["low"] < 0.5, "scores": scores})
-                        score_idx += 1
-
-                return results
-            except Exception as e:
-                logger.error(f"Failed to check batch: {e}")
-                # Return all unsafe on batch failure
-                return [
-                    {
-                        "is_safe": False,
-                        "scores": {"neutral": 0.0, "low": 1.0, "medium": 0.0, "high": 0.0},
-                    }
-                    for _ in image_paths
-                ]
             finally:
                 if self._should_unload():
                     self.unload_model()
