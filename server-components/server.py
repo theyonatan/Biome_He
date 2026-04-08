@@ -804,6 +804,8 @@ async def websocket_endpoint(websocket: WebSocket):
             scene_edit_requested = msg["scene_edit"]
         if "action_logging" in msg:
             action_logging_requested = msg["action_logging"]
+        if "cap_inference_fps" in msg:
+            cap_inference_fps = msg["cap_inference_fps"]
 
         # Sync action logger with requested state during gameplay
         if is_game_loop:
@@ -847,6 +849,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
     scene_edit_requested = False
     action_logging_requested = False
+    cap_inference_fps = True
     action_logger: ActionLogger | None = None
     current_seed_hash: str | None = None
     current_seed_filename: str | None = None
@@ -1265,7 +1268,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 """JPEG-encode + queue pending CPU frames."""
                 if not _flush_pending.work:
                     return
-                cpu_frames, gen_time, n_frames, client_ts, t0, t_infer, t_sync = _flush_pending.work
+                cpu_frames, gen_time, n_frames, client_ts, t_infer_start, t_infer, t_sync = _flush_pending.work
                 _flush_pending.work = None
 
                 t_enc_start = time.perf_counter()
@@ -1280,7 +1283,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     session.frame_count += 1
                     t_queued = time.perf_counter()
                     profile = {
-                        "t_infer_ms": round((t_infer - t0) * 1000, 1),
+                        "t_infer_ms": round((t_infer - t_infer_start) * 1000, 1),
                         "t_sync_ms": round((t_sync - t_infer) * 1000, 1),
                         "t_enc_ms": round((t_enc - t_enc_start) * 1000, 1),
                         "t_metrics_ms": round((t_metrics - t_enc) * 1000, 1),
@@ -1295,6 +1298,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
             _flush_pending.work = None
             _gen_was_paused = False
+            next_frame_time = 0.0  # perf_counter target for frame pacing
 
             while running:
                 if paused:
@@ -1303,6 +1307,7 @@ async def websocket_endpoint(websocket: WebSocket):
                         _action_logger_end_segment()
                         _gen_was_paused = True
                     time.sleep(0.01)
+                    next_frame_time = 0.0
                     continue
 
                 if _gen_was_paused:
@@ -1310,12 +1315,24 @@ async def websocket_endpoint(websocket: WebSocket):
                     _action_logger_new_segment()
 
                 try:
+                    # Start frame timer before pacing sleep so gen_time
+                    # reflects actual frame-to-frame throughput.
+                    t0 = time.perf_counter()
+
+                    # Frame pacing: sleep until target time, just before
+                    # reading input, so we use the freshest controls.
+                    if cap_inference_fps and next_frame_time > 0.0:
+                        sleep_time = next_frame_time - time.perf_counter()
+                        if sleep_time > 0.001:
+                            time.sleep(sleep_time)
+
                     if prompt_pending is not None:
                         _flush_pending()
                         world_engine.current_prompt = prompt_pending
                         prompt_pending = None
                         run_coro(reset_engine())
                         _action_logger_new_segment()
+                        next_frame_time = 0.0
 
                     if reset_flag or session.frame_count >= session.max_frames:
                         _flush_pending()
@@ -1324,6 +1341,7 @@ async def websocket_endpoint(websocket: WebSocket):
                         run_coro(reset_engine())
                         reset_flag = False
                         _action_logger_new_segment()
+                        next_frame_time = 0.0
 
                     # Handle pending scene edit — runs inpainting on the last
                     # subframe from the most recent gen_frame, then appends.
@@ -1371,7 +1389,17 @@ async def websocket_endpoint(websocket: WebSocket):
                     # client_ts is a performance.now() timestamp from the browser;
                     # we can't compare clocks, but we CAN forward it so the client
                     # can measure the full round-trip on its own clock.
-                    t0 = time.perf_counter()
+                    t_infer_start = time.perf_counter()
+
+                    # Advance frame pacing target for next iteration.
+                    if cap_inference_fps:
+                        fps = world_engine.inference_fps
+                        if fps > 0:
+                            frame_interval = world_engine.n_frames / fps
+                            if next_frame_time == 0.0:
+                                next_frame_time = t_infer_start + frame_interval
+                            else:
+                                next_frame_time = max(t_infer_start, next_frame_time) + frame_interval
 
                     # Submit inference to CUDA thread (non-blocking) so we can
                     # overlap JPEG encoding of the previous batch with GPU work.
@@ -1405,7 +1433,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     last_generated_cpu_frames = cpu_frames
 
                     # Stash this batch's CPU frames for deferred JPEG encoding
-                    _flush_pending.work = (cpu_frames, gen_time, n_frames, client_ts, t0, t_infer, t_sync)
+                    _flush_pending.work = (cpu_frames, gen_time, n_frames, client_ts, t_infer_start, t_infer, t_sync)
 
                 except Exception as cuda_err:
                     _flush_pending.work = None

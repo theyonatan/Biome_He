@@ -154,9 +154,17 @@ const en = {
           fixInPlace: 'Fix In Place',
           totalReinstall: 'Total Reinstall'
         },
+        performance: {
+          title: 'Performance Settings',
+          description: "want to dial in the model's performance?",
+          quantization: 'Quantization',
+          quantizationDescription:
+            'Reduces model precision for faster inference and lower memory usage, at the cost of some visual quality.',
+          capInferenceFps: 'Cap Inference FPS',
+          capInferenceFpsDescription:
+            "Limits the generation rate to the model's trained framerate. Without this, the game may run faster than intended."
+        },
         quantization: {
-          title: 'Quantization',
-          description: 'trade a little quality for faster speed and lower memory?',
           none: 'None (full precision)',
           fp8w8a8: 'FP8 W8A8',
           intw8a8: 'INT8 W8A8'

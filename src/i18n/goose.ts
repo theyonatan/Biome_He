@@ -155,9 +155,17 @@ const goose = {
           fixInPlace: 'Preen in place',
           totalReinstall: 'Full molt'
         },
+        performance: {
+          title: 'Waddle Tuning',
+          description: "want to dial in the goose's waddle?",
+          quantization: 'Feather compression',
+          quantizationDescription:
+            'Plucks a few feathers for faster waddling with less nest space, at the cost of some plumage quality.',
+          capInferenceFps: 'Cap honk rate',
+          capInferenceFpsDescription:
+            "Limits the waddling rate to the flock's trained pace. Turning this off may result in the goose waddling faster than intended."
+        },
         quantization: {
-          title: 'Feather compression',
-          description: 'pluck a few feathers to waddle faster with less nest space?',
           none: 'None (full plumage)',
           fp8w8a8: 'FP8 W8A8',
           intw8a8: 'INT8 W8A8'

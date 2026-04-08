@@ -153,9 +153,17 @@ const ja = {
           fixInPlace: 'その場で修復',
           totalReinstall: '完全再インストール'
         },
+        performance: {
+          title: 'パフォーマンス設定',
+          description: 'モデルのパフォーマンスを調整しますか？',
+          quantization: '量子化',
+          quantizationDescription:
+            'モデルの精度を下げて推論速度を向上させ、メモリ使用量を削減します。画質がわずかに低下します。',
+          capInferenceFps: '推論FPSを制限',
+          capInferenceFpsDescription:
+            'モデルの学習フレームレートに合わせて生成速度を制限します。オフにすると、ゲーム速度が意図より速くなる場合があります。'
+        },
         quantization: {
-          title: '量子化',
-          description: '速度とメモリを優先して、少しだけ品質を下げますか？',
           none: 'なし（最高精度）',
           fp8w8a8: 'FP8 W8A8',
           intw8a8: 'INT8 W8A8'

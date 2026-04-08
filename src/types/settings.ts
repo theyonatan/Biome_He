@@ -43,6 +43,7 @@ export const settingsSchema = z.object({
   engine_mode: z.enum(['standalone', 'server']).default('standalone'),
   engine_model: z.string().default(DEFAULT_WORLD_ENGINE_MODEL),
   engine_quant: z.enum(QUANT_OPTIONS).default('none'),
+  cap_inference_fps: z.boolean().default(true),
   custom_models: z.array(z.string()).default([]),
   mouse_sensitivity: z.number().min(0.1).max(3.0).default(1.0),
   pinned_scenes: z.array(z.string()).default(DEFAULT_PINNED_SCENES),

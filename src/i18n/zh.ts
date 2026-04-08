@@ -148,9 +148,15 @@ const zh = {
           fixInPlace: '原地修复',
           totalReinstall: '全部重装'
         },
+        performance: {
+          title: '性能设置',
+          description: '想要调整模型的性能吗？',
+          quantization: '量化',
+          quantizationDescription: '降低模型精度以加快推理速度并减少显存占用，但会略微降低画质。',
+          capInferenceFps: '限制推理帧率',
+          capInferenceFpsDescription: '将生成速率限制为模型的训练帧率。关闭此选项可能导致游戏速度快于预期。'
+        },
         quantization: {
-          title: '量化',
-          description: '用少许画质换取更快的速度和更低的显存占用？',
           none: '无（最高精度）',
           fp8w8a8: 'FP8 W8A8',
           intw8a8: 'INT8 W8A8'

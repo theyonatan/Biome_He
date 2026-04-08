@@ -21,6 +21,7 @@ export type InitMessage = {
   scene_edit?: boolean
   action_logging?: boolean
   quant?: string
+  cap_inference_fps?: boolean
 }
 export type InitResponse = {
   gpu_name: string | null

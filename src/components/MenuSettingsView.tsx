@@ -100,6 +100,7 @@ const MenuSettingsView = ({ onBack, wide }: MenuSettingsViewProps) => {
   const [showCredits, setShowCredits] = useState(false)
 
   const [menuQuant, setMenuQuant] = useState<QuantOption>(settings.engine_quant ?? 'none')
+  const [menuCapInferenceFps, setMenuCapInferenceFps] = useState(() => settings.cap_inference_fps ?? true)
   const [menuKeybindings, setMenuKeybindings] = useState<Keybindings>(() => ({ ...settings.keybindings }))
   const [menuSceneEditEnabled, setMenuSceneEditEnabled] = useState(
     () => settings.experimental?.scene_edit_enabled ?? false
@@ -357,6 +358,7 @@ const MenuSettingsView = ({ onBack, wide }: MenuSettingsViewProps) => {
       engine_mode: engineModeValue,
       engine_model: menuWorldModel,
       engine_quant: menuQuant,
+      cap_inference_fps: menuCapInferenceFps,
       mouse_sensitivity: streamingValue,
       keybindings: menuKeybindings,
       audio: volume.getAudioSettings(),
@@ -380,6 +382,7 @@ const MenuSettingsView = ({ onBack, wide }: MenuSettingsViewProps) => {
     menuServerUrl,
     menuWorldModel,
     menuQuant,
+    menuCapInferenceFps,
     menuKeybindings,
     menuSceneEditEnabled,
     menuPerformanceStats,
@@ -572,15 +575,28 @@ const MenuSettingsView = ({ onBack, wide }: MenuSettingsViewProps) => {
             )}
           </SettingsSection>
 
-          <SettingsSection title="app.settings.quantization.title" description="app.settings.quantization.description">
-            <SettingsSelect
-              options={availableQuantOptions.map((q) => ({
-                value: q,
-                label: `app.settings.quantization.${q}` as const
-              }))}
-              value={menuQuant}
-              onChange={(v) => setMenuQuant(v as QuantOption)}
-            />
+          <SettingsSection title="app.settings.performance.title" description="app.settings.performance.description">
+            <div className="flex flex-col gap-[1cqh]">
+              <SettingsRow
+                label={t('app.settings.performance.quantization')}
+                hint={t('app.settings.performance.quantizationDescription')}
+              >
+                <SettingsSelect
+                  options={availableQuantOptions.map((q) => ({
+                    value: q,
+                    label: `app.settings.quantization.${q}` as const
+                  }))}
+                  value={menuQuant}
+                  onChange={(v) => setMenuQuant(v as QuantOption)}
+                />
+              </SettingsRow>
+              <SettingsCheckbox
+                label="app.settings.performance.capInferenceFps"
+                description="app.settings.performance.capInferenceFpsDescription"
+                checked={menuCapInferenceFps}
+                onChange={setMenuCapInferenceFps}
+              />
+            </div>
           </SettingsSection>
 
           <SettingsSection title="app.settings.language.title" description="app.settings.language.description">

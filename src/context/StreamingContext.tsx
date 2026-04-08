@@ -256,7 +256,8 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
         seed_filename: seedFilename,
         scene_edit: settings.experimental?.scene_edit_enabled ?? false,
         action_logging: settings.debug_overlays?.action_logging ?? false,
-        quant: quant !== 'none' ? quant : undefined
+        quant: quant !== 'none' ? quant : undefined,
+        cap_inference_fps: settings.cap_inference_fps ?? true
       })
       setInitMetrics(metrics)
     }
@@ -268,6 +269,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     isConnected,
     settings?.engine_model,
     settings?.engine_quant,
+    settings?.cap_inference_fps,
     settings.experimental?.scene_edit_enabled,
     settings.debug_overlays?.action_logging,
     sendInit,
@@ -289,6 +291,14 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
       log.error('Failed to toggle action logging:', err)
     )
   }, [isStreaming, isConnected, settings.debug_overlays?.action_logging, sendInit])
+
+  // Live-toggle inference FPS cap during streaming without a full re-bootstrap
+  useEffect(() => {
+    if (!isStreaming || !isConnected) return
+    sendInit({ cap_inference_fps: settings.cap_inference_fps ?? true }).catch((err) =>
+      log.error('Failed to toggle inference FPS cap:', err)
+    )
+  }, [isStreaming, isConnected, settings.cap_inference_fps, sendInit])
 
   // Pointer lock controls
   const requestPointerLock = useCallback(() => {
