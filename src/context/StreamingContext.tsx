@@ -270,6 +270,14 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [isConnected, setPlaceholderFrame])
 
+  // Live-toggle action logging during streaming without a full re-bootstrap
+  useEffect(() => {
+    if (!isStreaming || !isConnected) return
+    sendInit({ action_logging: settings.debug_overlays?.action_logging ?? false }).catch((err) =>
+      log.error('Failed to toggle action logging:', err)
+    )
+  }, [isStreaming, isConnected, settings.debug_overlays?.action_logging, sendInit])
+
   // Pointer lock controls
   const requestPointerLock = useCallback(() => {
     if (connectionLost) {

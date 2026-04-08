@@ -790,7 +790,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
     async def handle_init(msg: dict, is_game_loop: bool = False) -> bool:
         """Handle unified init message — apply deltas for model, seed, flags."""
-        nonlocal scene_edit_requested, action_logging_requested
+        nonlocal scene_edit_requested, action_logging_requested, action_logger
 
         model_uri = (msg.get("model") or "").strip()
         seed_data = msg.get("seed_image_data")
@@ -802,6 +802,23 @@ async def websocket_endpoint(websocket: WebSocket):
             scene_edit_requested = msg["scene_edit"]
         if "action_logging" in msg:
             action_logging_requested = msg["action_logging"]
+
+        # Sync action logger with requested state during gameplay
+        if is_game_loop:
+            if action_logging_requested and action_logger is None:
+                action_logger = ActionLogger(client_host)
+                action_logger.new_segment(
+                    model=getattr(world_engine, "model_uri", None),
+                    seed=current_seed_filename,
+                    n_frames=world_engine.n_frames,
+                    seed_target_size=world_engine.seed_target_size,
+                    has_prompt_conditioning=getattr(world_engine, "has_prompt_conditioning", False),
+                )
+                logger.info(f"[{client_host}] Action logging enabled")
+            elif not action_logging_requested and action_logger is not None:
+                action_logger.end_segment()
+                action_logger = None
+                logger.info(f"[{client_host}] Action logging disabled")
 
         # Model delta
         model_changed = False
