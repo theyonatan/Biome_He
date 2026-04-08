@@ -20,7 +20,7 @@ export const DEFAULT_STANDALONE_URL = localhostUrl(STANDALONE_PORT)
 
 export const DEFAULT_PINNED_SCENES = [
   'default.jpg',
-  'crystal_desert_blade.jpg',
+  'mountain_ruins_gun.jpg',
   'enchanted_swamp_torch.jpg',
   'shattered_cockpit_nebula.jpg',
   'sunken_city_depths.jpg'
