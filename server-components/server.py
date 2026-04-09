@@ -824,10 +824,11 @@ async def websocket_endpoint(websocket: WebSocket):
                 action_logger = None
                 logger.info(f"[{client_host}] Action logging disabled")
 
-        # Model delta
+        # Model delta — reload if model URI or quantization changed
         model_changed = False
-        if model_uri and model_uri != getattr(world_engine, "model_uri", None):
-            logger.info(f"[{client_host}] {'Live model switch' if is_game_loop else 'Requested model'}: {model_uri}")
+        quant_changed = "quant" in msg and quant != getattr(world_engine, "quant", None)
+        if model_uri and (model_uri != getattr(world_engine, "model_uri", None) or quant_changed):
+            logger.info(f"[{client_host}] {'Live model switch' if is_game_loop else 'Requested model'}: {model_uri} (quant={quant})")
             world_engine.set_progress_callback(progress_callback, asyncio.get_running_loop())
             await world_engine.load_engine(model_uri, quant=quant)
             world_engine.set_progress_callback(None)
