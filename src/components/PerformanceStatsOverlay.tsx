@@ -89,14 +89,6 @@ const PerformanceStatsOverlay = () => {
   const prevLatentGenMsRef = useRef(latentGenMs)
   const prevLatencyRef = useRef(inputLatency)
 
-  // Track latent frame count for rollout time — resets when frameId drops (new seed)
-  const latentFrameCountRef = useRef(0)
-  const prevFrameIdRef = useRef(frameId)
-  if (frameId < prevFrameIdRef.current) {
-    latentFrameCountRef.current = 0
-  }
-  prevFrameIdRef.current = frameId
-
   // Push GPU metrics into ring buffers when they update
   if (serverMetrics && serverMetrics !== prevMetricsRef.current) {
     prevMetricsRef.current = serverMetrics
@@ -107,7 +99,6 @@ const PerformanceStatsOverlay = () => {
   // Accumulate per-latent-pass gen times for sparklines and distribution stats
   if (latentGenMs !== null && latentGenMs !== prevLatentGenMsRef.current) {
     prevLatentGenMsRef.current = latentGenMs
-    latentFrameCountRef.current++
     genBuf.push(latentGenMs)
     fpsBuf.push(perceivedFps)
     lfpsBuf.push(latentFps)
@@ -147,7 +138,7 @@ const PerformanceStatsOverlay = () => {
       <Row label="MDL" value={m?.model || '\u2014'} color={COLOR_WARM} />
       <Row
         label="ROLL"
-        value={formatElapsed((latentFrameCountRef.current * nFrames) / (m?.inferenceFps ?? 60))}
+        value={`${formatElapsed(frameId / (m?.inferenceFps ?? 60))} (${frameId}f)`}
         color={COLOR_HUD}
         className="mb-[0.4cqh]"
       />
