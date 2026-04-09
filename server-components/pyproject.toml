@@ -3,7 +3,7 @@ name = "biome-server"
 version = "1.0.0-rc3"
 requires-python = "==3.12.*"
 dependencies = [
-  "world-engine @ https://github.com/Overworldai/world_engine/archive/refs/tags/1.5.2.zip",
+  "world-engine @ https://github.com/Overworldai/world_engine/archive/refs/tags/1.5.3.zip",
   "torch==2.10.0",
   "torchvision==0.25.0",
   "pillow==12.2.0",
