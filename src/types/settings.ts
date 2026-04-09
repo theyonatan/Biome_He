@@ -45,7 +45,7 @@ export const settingsSchema = z.object({
   engine_quant: z.enum(QUANT_OPTIONS).default('none'),
   cap_inference_fps: z.boolean().default(true),
   custom_models: z.array(z.string()).default([]),
-  mouse_sensitivity: z.number().min(0.1).max(3.0).default(1.0),
+  mouse_sensitivity: z.number().min(0.1).max(3.0).default(1.8),
   pinned_scenes: z.array(z.string()).default(DEFAULT_PINNED_SCENES),
   keybindings: z
     .object({
