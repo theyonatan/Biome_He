@@ -1336,9 +1336,15 @@ async def websocket_endpoint(websocket: WebSocket):
                         _action_logger_new_segment()
                         next_frame_time = 0.0
 
-                    if reset_flag or session.perceptual_frame_count >= session.max_perceptual_frames:
+                    # Auto-reset at context length limit (single-frame models only;
+                    # multiframe models don't support mid-session reset).
+                    auto_reset = (
+                        not world_engine.is_multiframe
+                        and session.perceptual_frame_count >= session.max_perceptual_frames
+                    )
+                    if reset_flag or auto_reset:
                         _flush_pending()
-                        if session.perceptual_frame_count >= session.max_perceptual_frames:
+                        if auto_reset:
                             logger.info(f"[{client_host}] Auto-reset at frame limit")
                         run_coro(reset_engine())
                         reset_flag = False
