@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from 'react'
+import { useRef, useState, type ChangeEvent, type DragEvent } from 'react'
 import type { SeedRecord } from '../types/app'
-import SceneCard from './SceneCard'
+import SceneGrid from './SceneGrid'
 import MenuButton from './ui/MenuButton'
 import RawSettingsButton from './ui/RawSettingsButton'
 import { VIEW_DESCRIPTION, VIEW_HEADING } from '../styles'
@@ -42,29 +42,6 @@ const PauseScenesView = ({
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const dragDepthRef = useRef(0)
   const [isDragActive, setIsDragActive] = useState(false)
-
-  useEffect(() => {
-    if (!ALLOW_USER_SCENES) return
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      const isPasteShortcut = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'v'
-      if (!isPasteShortcut) return
-
-      const target = event.target as HTMLElement | null
-      if (
-        target &&
-        (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target.isContentEditable)
-      ) {
-        return
-      }
-
-      event.preventDefault()
-      void onClipboardUpload()
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onClipboardUpload])
 
   const hasImagePayload = (event: DragEvent<HTMLDivElement>): boolean => {
     const dt = event.dataTransfer
@@ -155,9 +132,18 @@ const PauseScenesView = ({
         {ALLOW_USER_SCENES && (
           <input ref={fileInputRef} type="file" accept="image/*" onChange={onImageUpload} style={{ display: 'none' }} />
         )}
-        <div className="styled-scrollbar overflow-y-auto pr-[0.8cqh] max-h-[62cqh] mt-[1.1cqh] relative z-[4]">
-          <div className="grid grid-cols-[repeat(auto-fill,25.78cqh)] gap-[1.28cqh] w-full">
-            {ALLOW_USER_SCENES && (
+        <SceneGrid
+          seeds={seeds}
+          thumbnails={thumbnails}
+          pinnedSceneIds={pinnedSceneIds}
+          pinVariant="toggle"
+          selectCooldown={selectCooldown}
+          onSelect={onSceneSelect}
+          onTogglePin={onTogglePin}
+          onRemove={onRemoveScene}
+          className="relative z-[4]"
+          before={
+            ALLOW_USER_SCENES && (
               <div
                 className={`relative w-full aspect-video border border-[rgba(245,249,255,0.84)] bg-[rgba(248,248,245,0.14)] p-0 overflow-hidden grid grid-cols-2 ${uploadingImage ? 'opacity-60 pointer-events-none' : ''}`}
               >
@@ -202,22 +188,9 @@ const PauseScenesView = ({
                   </svg>
                 </RawSettingsButton>
               </div>
-            )}
-            {seeds.map((seed) => (
-              <SceneCard
-                key={`scene-${seed.filename}`}
-                seed={seed}
-                thumbnailSrc={thumbnails[seed.filename]}
-                isPinned={pinnedSceneIds.includes(seed.filename)}
-                pinVariant="toggle"
-                selectCooldown={selectCooldown}
-                onSelect={onSceneSelect}
-                onTogglePin={onTogglePin}
-                onRemove={onRemoveScene}
-              />
-            ))}
-          </div>
-        </div>
+            )
+          }
+        />
       </section>
       <MenuButton
         variant="primary"
