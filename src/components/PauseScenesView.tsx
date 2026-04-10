@@ -3,7 +3,7 @@ import type { SeedRecord } from '../types/app'
 import SceneCard from './SceneCard'
 import MenuButton from './ui/MenuButton'
 import RawSettingsButton from './ui/RawSettingsButton'
-import { HEADING_BASE } from '../styles'
+import { VIEW_DESCRIPTION, VIEW_HEADING } from '../styles'
 import { ALLOW_USER_SCENES } from '../constants'
 import { useTranslation } from 'react-i18next'
 
@@ -144,10 +144,8 @@ const PauseScenesView = ({
         </div>
       )}
       <section className="absolute top-[var(--edge-top-xl)] left-[var(--edge-left)] w-[92%] z-[3] flex flex-col">
-        <h2 className={`${HEADING_BASE} text-heading text-text-primary font-normal text-left`}>
-          {t('app.pause.scenes.title')}
-        </h2>
-        <p className="m-0 font-serif text-caption text-text-muted max-w-[103.12cqh] text-left">
+        <h2 className={VIEW_HEADING}>{t('app.pause.scenes.title')}</h2>
+        <p className={VIEW_DESCRIPTION}>
           {t('app.pause.scenes.description', { count: seeds.length })}
           {ALLOW_USER_SCENES && ` ${t('app.pause.scenes.uploadHint')}`}
         </p>

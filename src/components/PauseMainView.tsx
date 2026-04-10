@@ -3,7 +3,7 @@ import SceneCard from './SceneCard'
 import SocialCtaRow from './SocialCtaRow'
 import ViewLabel from './ui/ViewLabel'
 import MenuButton from './ui/MenuButton'
-import { HEADING_BASE } from '../styles'
+import { VIEW_DESCRIPTION, VIEW_HEADING } from '../styles'
 import { ALLOW_USER_SCENES } from '../constants'
 import { useTranslation } from 'react-i18next'
 
@@ -44,12 +44,8 @@ const PauseMainView = ({
       <SocialCtaRow />
 
       <section className="absolute top-[var(--edge-top-xl)] left-[var(--edge-left)] w-[77%] flex flex-col">
-        <h2 className={`${HEADING_BASE} text-heading text-text-primary font-normal text-left`}>
-          {t('app.pause.pinnedScenes.title')}
-        </h2>
-        <p className="m-0 font-serif text-caption text-text-muted max-w-[103.12cqh] text-left">
-          {t('app.pause.pinnedScenes.description', { suffix })}
-        </p>
+        <h2 className={VIEW_HEADING}>{t('app.pause.pinnedScenes.title')}</h2>
+        <p className={VIEW_DESCRIPTION}>{t('app.pause.pinnedScenes.description', { suffix })}</p>
         <div className="styled-scrollbar overflow-y-auto pr-[0.8cqh] max-h-[62cqh] mt-[1.1cqh]">
           <div className="grid grid-cols-[repeat(auto-fill,25.78cqh)] gap-[1.28cqh] w-full">
             {pinnedScenes.length > 0 ? (
