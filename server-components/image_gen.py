@@ -1,6 +1,7 @@
 """
-Scene editing module - Uses FLUX.2 Klein 4B for reference-based image editing,
-with Qwen3.5 vision (via llama.cpp) to construct an edit-aware prompt grounded in the frame.
+Image generation module - Uses FLUX.2 Klein 4B for reference-based image editing
+and text-to-image generation, with Qwen3.5 vision (via llama.cpp) for prompt
+construction and content sanitisation.
 """
 
 import asyncio
@@ -18,16 +19,18 @@ from qwen_tool_parser import parse_tool_calls
 
 logger = logging.getLogger(__name__)
 
-SAFETY_REJECTION_MESSAGE_ID = "app.server.error.sceneEditSafetyRejected"
+SCENE_EDIT_SAFETY_MESSAGE_ID = "app.server.error.sceneEditSafetyRejected"
+GENERATE_SCENE_SAFETY_MESSAGE_ID = "app.server.error.generateSceneSafetyRejected"
 
 
 class SafetyRejectionError(RuntimeError):
-    """Raised when a scene edit is rejected by the VLM or output safety checker."""
+    """Raised when image generation/editing is rejected by the VLM or output safety checker."""
 
-    message_id: str = SAFETY_REJECTION_MESSAGE_ID
+    message_id: str
 
-    def __init__(self):
-        super().__init__(SAFETY_REJECTION_MESSAGE_ID)
+    def __init__(self, message_id: str = SCENE_EDIT_SAFETY_MESSAGE_ID):
+        self.message_id = message_id
+        super().__init__(message_id)
 
 # ── Edit model configuration ────────────────────────────────────────
 EDIT_MODEL_ID = "black-forest-labs/FLUX.2-klein-4B"
@@ -40,9 +43,40 @@ VLM_GGUF_REPO = "unsloth/Qwen3.5-4B-GGUF"
 VLM_GGUF_FILE = "Qwen3.5-4B-UD-Q5_K_XL.gguf"
 VLM_MMPROJ_FILE = "mmproj-F16.gguf"
 VLM_CTX_SIZE = 4096
-VLM_MAX_TOKENS = 768  # Enough for thinking + tool call, prevents overthinking
+VLM_MAX_TOKENS = 1024  # Enough for thinking + tool call, prevents overthinking
 VLM_MAX_RETRIES = 3  # Retry tool-call parsing up to this many times
 VLM_IMAGE_MAX_SIZE = 384  # Downscale frame to this max dimension before sending to VLM
+
+VLM_TOOL_CALL_SUFFIX = (
+    "You MUST call one of these tools:\n\n"
+    "To submit an edit instruction:\n"
+    "<tool_call>\n"
+    "<function=submit_edit_instruction>\n"
+    "<parameter=instruction>YOUR INSTRUCTION HERE</parameter>\n"
+    "</function>\n"
+    "</tool_call>\n\n"
+    "To reject an unsafe request:\n"
+    "<tool_call>\n"
+    "<function=reject_request>\n"
+    "</function>\n"
+    "</tool_call>"
+)
+
+VLM_CONTENT_POLICY = (
+    "CONTENT POLICY: You MUST sanitize the user's request before "
+    "producing the instruction.\n"
+    "   - COPYRIGHTED CHARACTERS/IP: Replace any named copyrighted "
+    "characters, brands, or intellectual property with generic "
+    "equivalents. E.g. 'Master Chief' → 'armored sci-fi soldier', "
+    "'Pikachu' → 'small yellow electric creature', 'Coca-Cola' → "
+    "'red soda can'.\n"
+    "   - NUDITY/SEXUAL CONTENT: Remove or replace any request for "
+    "nudity or sexual content with a clothed/appropriate equivalent. "
+    "Violence (weapons, combat, monsters) is acceptable.\n"
+    "   - If the ENTIRE request is only about NSFW "
+    "content with no salvageable intent, call the reject_request "
+    "tool instead of submit_edit_instruction."
+)
 
 VLM_SYSTEM_PROMPT = (
     "You write image editing instructions for an AI image editor. "
@@ -59,19 +93,7 @@ VLM_SYSTEM_PROMPT = (
     "3. SCENE ELEMENTS (buildings, creatures, weather): Place naturally "
     "in the environment.\n"
     "4. STYLE/MOOD changes: Describe the transformation clearly.\n"
-    "5. CONTENT POLICY: You MUST sanitize the user's request before "
-    "producing the edit instruction.\n"
-    "   - COPYRIGHTED CHARACTERS/IP: Replace any named copyrighted "
-    "characters, brands, or intellectual property with generic "
-    "equivalents. E.g. 'Master Chief' → 'armored sci-fi soldier', "
-    "'Pikachu' → 'small yellow electric creature', 'Coca-Cola' → "
-    "'red soda can'.\n"
-    "   - NUDITY/SEXUAL CONTENT: Remove or replace any request for "
-    "nudity or sexual content with a clothed/appropriate equivalent. "
-    "Violence (weapons, combat, monsters) is acceptable.\n"
-    "   - If the ENTIRE request is only about NSFW "
-    "content with no salvageable intent, call the reject_request "
-    "tool instead of submit_edit_instruction.\n\n"
+    f"5. {VLM_CONTENT_POLICY}\n\n"
     "EXAMPLES:\n"
     '- User: "sword" → "Add a glowing sword held in a right hand in '
     'the bottom-right corner of the frame, as in a first-person game. '
@@ -89,18 +111,38 @@ VLM_SYSTEM_PROMPT = (
     "Always end with 'Keep everything else unchanged.'\n\n"
     "IMPORTANT: Be concise. Think briefly (2-3 sentences max), then "
     "immediately submit your instruction. Do not deliberate at length.\n\n"
-    "You MUST call one of these tools:\n\n"
-    "To submit an edit instruction:\n"
-    "<tool_call>\n"
-    "<function=submit_edit_instruction>\n"
-    "<parameter=instruction>YOUR INSTRUCTION HERE</parameter>\n"
-    "</function>\n"
-    "</tool_call>\n\n"
-    "To reject an unsafe request:\n"
-    "<tool_call>\n"
-    "<function=reject_request>\n"
-    "</function>\n"
-    "</tool_call>"
+    + VLM_TOOL_CALL_SUFFIX
+)
+
+VLM_GENERATE_SYSTEM_PROMPT = (
+    "You write text-to-image prompts for an AI image generator. "
+    "The generator will create an image from scratch based on your "
+    "description. Write a detailed, vivid description of the COMPLETE "
+    "scene to generate.\n\n"
+    "The image will be used as a starting frame for a first-person "
+    "game world. Follow these rules:\n\n"
+    "1. Describe the scene from a FIRST-PERSON perspective.\n"
+    "2. Include environment details: setting, lighting, atmosphere, "
+    "key objects, and mood.\n"
+    "3. ALWAYS include a handheld item held in a right hand at the "
+    "bottom-right of the frame, as in a first-person game. A gun or "
+    "weapon is preferred, but tools, sticks, or other items fitting "
+    "the scene are also fine. Pick something that matches the setting.\n"
+    f"4. {VLM_CONTENT_POLICY}\n\n"
+    "EXAMPLES:\n"
+    '- User: "underwater city" → "A vibrant underwater city seen from '
+    "a first-person perspective. Bioluminescent coral buildings rise "
+    "from the ocean floor, schools of colorful fish swim between "
+    "towering structures. Shafts of sunlight pierce through the deep "
+    'blue water. The scene is rich with marine life and ancient ruins."\n'
+    '- User: "space station" → "Interior of a futuristic space station '
+    "corridor seen from first-person perspective. Metallic walls with "
+    "glowing blue panels, a large viewport showing stars and a distant "
+    "planet. Emergency lights cast a warm amber glow. The corridor "
+    'stretches ahead with sealed bulkhead doors."\n\n'
+    "IMPORTANT: Be concise. Think briefly (2-3 sentences max), then "
+    "immediately submit your instruction. Do not deliberate at length.\n\n"
+    + VLM_TOOL_CALL_SUFFIX
 )
 
 
@@ -112,7 +154,7 @@ def _pil_to_data_uri(image: Image.Image) -> str:
     return f"data:image/png;base64,{b64}"
 
 
-class InpaintingManager:
+class ImageGenManager:
     """Manages FLUX.2 Klein (editing) + Qwen3.5 (vision-language) for scene editing."""
 
     def __init__(self, cuda_executor):
@@ -201,7 +243,7 @@ class InpaintingManager:
         self.pipeline = pipe
 
     @staticmethod
-    def _parse_edit_instruction(text: str) -> str:
+    def _parse_edit_instruction(text: str, safety_message_id: str = SCENE_EDIT_SAFETY_MESSAGE_ID) -> str:
         """Extract the 'instruction' from a submit_edit_instruction tool call.
 
         Raises SafetyRejectionError if a reject_request tool call is found.
@@ -210,13 +252,63 @@ class InpaintingManager:
         tool_calls = parse_tool_calls(text)
         for call in tool_calls:
             if call.name == "reject_request":
-                raise SafetyRejectionError()
+                raise SafetyRejectionError(safety_message_id)
             if call.name == "submit_edit_instruction":
                 instruction = call.arguments.get("instruction", "")
                 if instruction:
                     return instruction
         raise ValueError(
             f"No submit_edit_instruction tool call with an instruction found in: {text!r}"
+        )
+
+    def _run_vlm(
+        self,
+        messages: list[dict],
+        log_prefix: str,
+        safety_message_id: str = SCENE_EDIT_SAFETY_MESSAGE_ID,
+    ) -> str:
+        """Run the VLM with retries, parse a tool call, return the instruction.
+
+        Raises SafetyRejectionError if the VLM calls reject_request.
+        Raises RuntimeError after VLM_MAX_RETRIES failed attempts.
+        """
+        last_error = None
+        for attempt in range(1, VLM_MAX_RETRIES + 1):
+            t0 = time.perf_counter()
+            result = self.vlm.create_chat_completion(
+                messages=messages,
+                max_tokens=VLM_MAX_TOKENS,
+                temperature=1.0,
+                top_p=0.95,
+                top_k=20,
+                min_p=0.0,
+                present_penalty=1.5,
+                repeat_penalty=1.0,
+            )
+            elapsed_ms = (time.perf_counter() - t0) * 1000
+
+            raw_output = result["choices"][0]["message"]["content"] or ""
+            logger.info(
+                f"[{log_prefix}] VLM raw (attempt {attempt}, {elapsed_ms:.0f}ms): {raw_output}"
+            )
+
+            # Strip thinking block — the model wraps reasoning in
+            # <think>...</think> which confuses the tool call parser.
+            if "</think>" in raw_output:
+                raw_output = raw_output.split("</think>", 1)[1]
+
+            try:
+                prompt = self._parse_edit_instruction(raw_output, safety_message_id)
+                logger.info(f"[{log_prefix}] Prompt: {prompt}")
+                return prompt
+            except ValueError as exc:
+                last_error = exc
+                logger.warning(
+                    f"[{log_prefix}] Tool call parse failed (attempt {attempt}/{VLM_MAX_RETRIES}): {exc}"
+                )
+
+        raise RuntimeError(
+            f"VLM failed to produce a valid tool call after {VLM_MAX_RETRIES} attempts: {last_error}"
         )
 
     def _build_edit_prompt(self, frame_pil: Image.Image, user_request: str) -> str:
@@ -246,40 +338,27 @@ class InpaintingManager:
                 ],
             },
         ]
+        return self._run_vlm(messages, "SCENE_EDIT", SCENE_EDIT_SAFETY_MESSAGE_ID)
 
-        last_error = None
-        for attempt in range(1, VLM_MAX_RETRIES + 1):
-            t0 = time.perf_counter()
-            result = self.vlm.create_chat_completion(
-                messages=messages,
-                max_tokens=VLM_MAX_TOKENS,
-                temperature=1.0,
-                top_p=0.95,
-                top_k=20,
-                min_p=0.0,
-                present_penalty=1.5,
-                repeat_penalty=1.0,
-            )
-            elapsed_ms = (time.perf_counter() - t0) * 1000
+    def _build_generation_prompt(self, user_request: str) -> str:
+        """Ask the VLM to write a text-to-image prompt from the user's request.
 
-            raw_output = result["choices"][0]["message"]["content"] or ""
-            logger.info(
-                f"[SCENE_EDIT] VLM raw (attempt {attempt}, {elapsed_ms:.0f}ms): {raw_output}"
-            )
-
-            try:
-                edit_prompt = self._parse_edit_instruction(raw_output)
-                logger.info(f"[SCENE_EDIT] Edit prompt: {edit_prompt}")
-                return edit_prompt
-            except ValueError as exc:
-                last_error = exc
-                logger.warning(
-                    f"[SCENE_EDIT] Tool call parse failed (attempt {attempt}/{VLM_MAX_RETRIES}): {exc}"
-                )
-
-        raise RuntimeError(
-            f"VLM failed to produce a valid tool call after {VLM_MAX_RETRIES} attempts: {last_error}"
-        )
+        Text-only (no image input). Sanitises content and produces a detailed
+        scene description suitable for image generation.
+        """
+        messages = [
+            {"role": "system", "content": VLM_GENERATE_SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": (
+                    f'The user wants to play: "{user_request}"\n\n'
+                    "Write a detailed text-to-image prompt describing this scene "
+                    "from a first-person perspective. "
+                    "Submit it using the submit_edit_instruction tool."
+                ),
+            },
+        ]
+        return self._run_vlm(messages, "GENERATE_SCENE", GENERATE_SCENE_SAFETY_MESSAGE_ID)
 
     async def inpaint(
         self,
@@ -342,6 +421,50 @@ class InpaintingManager:
             .contiguous()
         )
         return result_tensor, edit_prompt
+
+    def _generate_scene_sync(
+        self,
+        prompt: str,
+        seed_target_size: tuple[int, int],
+    ) -> torch.Tensor:
+        """Generate a new scene from a text prompt using a blank canvas as the
+        reference image.  The VLM sanitises / refines the prompt (text-only,
+        no image input), then Klein produces the image.
+
+        Returns:
+            Generated frame as a uint8 CUDA tensor (HxWx3).
+        """
+        h, w = seed_target_size
+
+        # Align to 16px boundaries for the transformer
+        target_w = w // 16 * 16
+        target_h = h // 16 * 16
+        blank = Image.new("RGB", (target_w, target_h), (255, 255, 255))
+
+        # VLM sanitises and refines the user prompt (text-only, no image)
+        generation_prompt = self._build_generation_prompt(prompt)
+
+        # Run Klein with the blank canvas and refined prompt
+        t0 = time.perf_counter()
+        result = self.pipeline(
+            image=blank,
+            prompt=generation_prompt,
+            num_inference_steps=EDIT_NUM_STEPS,
+            height=target_h,
+            width=target_w,
+        ).images[0]
+        logger.info(
+            f"[GENERATE_SCENE] Generation took {(time.perf_counter() - t0) * 1000:.0f}ms"
+        )
+
+        # Resize to seed target size and convert to tensor
+        result = result.resize((w, h), Image.LANCZOS)
+        result_tensor = (
+            torch.from_numpy(np.array(result))
+            .to(dtype=torch.uint8, device="cuda")
+            .contiguous()
+        )
+        return result_tensor
 
     def unload(self):
         """Free GPU memory used by both models."""
