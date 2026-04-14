@@ -29,6 +29,7 @@ const ja = {
         hideLogs: 'ログを隠す',
         abort: '中止',
         aborting: '中止中...',
+        copy: 'コピー',
         pasteImageFromClipboard: 'クリップボードから画像を貼り付け',
         browseForImageFile: '画像ファイルを選択'
       },
@@ -238,7 +239,11 @@ const ja = {
           frameTimelineDescription: 'スロットごとのタイミングを含むフレーム補間パイプラインを表示します。',
           actionLogging: 'アクションログ',
           actionLoggingDescription:
-            'リプレイ用に全入力をサーバー上のファイルに記録します。OSの一時ディレクトリに書き込まれます。'
+            'リプレイ用に全入力をサーバー上のファイルに記録します。OSの一時ディレクトリに書き込まれます。',
+          copyDiagnostics: '診断情報',
+          copyDiagnosticsDescription: 'バグ報告用の診断情報をクリップボードにコピーします。',
+          diagnosticsCopied: 'クリップボードにコピーしました',
+          diagnosticsCopyFailed: 'コピーに失敗しました'
         },
         credits: {
           title: 'クレジット'

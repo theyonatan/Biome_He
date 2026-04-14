@@ -29,6 +29,7 @@ const zh = {
         hideLogs: '隐藏日志',
         abort: '中止',
         aborting: '正在中止...',
+        copy: '复制',
         pasteImageFromClipboard: '从剪贴板粘贴图片',
         browseForImageFile: '浏览图片文件'
       },
@@ -230,7 +231,11 @@ const zh = {
           frameTimeline: '帧时间线',
           frameTimelineDescription: '显示帧插值管线及每个槽位的计时。',
           actionLogging: '操作日志',
-          actionLoggingDescription: '将所有输入记录到服务器上的文件以供回放。写入操作系统的临时目录。'
+          actionLoggingDescription: '将所有输入记录到服务器上的文件以供回放。写入操作系统的临时目录。',
+          copyDiagnostics: '诊断信息',
+          copyDiagnosticsDescription: '将诊断信息复制到剪贴板，用于错误报告。',
+          diagnosticsCopied: '已复制到剪贴板',
+          diagnosticsCopyFailed: '复制失败'
         },
         credits: {
           title: '鸣谢'

@@ -29,6 +29,7 @@ const goose = {
         hideLogs: 'Hide honks',
         abort: 'Flee!',
         aborting: 'Fleeing...',
+        copy: 'Honk',
         pasteImageFromClipboard: 'Peck image from clipboard',
         browseForImageFile: 'Forage for image file'
       },
@@ -241,7 +242,11 @@ const goose = {
           frameTimelineDescription: 'Show the feather interpolation pipeline with per-egg timing.',
           actionLogging: 'Migration log',
           actionLoggingDescription:
-            "Record all pecks and waddles to a file on the pond server for replay. Honked to the OS's temp nest."
+            "Record all pecks and waddles to a file on the pond server for replay. Honked to the OS's temp nest.",
+          copyDiagnostics: 'Honknostics',
+          copyDiagnosticsDescription: 'Copy honknostic information to the clipboard for flock reports.',
+          diagnosticsCopied: 'Honked to clipboard',
+          diagnosticsCopyFailed: 'Honk failed'
         },
         credits: {
           title: 'The flock'

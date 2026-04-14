@@ -29,6 +29,7 @@ const en = {
         hideLogs: 'Hide Logs',
         abort: 'Abort',
         aborting: 'Aborting...',
+        copy: 'Copy',
         pasteImageFromClipboard: 'Paste image from clipboard',
         browseForImageFile: 'Browse for image file'
       },
@@ -239,7 +240,11 @@ const en = {
           frameTimelineDescription: 'Show the frame interpolation pipeline with per-slot timing.',
           actionLogging: 'Action Logging',
           actionLoggingDescription:
-            "Record all inputs to a file on the server for replay. Written to the OS's temp directory."
+            "Record all inputs to a file on the server for replay. Written to the OS's temp directory.",
+          copyDiagnostics: 'Diagnostics',
+          copyDiagnosticsDescription: 'Copy diagnostic information to the clipboard for bug reports.',
+          diagnosticsCopied: 'Copied to clipboard',
+          diagnosticsCopyFailed: 'Failed to copy'
         },
         credits: {
           title: 'Credits'

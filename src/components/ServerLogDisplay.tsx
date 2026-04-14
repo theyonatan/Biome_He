@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { TranslatableError, type TranslationKey } from '../i18n'
+import type { DiagnosticsPayload } from '../types/ipc'
 import Button from './ui/Button'
 
 const MAX_ERROR_MESSAGE_CHARS = 220
@@ -57,7 +58,7 @@ const ServerLogDisplay = ({
   headerAction?: ReactNode
   logs?: string[]
   title?: TranslationKey | null
-  buildDiagnosticsPayload: () => Promise<Record<string, unknown>>
+  buildDiagnosticsPayload: () => Promise<DiagnosticsPayload>
   showExportAction?: boolean
   onExportAction?: () => void
   isExportingAction?: boolean
@@ -132,9 +133,9 @@ const ServerLogDisplay = ({
       const firstLine =
         (errorMessage || progressMessage || runtimeErrorLabel).split('\n')[0]?.trim() || runtimeErrorLabel
       const issueTitle = `[Auto Bug Report] ${firstLine.slice(0, 76)}`
-      const runtime = payload.runtime as Record<string, unknown> | undefined
-      const appVersion = String(runtime?.app_version ?? 'unknown')
-      const platform = String(runtime?.platform ?? 'unknown')
+      const appVersion = payload.app.version
+      const platform = payload.client.os
+      const gpuName = payload.server?.gpu ?? 'unknown'
       const recentLogsRaw = logs.slice(-MAX_GITHUB_LOG_LINES).join('\n')
       const recentLogsTrimmed =
         recentLogsRaw.length > MAX_GITHUB_LOG_CHARS
@@ -148,6 +149,7 @@ const ServerLogDisplay = ({
         `## ${t('app.loading.terminal.environment')}`,
         `- ${t('app.loading.terminal.appVersion')}: ${appVersion}`,
         `- ${t('app.loading.terminal.platform')}: ${platform}`,
+        `- GPU: ${gpuName}`,
         '',
         `## ${t('app.loading.terminal.reproductionSteps')}`,
         '1. ',

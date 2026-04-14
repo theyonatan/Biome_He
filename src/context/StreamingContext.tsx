@@ -84,7 +84,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     frameGenMsRef,
     frameTemporalCompressionRef,
     frameIdRef,
-    serverMetrics,
+    connection,
     inputLatency,
     logs: wsLogs,
     allLogs: wsAllLogs,
@@ -93,7 +93,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     sendControl,
     sendPause,
     sendInit,
-    setInitMetrics,
+    applyInitResponse,
     setPlaceholderFrame,
     reset,
     request: wsRequest,
@@ -244,7 +244,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
       }
 
       // Set lastAppliedModel before await to prevent the lifecycle machine from
-      // seeing a model mismatch during the re-render triggered by setInitMetrics.
+      // seeing a model mismatch during the re-render triggered by applyInitResponse.
       const quant = settings.engine_quant ?? 'none'
       lastAppliedModelRef.current = settings.experimental?.scene_edit_enabled
         ? `${selectedModel}+scene_edit+${quant}`
@@ -259,7 +259,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
         quant: quant !== 'none' ? quant : null,
         cap_inference_fps: settings.cap_inference_fps ?? true
       })
-      setInitMetrics(metrics)
+      applyInitResponse(metrics)
     }
 
     bootstrap().catch((err) => log.error('Bootstrap failed:', err))
@@ -273,7 +273,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     settings.experimental?.scene_edit_enabled,
     settings.debug_overlays?.action_logging,
     sendInit,
-    setInitMetrics,
+    applyInitResponse,
     setPlaceholderFrame
   ])
 
@@ -732,9 +732,9 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
       if (!result) return
       lastSeedRef.current = { filename, imageData: result.base64 }
       const metrics = await sendInit({ seed_image_data: result.base64, seed_filename: filename })
-      setInitMetrics(metrics)
+      applyInitResponse(metrics)
     },
-    [sendInit, setInitMetrics]
+    [sendInit, applyInitResponse]
   )
 
   const value: StreamingContextValue = {
@@ -770,7 +770,7 @@ export const StreamingProvider = ({ children }: { children: ReactNode }) => {
     },
     showStats,
     setShowStats,
-    serverMetrics,
+    connection,
     inputLatency,
     performanceStatsOverlay: settings.debug_overlays.performance_stats,
     inputOverlay: settings.debug_overlays.input,

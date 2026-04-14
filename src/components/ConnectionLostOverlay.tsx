@@ -1,19 +1,46 @@
+import { useState, useCallback } from 'react'
 import { invoke } from '../bridge'
+import { buildDiagnosticsPayload } from '../lib/diagnosticsPayload'
 import { useStreaming } from '../context/StreamingContext'
+import { useSettings } from '../hooks/useSettings'
 import Button from './ui/Button'
 import { useTranslation } from 'react-i18next'
+import { SETTINGS_MUTED_TEXT } from '../styles'
 
 const ConnectionLostOverlay = () => {
   const { t } = useTranslation()
-  const { connectionLost, reconnectAfterConnectionLost } = useStreaming()
+  const { connectionLost, reconnectAfterConnectionLost, connection, wsAllLogs } = useStreaming()
+  const { settings, isServerMode } = useSettings()
+  const [copyStatus, setCopyStatus] = useState<string | null>(null)
 
   const handleReconnect = () => {
+    setCopyStatus(null)
     void reconnectAfterConnectionLost()
   }
 
   const handleQuit = () => {
     void invoke('quit-app')
   }
+
+  const handleCopyReport = useCallback(async () => {
+    setCopyStatus(null)
+    try {
+      const payload = await buildDiagnosticsPayload({
+        connection,
+        error: { message: t('app.dialogs.connectionLost.title'), connection_state: 'disconnected' },
+        logs: wsAllLogs,
+        session: {
+          engineMode: isServerMode ? 'server' : 'standalone',
+          requestedModel: settings.engine_model ?? null,
+          requestedQuant: settings.engine_quant ?? null
+        }
+      })
+      await navigator.clipboard.writeText(JSON.stringify(payload, null, 2))
+      setCopyStatus(t('app.settings.debugMetrics.diagnosticsCopied'))
+    } catch {
+      setCopyStatus(t('app.settings.debugMetrics.diagnosticsCopyFailed'))
+    }
+  }, [connection, wsAllLogs, isServerMode, settings.engine_model, settings.engine_quant, t])
 
   return (
     <div
@@ -45,21 +72,31 @@ const ConnectionLostOverlay = () => {
             {t('app.dialogs.connectionLost.description')}
           </p>
         </div>
-        <div className="flex justify-end gap-[1.5cqh] w-full">
-          <Button
-            variant="danger"
-            autoShrinkLabel
-            label="app.buttons.quit"
-            className="p-[0.5cqh_1.78cqh] text-[2.49cqh]"
-            onClick={handleQuit}
-          />
-          <Button
-            variant="primary"
-            autoShrinkLabel
-            label="app.buttons.reconnect"
-            className="p-[0.5cqh_1.78cqh] text-[2.49cqh]"
-            onClick={handleReconnect}
-          />
+        <div className="flex flex-col items-center gap-[1.5cqh] w-full">
+          <div className="flex gap-[1.5cqh] w-full">
+            <Button
+              variant="secondary"
+              autoShrinkLabel
+              label="app.buttons.copyReport"
+              className="flex-1 p-[0.5cqh_1.78cqh] text-[2.49cqh]"
+              onClick={() => void handleCopyReport()}
+            />
+            <Button
+              variant="primary"
+              autoShrinkLabel
+              label="app.buttons.reconnect"
+              className="flex-1 p-[0.5cqh_1.78cqh] text-[2.49cqh]"
+              onClick={handleReconnect}
+            />
+            <Button
+              variant="danger"
+              autoShrinkLabel
+              label="app.buttons.quit"
+              className="flex-1 p-[0.5cqh_1.78cqh] text-[2.49cqh]"
+              onClick={handleQuit}
+            />
+          </div>
+          {copyStatus && <span className={`font-serif text-[2cqh] ${SETTINGS_MUTED_TEXT}`}>{copyStatus}</span>}
         </div>
       </div>
     </div>

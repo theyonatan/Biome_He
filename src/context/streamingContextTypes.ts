@@ -1,7 +1,7 @@
 import type { EngineStatus } from '../types/app'
 import type { StageId } from '../stages'
 import type { TranslatableError } from '../i18n'
-import type { ServerMetrics } from '../hooks/useWebSocket'
+import type { ServerConnection } from '../hooks/useWebSocket'
 import type { SceneEditState, SceneEditEvent } from './sceneEditMachine'
 
 export type StreamingStats = {
@@ -37,7 +37,7 @@ export type StreamingContextValue = {
   showStats: boolean
   setShowStats: (value: boolean) => void
   stats: StreamingStats
-  serverMetrics: ServerMetrics | null
+  connection: ServerConnection
   inputLatency: number | null
   performanceStatsOverlay: boolean
   inputOverlay: boolean
